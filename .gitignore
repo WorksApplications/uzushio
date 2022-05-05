@@ -1,0 +1,5 @@
+# sbt
+target/
+
+# metal
+.metals/
