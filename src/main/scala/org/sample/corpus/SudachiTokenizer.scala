@@ -1,19 +1,14 @@
 package org.sample.corpus
 
 import collection.JavaConverters._
+import com.worksap.nlp.sudachi.{DictionaryFactory, Tokenizer}
 
-import org.apache.spark.sql.{SparkSession, DataFrame, Dataset}
-import org.apache.spark.sql.{Row}
-import org.apache.spark.sql.types.{
-  ArrayType,
-  StringType,
-  StructType,
-  StructField
-}
+import org.apache.spark.sql.{SparkSession, DataFrame, Dataset, Row}
+import org.apache.spark.sql.types._
 import org.apache.spark.ml.{Transformer}
-import org.apache.spark.ml.util.{Identifiable}
 import org.apache.spark.ml.param.{Param, ParamMap}
 import org.apache.spark.ml.param.shared.{HasInputCol, HasOutputCol}
+import org.apache.spark.ml.util.{Identifiable}
 
 class SudachiTokenizer(override val uid: String)
     extends Transformer
@@ -58,13 +53,28 @@ class SudachiTokenizer(override val uid: String)
     StructType(outputFields)
   }
 
+  def parseSplitMode(mode: String): Tokenizer.SplitMode = {
+    // Parse sudachi SplitMode from a string.
+    mode.capitalize match {
+      case "A" => Tokenizer.SplitMode.A
+      case "B" => Tokenizer.SplitMode.B
+      case _   => Tokenizer.SplitMode.C
+    }
+  }
+
+  def setupSudachiTokenizer(): Tokenizer = {
+    // create sudachi Tokenizer instance
+    // system_core.dict must be in cwd.
+    new DictionaryFactory().create().create()
+  }
+
   override def transform(dataset: Dataset[_]): DataFrame = {
     val outputSchema = transformSchema(dataset.schema)
 
-    val mode = Sudachi.parseSplitMode($(splitMode))
+    val mode = parseSplitMode($(splitMode))
     val tokenized = dataset.toDF.rdd
       .mapPartitions(iter => {
-        val tok = Sudachi.setupSudachiTokenizer()
+        val tok = setupSudachiTokenizer()
 
         iter.map(row => {
           val tokens = row

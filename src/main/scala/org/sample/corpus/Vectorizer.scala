@@ -3,35 +3,31 @@ package org.sample.corpus
 import java.nio.file.{Path, Paths}
 import org.rogach.scallop.ScallopConf
 
-import org.apache.spark.sql.{SparkSession, Dataset, DataFrame}
+import org.apache.spark.sql.{SparkSession, DataFrame}
 import org.apache.spark.sql.functions.{expr}
 import org.apache.spark.ml.{Pipeline}
 import org.apache.spark.ml.feature.{HashingTF, IDF}
-import org.apache.spark.ml.linalg.{Vector, Vectors}
+import org.apache.spark.ml.linalg.{Vector}
 
-object TfIdfVectorizer {
+object Vectorizer {
   val featureCol = "feature"
 
   private class Conf(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[Path]](required = true)
     val output = opt[Path](default = Some(Paths.get("./out")))
 
-    val numTfFeature = opt[Int](default = Some(1000))
     val mode = opt[String](default = Some("c"))
+    val numTfFeature = opt[Int](default = Some(1000))
     verify()
   }
 
   def run(spark: SparkSession, conf: Conf): Unit = {
     val indexedDoc = DocumentIO.loadIndexedDocuments(spark, conf.input())
 
-    val featureColName = "idf"
-    val pipeline = setupPipeline(
+    val pipeline = setupTfIdfPipeline(
       conf.mode(),
-      nTfFeature = conf.numTfFeature(),
-      DocumentIO.docCol,
-      featureColName
+      nTfFeature = conf.numTfFeature()
     )
-
     val model = pipeline.fit(indexedDoc)
     // sudachiTokenizer transformer is not writable now
     // model.write.overwrite().save(conf.output().toString + "/model")
@@ -39,19 +35,17 @@ object TfIdfVectorizer {
     val processed = model.transform(indexedDoc)
 
     saveFeatureVector(
-      spark,
       processed,
-      DocumentIO.idxCol,
-      featureColName,
-      conf.output()
+      conf.output(),
+      idxColName = DocumentIO.idxCol
     )
   }
 
-  def setupPipeline(
+  def setupTfIdfPipeline(
       mode: String = "C",
       nTfFeature: Int = 1000,
-      inputCol: String = "document",
-      outputCol: String = "idf"
+      inputCol: String = DocumentIO.docCol,
+      outputCol: String = featureCol
   ) = {
     val tokenizer =
       new SudachiTokenizer()
@@ -69,11 +63,10 @@ object TfIdfVectorizer {
   }
 
   def saveFeatureVector(
-      spark: SparkSession,
       dataframe: DataFrame,
-      idxColName: String,
-      featureColName: String,
       output: Path,
+      idxColName: String = DocumentIO.idxCol,
+      featureColName: String = featureCol,
       format: String = "parquet"
   ): Unit = {
     val data = dataframe

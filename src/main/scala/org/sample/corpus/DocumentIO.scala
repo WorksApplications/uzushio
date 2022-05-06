@@ -3,7 +3,7 @@ package org.sample.corpus
 import java.nio.file.{Path, Paths}
 import org.rogach.scallop.ScallopConf
 
-import org.apache.spark.sql.{SparkSession, Dataset, DataFrame}
+import org.apache.spark.sql.{SparkSession, DataFrame}
 import org.apache.spark.sql.functions.{expr, monotonically_increasing_id}
 
 object DocumentIO {
@@ -21,7 +21,7 @@ object DocumentIO {
   def run(spark: SparkSession, conf: Conf): Unit = {
     val docs = loadRawDocuments(spark, conf.input())
     val docWithIdx = addIndex(docs)
-    saveIndexedDocuments(spark, docWithIdx, idxCol, docCol, conf.output())
+    saveIndexedDocuments(docWithIdx, conf.output())
   }
 
   def main(args: Array[String]): Unit = {
@@ -33,7 +33,7 @@ object DocumentIO {
   }
 
   def addIndex(
-      dataframe: Dataset[_],
+      dataframe: DataFrame,
       idxColName: String = idxCol
   ): DataFrame = {
     // add index column
@@ -41,54 +41,47 @@ object DocumentIO {
   }
 
   def formatPathList(paths: Seq[Path]): Seq[Path] = {
+    // align list to fix the order of file load (todo: check if necessary)
     paths.distinct.sorted
   }
 
   def saveRawDocuments(
-      spark: SparkSession,
-      documents: Dataset[String],
+      documents: DataFrame,
       output: Path,
+      docCol: String = docCol,
       sep: String = "\n\n\n"
   ): Unit = {
-    documents.write.option("lineSep", sep).text(output.toString)
+    documents.select(docCol).write.option("lineSep", sep).text(output.toString)
   }
 
   def loadRawDocuments(
       spark: SparkSession,
       input: Seq[Path],
       sep: String = "\n\n\n"
-  ): Dataset[String] = {
+  ): DataFrame = {
     // load document data.
     //
     // Assumes each input file contains multiple documents,
     // and they are separated by `sep` (by default two empty lines).
-    import spark.implicits._
-
     val paths = formatPathList(input).map(_.toString)
     spark.read
       .option("lineSep", sep)
-      .textFile(paths: _*)
-      .filter(_.trim != "")
+      .text(paths: _*)
+      .filter(r => r.getAs[String](0).trim != "")
       .select(expr(s"value as ${docCol}"))
-      .as[String]
   }
 
   def saveIndexedDocuments(
-      spark: SparkSession,
       dataframe: DataFrame,
-      idxColName: String,
-      docColName: String,
       output: Path,
+      idxColName: String = idxCol,
+      docColName: String = docCol,
       format: String = "parquet"
   ): Unit = {
-    import spark.implicits._
-
-    val data = dataframe
-      .select(
-        expr(s"${idxColName} as ${idxCol}"),
-        expr(s"${docColName} as ${docCol}")
-      )
-      .as[(Long, String)]
+    val data = dataframe.select(
+      expr(s"${idxColName} as ${idxCol}"),
+      expr(s"${docColName} as ${docCol}")
+    )
 
     data.write.format(format).save(output.toString)
   }
@@ -97,11 +90,9 @@ object DocumentIO {
       spark: SparkSession,
       input: Seq[Path],
       format: String = "parquet"
-  ): Dataset[(Long, String)] = {
+  ): DataFrame = {
     // Assume the schema of files is same to `saveIndexedDocuments` output
-    import spark.implicits._
-
     val paths = formatPathList(input).map(_.toString)
-    spark.read.format(format).load(paths: _*).as[(Long, String)]
+    spark.read.format(format).load(paths: _*)
   }
 }
