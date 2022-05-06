@@ -3,9 +3,12 @@ package org.sample.corpus
 import java.nio.file.{Path, Paths}
 import org.rogach.scallop.ScallopConf
 
-import org.apache.spark.sql.{SparkSession, Dataset, DataFrame}
+import org.apache.spark.sql.{SparkSession, Dataset, DataFrame, Row}
 import org.apache.spark.sql.functions._
-import org.apache.spark.ml.feature.BucketedRandomProjectionLSH
+import org.apache.spark.ml.feature.{
+  BucketedRandomProjectionLSH,
+  BucketedRandomProjectionLSHModel
+}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 
 object SimilaritySelector {
@@ -18,7 +21,7 @@ object SimilaritySelector {
     val bucketLength = opt[Double](default = Some(2))
     val numTables = opt[Int](default = Some(3))
 
-    val numSamples = opt[Int](default = Some(20))
+    val numSamples = opt[Int](default = Some(3))
     verify()
   }
 
@@ -30,7 +33,7 @@ object SimilaritySelector {
     val corpus = DocumentIO
       .loadIndexedDocuments(spark, conf.corpusDoc())
       .join(featureVecs, DocumentIO.idxCol)
-    val seed = DocumentIO
+    val seeds = DocumentIO
       .loadIndexedDocuments(spark, conf.seedDoc())
       .join(featureVecs, DocumentIO.idxCol)
 
@@ -46,8 +49,8 @@ object SimilaritySelector {
       .setOutputCol(outCol)
     val model = brp.fit(corpus)
 
-    val key = avgNorm(seed)
-    val selected = model.approxNearestNeighbors(corpus, key, conf.numSamples())
+    // val selected = knnFromSeedSet(model, corpus, seeds, conf.numSamples())
+    val selected = knnFromEachSeeds(model, corpus, seeds, conf.numSamples())
 
     DocumentIO.saveRawDocuments(
       spark,
@@ -56,18 +59,50 @@ object SimilaritySelector {
     )
   }
 
-  def avgNorm(
-      seed: DataFrame,
+  def knnFromSeedSet(
+      model: BucketedRandomProjectionLSHModel,
+      corpus: DataFrame,
+      seeds: DataFrame,
+      numSamples: Int,
       featureCol: String = TfIdfVectorizer.featureCol
-  ): Vector = {
+  ): DataFrame = {
+    // select doc based on the similarity to whole seed set
+
     // avg cossim with seeds equals to cossim with avg of normalized seeds
-    VecOps.div(
-      seed.rdd
+    val avgSeedNorm = VecOps.div(
+      seeds.rdd
         .map(r => VecOps.normalize(r.getAs[Vector](featureCol)))
         .reduce((a, b) => VecOps.add(a, b))
         .compressed,
-      seed.count
+      seeds.count
     )
+
+    model.approxNearestNeighbors(corpus, avgSeedNorm, numSamples).toDF
+  }
+
+  def knnFromEachSeeds(
+      model: BucketedRandomProjectionLSHModel,
+      corpus: DataFrame,
+      seeds: DataFrame,
+      numSamples: Int,
+      featureCol: String = TfIdfVectorizer.featureCol
+  ): DataFrame = {
+    // select doc based on the similarity to each seed and concat them
+    // todo: should use spark functionality to speed up
+    seeds
+      .select(featureCol)
+      .collect()
+      .map(row =>
+        model
+          .approxNearestNeighbors(
+            corpus,
+            row.getAs[Vector](featureCol),
+            numSamples
+          )
+          .toDF
+      )
+      .reduce((df1, df2) => df1.union(df2))
+      .distinct
   }
 
   def main(args: Array[String]): Unit = {
