@@ -20,11 +20,7 @@ object DocumentIO {
 
   def run(spark: SparkSession, conf: Conf): Unit = {
     val docs = loadRawDocuments(spark, conf.input())
-    docs.printSchema()
-
-    val docWithIdx = docs.withColumn(idxCol, monotonically_increasing_id)
-    docWithIdx.printSchema()
-
+    val docWithIdx = addIndex(docs)
     saveIndexedDocuments(spark, docWithIdx, idxCol, docCol, conf.output())
   }
 
@@ -34,6 +30,14 @@ object DocumentIO {
 
     try { run(spark, conf) }
     finally { spark.stop() }
+  }
+
+  def addIndex(
+      dataframe: Dataset[_],
+      idxColName: String = idxCol
+  ): DataFrame = {
+    // add index column
+    dataframe.withColumn(idxColName, monotonically_increasing_id)
   }
 
   def formatPathList(paths: Seq[Path]): Seq[Path] = {
