@@ -10,6 +10,23 @@ import org.apache.spark.ml.param.{Param, ParamMap}
 import org.apache.spark.ml.param.shared.{HasInputCol, HasOutputCol}
 import org.apache.spark.ml.util.{Identifiable}
 
+object Sudachi {
+  def parseSplitMode(mode: String): Tokenizer.SplitMode = {
+    // Parse sudachi SplitMode from a string.
+    mode.capitalize match {
+      case "A" => Tokenizer.SplitMode.A
+      case "B" => Tokenizer.SplitMode.B
+      case _   => Tokenizer.SplitMode.C
+    }
+  }
+
+  def setupSudachiTokenizer(): Tokenizer = {
+    // create sudachi Tokenizer instance.
+    // system_core.dict must be in cwd.
+    new DictionaryFactory().create().create()
+  }
+}
+
 class SudachiTokenizer(override val uid: String)
     extends Transformer
     with HasInputCol
@@ -53,28 +70,13 @@ class SudachiTokenizer(override val uid: String)
     StructType(outputFields)
   }
 
-  def parseSplitMode(mode: String): Tokenizer.SplitMode = {
-    // Parse sudachi SplitMode from a string.
-    mode.capitalize match {
-      case "A" => Tokenizer.SplitMode.A
-      case "B" => Tokenizer.SplitMode.B
-      case _   => Tokenizer.SplitMode.C
-    }
-  }
-
-  def setupSudachiTokenizer(): Tokenizer = {
-    // create sudachi Tokenizer instance
-    // system_core.dict must be in cwd.
-    new DictionaryFactory().create().create()
-  }
-
   override def transform(dataset: Dataset[_]): DataFrame = {
     val outputSchema = transformSchema(dataset.schema)
 
-    val mode = parseSplitMode($(splitMode))
+    val mode = Sudachi.parseSplitMode($(splitMode))
     val tokenized = dataset.toDF.rdd
       .mapPartitions(iter => {
-        val tok = setupSudachiTokenizer()
+        val tok = Sudachi.setupSudachiTokenizer()
 
         iter.map(row => {
           val tokens = row
