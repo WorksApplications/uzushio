@@ -13,7 +13,7 @@ object CorpusCleaner {
     val input = opt[List[Path]](required = true)
     val output = opt[Path](default = Some(Paths.get("./out")))
 
-    val ngword = opt[Path]()
+    val ngwords = opt[Path]()
     verify()
   }
 
@@ -24,13 +24,18 @@ object CorpusCleaner {
     val data = raw.as[String].map(docStr => docStr.split("\n").toSeq)
 
     val normaliser = setupFullNormalizer()
-    val filter = setupFullFilter(conf.ngword.toOption)
+    val filter = setupFullFilter(conf.ngwords.toOption)
 
     val cleansed = filter
       .filter(normaliser.normalize(data))
       .map(doc => doc.mkString("\n"))
       .toDF
-    DocumentIO.saveRawDocuments(cleansed, conf.output())
+
+    DocumentIO.saveRawDocuments(
+      cleansed,
+      conf.output(),
+      docCol = cleansed.columns(0)
+    )
   }
 
   def setupFullNormalizer(): Normalizer = {

@@ -10,7 +10,7 @@ import org.apache.spark.sql.types._
 
 import org.sample.corpus.Sudachi
 
-abstract class Filter {
+abstract class Filter extends scala.Serializable {
   /* Filters documents in the dataset.
    *
    * Filtering can be per document, sentence, or word etc.
@@ -61,11 +61,14 @@ class NgWordFilter(ngwords: Set[String]) extends Filter {
   def filter(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
     import ds.sparkSession.implicits._
 
-    ds.mapPartitions(iter => {
-      // setup sudachi tokenizer per partition
-      val tok = Sudachi.setupSudachiTokenizer()
-      iter.filter(doc => !containsNgword(tok, doc))
-    })
+    if (ngwords.size == 0) { ds }
+    else {
+      ds.mapPartitions(iter => {
+        // setup sudachi tokenizer per partition
+        val tok = Sudachi.setupSudachiTokenizer()
+        iter.filter(doc => !containsNgword(tok, doc))
+      })
+    }
   }
 }
 
@@ -109,7 +112,7 @@ class ScriptFilter extends DocumentFilter {
   val curlyBracketsPattern = """[\{|\}]""".r
 
   def isFilteredSent(sent: String): Boolean = {
-    curlyBracketsPattern.findFirstIn(sent).nonEmpty
+    curlyBracketsPattern.findFirstIn(sent).isEmpty
   }
 
   override def isFiltered(doc: Seq[String]): Boolean = {
@@ -157,7 +160,7 @@ class EmailFilter extends SentenceFilter {
   val emailPattern = """[\w\d_-]+@[\w\d_-]+\.[\w\d._-]+""".r
 
   override def isFiltered(sent: String): Boolean = {
-    emailPattern.findFirstIn(sent).nonEmpty
+    emailPattern.findFirstIn(sent).isEmpty
   }
 }
 
@@ -166,7 +169,7 @@ class UrlFilter extends SentenceFilter {
   val urlPattern = """(https?|sftp?)://[\w/:%#\$&\?\(\)~\.=\+\-]+""".r
 
   override def isFiltered(sent: String): Boolean = {
-    urlPattern.findFirstIn(sent).nonEmpty
+    urlPattern.findFirstIn(sent).isEmpty
   }
 }
 

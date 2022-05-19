@@ -2,7 +2,7 @@ package org.sample.corpus.cleaning
 
 import org.apache.spark.sql.Dataset
 
-abstract class Normalizer {
+abstract class Normalizer extends scala.Serializable {
   /* Normalizes document in the dataset. */
   def normalize(ds: Dataset[Seq[String]]): Dataset[Seq[String]]
 }
