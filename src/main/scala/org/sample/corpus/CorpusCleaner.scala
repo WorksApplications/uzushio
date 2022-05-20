@@ -44,6 +44,7 @@ object CorpusCleaner {
         new SequenceSentenceNormalizer(
           Seq(
             new CitationNormalizer,
+            new CharacterNormalizer,
             new WhitespaceNormalizer
           )
         ),

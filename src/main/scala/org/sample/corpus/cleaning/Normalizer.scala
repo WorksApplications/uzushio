@@ -82,15 +82,25 @@ class SequenceSentenceNormalizer(normalizers: Seq[SentenceNormalizer])
   }
 }
 
-/* Removes non-printable characters and excess whitespaces. */
+/* Removes non-printable characters. */
+class CharacterNormalizer extends SentenceNormalizer {
+  /* Remove unicode general-category "Other" or "Separator" except ascii space,
+   * following python str.isprintable.
+   * We also keep surrogate code points (that are not in python).
+   */
+  val nonPrintablePattern = """[\p{gc=C}\p{gc=Z}&&[^ \p{gc=Cs}]]""".r
+
+  override def normalizeSentence(sent: String): String = {
+    nonPrintablePattern.replaceAllIn(sent, "")
+  }
+}
+
+/* Removes excess whitespaces. */
 class WhitespaceNormalizer extends SentenceNormalizer {
-  // todo: this may not be a good way to rm non-printable chars.
-  val nonPrintablePattern = """\p{C}""".r
   val continuousWhitespacePattern = """\s+""".r
 
   override def normalizeSentence(sent: String): String = {
-    val rmNP = nonPrintablePattern.replaceAllIn(sent, "")
-    continuousWhitespacePattern.replaceAllIn(rmNP, " ")
+    continuousWhitespacePattern.replaceAllIn(sent, " ")
   }
 }
 
