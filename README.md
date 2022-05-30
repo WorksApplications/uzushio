@@ -8,6 +8,8 @@ Apach Spark (scala) ベース
 
 コンパイル及び実行のために apach spark と scala のインストールが必要
 
+また内部で sudachi を使用するため、辞書ファイル(.dict)を root に配置する必要がある
+
 ## spark
 
 https://spark.apache.org/downloads.html
@@ -26,6 +28,11 @@ https://www.scala-sbt.org/download.html
 
 spark が参照している scala バージョンに合わせること
 
+## sudachi
+
+sudachi 辞書ファイルをダウンロードしルートに配置する
+todo: 位置の path による指定
+
 ## other
 
 別途 Java が必要？
@@ -42,9 +49,9 @@ root (`build.sbt`のあるディレクトリ) にて `sbt assembly` でコンパ
 
 - 開発段階などでコンパイルを繰り返すなら `sbt` で sbt-shell を起動しておいた方が速い
 - `sbt compile` ではなく `sbt assembly`を使う
-    - spark に投げる用に必要ライブラリ等もまとめてバンドルする
-        - なお spark は除外する必要あり
-    - `./project/plugins.sbt` にてコマンド追加している
+  - spark に投げる用に必要ライブラリ等もまとめてバンドルする
+    - なお spark は除外する必要あり
+  - `./project/plugins.sbt` にてコマンド追加している
 
 ## submit
 
@@ -122,8 +129,8 @@ CorpusSelector の各段階について個別で実行できるようにして�
 詳細は各.scala ファイルを参照のこと（Conf class にて cli 設定を行っている）
 
 - DocumentIO
-    - 後段の処理のため生コーパスの各文書に id を振る / 取り除く
+  - 後段の処理のため生コーパスの各文書に id を振る / 取り除く
 - Vectorizer
-    - 各文書の特徴量化を行う
+  - 各文書の特徴量化を行う
 - SimilaritySelector
-    - 特徴量の類似度による選別を行う
+  - 特徴量の類似度による選別を行う
