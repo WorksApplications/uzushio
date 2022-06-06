@@ -1,41 +1,55 @@
 # Corpus cleaning
 
-大規模コーパス (e.g. Wikipedia, NWJC, etc.) の整形を目的としたツール
+大規模コーパス (e.g. Wikipedia, NWJC, etc.) の整形のためのツール
 
 Apach Spark (scala) ベース
 
+## Goal of this project
+
+It is known that ML model training with clean corpus is efficient / achieve high performance [].
+There are many many corpus cleaning methods, and suitable sets of them for each nlp tasks.
+
+In this repository, we try to:
+
+- provide a common corpus cleaning tool
+  - reduce the re-implementation cost
+  - share same implemantation for the compatibility
+- keep it efficient (high-speed), flexible and updated
+  - it should be able to used in every kind of nlp projects
+
+## ref
+
+- [chiTra の前処理について](https://docs.google.com/document/d/1colWQgSc22rzLHKdCH78BgtRLydGMZX-D-FAT6rD8iY/edit#heading=h.msy5fu9l7egn)
+  - preprocess in chitra pretraining
+- [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499)
+
 # setup
 
-コンパイル及び実行のために apach spark と scala のインストールが必要
+You need to install apach-spark, scala (sbt), and sudachi dictionary file.
 
-また内部で sudachi を使用するため、辞書ファイル(.dict)を root に配置する必要がある
+## apach spark
 
-## spark
+[download](https://spark.apache.org/downloads.html).
 
-https://spark.apache.org/downloads.html
+The version should be: `spark 3.2.1` + `Scala 2.12.15`.
 
-適宜インストールしパスを通す
-
-`spark-submit --version` が動けば OK
-
-`spark 3.2.1` + `Scala 2.12.15` で動作確認している
+check if `spark-submit --version` works.
 
 ## scala (sbt)
 
-https://www.scala-sbt.org/download.html
+[download](https://www.scala-sbt.org/download.html).
 
-こちらも適宜インストールする
-
-spark が参照している scala バージョンに合わせること
+Note that you should use compatible version to the one used by spark.
 
 ## sudachi
 
-sudachi 辞書ファイルをダウンロードしルートに配置する
-todo: 位置の path による指定
+[download](http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict/) sudachi dictionary file (.dict) and place in the root dir.
+
+todo: specify dict by config/args
 
 ## other
 
-別途 Java が必要？
+You may also need a Java environment.
 
 # run
 
