@@ -13,7 +13,8 @@ object CorpusCleaner {
     val input = opt[List[Path]](required = true)
     val output = opt[Path](default = Some(Paths.get("./out")))
 
-    val ngwords = opt[Path]()
+    val ngwords =
+      opt[Path](default = Some(Paths.get("./resources/ng_words.txt")))
     verify()
   }
 
