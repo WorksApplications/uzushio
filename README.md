@@ -1,21 +1,21 @@
 # Corpus cleaning
 
-大規模コーパス (e.g. Wikipedia, NWJC, etc.) の整形のためのツール
+大規模日本語コーパス (e.g. Wikipedia, NWJC, etc.) の整形のためのツール
 
 Apach Spark (scala) ベース
 
 ## Goal of this project
 
-It is known that ML model training with clean corpus is efficient / achieve high performance [].
-There are many many corpus cleaning methods, and suitable sets of them for each nlp tasks.
+It is known that ML model training with clean corpus is important.
+There are many many cleaning methods, and each nlp tasks have suitable sets of them.
 
 In this repository, we try to:
 
 - provide a common corpus cleaning tool
-  - reduce the re-implementation cost
+  - reduce the implementation cost
   - share same implemantation for the compatibility
-- keep it efficient (high-speed), flexible and updated
-  - it should be able to used in every kind of nlp projects
+- keep it efficient, flexible and updated
+  - it should be able to used in every kind of nlp projects (which uses large corpus)
 
 ## ref
 
@@ -29,7 +29,7 @@ You need to install apach-spark, scala (sbt), and sudachi dictionary file.
 
 ## apach spark
 
-[download](https://spark.apache.org/downloads.html).
+[download](https://spark.apache.org/downloads.html) and set path.
 
 The version should be: `spark 3.2.1` + `Scala 2.12.15`.
 
@@ -37,9 +37,14 @@ check if `spark-submit --version` works.
 
 ## scala (sbt)
 
-[download](https://www.scala-sbt.org/download.html).
+[download](https://www.scala-sbt.org/download.html) and set path.
 
 Note that you should use compatible version to the one used by spark.
+
+### Java
+
+You may also need to setup Java environment.
+
 
 ## sudachi
 
@@ -47,15 +52,14 @@ Note that you should use compatible version to the one used by spark.
 
 todo: specify dict by config/args
 
-## other
 
-You may also need a Java environment.
+
 
 # run
 
 ## build
 
-root (`build.sbt`のあるディレクトリ) にて `sbt assembly` でコンパイル
+root (`build.sbt`のあるディレクトリ) にて `sbt assembly` でコンパイルする
 
 `./target/scala-[version]/` 以下に jar が生成される
 
@@ -63,9 +67,9 @@ root (`build.sbt`のあるディレクトリ) にて `sbt assembly` でコンパ
 
 - 開発段階などでコンパイルを繰り返すなら `sbt` で sbt-shell を起動しておいた方が速い
 - `sbt compile` ではなく `sbt assembly`を使う
-  - spark に投げる用に必要ライブラリ等もまとめてバンドルする
-    - なお spark は除外する必要あり
-  - `./project/plugins.sbt` にてコマンド追加している
+  - spark に投げる用に必要ライブラリ等もまとめてバンドルするため
+    - なお spark は除外する必要があり、`build.sbt`で設定している
+  - `./project/plugins.sbt` にて設定している
 
 ## submit
 
@@ -79,8 +83,9 @@ ex.
 
 ```
 spark-submit --class org.sample.corpus.CorpusCleaner \
-    ./target/scala-2.12/CorpusProcessing-assembly-0.1.jar \
-    --input=../data/*.txt --output=./out
+    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
+    --input=../data/*.txt --output=./out \
+    --ngwords ./resources/ng_words.txt
 ```
 
 spark 側の設定等は [`spark-submit` のヘルプ](https://spark.apache.org/docs/latest/submitting-applications.html)を参照
