@@ -29,6 +29,8 @@ object MinHashDeduplicator {
   }
 
   val featureCol = "feature"
+  val ccCol = "cc"
+  val didCol = DocumentIO.idxCol
   val distCol = "JaccardDistance"
 
   def run(spark: SparkSession, conf: Conf): Unit = {
@@ -62,33 +64,25 @@ object MinHashDeduplicator {
           conf.joinThr(),
           distCol
         )
-        .filter( // rm self join and dup pair
-          col(s"datasetA.${DocumentIO.idxCol}") < col(
-            s"datasetB.${DocumentIO.idxCol}"
-          )
-        )
+        // rm self join and dup pair
+        .filter(col(s"datasetA.${didCol}") < col(s"datasetB.${didCol}"))
 
     // construct graph and clc connected components
     val g = Graph.fromEdges(
       docPairs
-        .select(
-          expr(s"datasetA.${DocumentIO.idxCol} as did1"),
-          expr(s"datasetB.${DocumentIO.idxCol} as did2")
-        )
+        .select(expr(s"datasetA.${didCol}"), expr(s"datasetB.${didCol}"))
         .rdd
         .map(row => Edge(row.getLong(0), row.getLong(1), "e")),
       "g"
     )
-    val cc = g.connectedComponents().vertices.toDF(DocumentIO.idxCol, "cc")
+    val cc = g.connectedComponents().vertices.toDF(didCol, ccCol)
 
     // rm duplicated documents
-    val joined = documents.join(cc, Seq(DocumentIO.idxCol), "left")
-    val dedup = joined.filter(
-      (isnull(col("cc"))) || (col("cc") === col(DocumentIO.idxCol))
-    )
-    val dup = joined.filter(
-      (!isnull(col("cc"))) && (col("cc") !== col(DocumentIO.idxCol))
-    )
+    val joined = documents.join(cc, Seq(didCol), "left")
+    val dedup =
+      joined.filter((isnull(col(ccCol))) || (col(ccCol) === col(didCol)))
+    val dup =
+      joined.filter((!isnull(col(ccCol))) && (col(ccCol) !== col(didCol)))
 
     DocumentIO.saveRawDocuments(dedup, conf.output().resolve("dedup"))
     DocumentIO.saveRawDocuments(dup, conf.output().resolve("dup"))
