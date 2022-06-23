@@ -1,5 +1,8 @@
 # sbt
 target/
+.bloop/
+.bsp/
 
 # metal
 .metals/
+metals.sbt

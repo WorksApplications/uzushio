@@ -44,14 +44,18 @@ class NgWordFilter(ngwords: Set[String]) extends Filter {
       val (matches, forSize) = matchIter.duplicate
 
       if (forSize.size != 0) {
-        val morphmes = tok.tokenize(sent).asScala
-        val morphBegins = morphmes.map(_.begin()).toSet
-        val morphEnds = morphmes.map(_.end()).toSet
+        try {
+          val morphmes = tok.tokenize(sent).asScala
+          val morphBegins = morphmes.map(_.begin()).toSet
+          val morphEnds = morphmes.map(_.end()).toSet
 
-        for (m <- matches) {
-          if (morphBegins.contains(m.start) && morphEnds.contains(m.end)) {
-            return true
+          for (m <- matches) {
+            if (morphBegins.contains(m.start) && morphEnds.contains(m.end)) {
+              return true
+            }
           }
+        } catch {
+          case err: Exception => println(s"$sent")
         }
       }
     }

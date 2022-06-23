@@ -45,15 +45,11 @@ Note that you should use compatible version to the one used by spark.
 
 You may also need to setup Java environment.
 
-
 ## sudachi
 
 [download](http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict/) sudachi dictionary file (.dict) and place in the root dir.
 
 todo: specify dict by config/args
-
-
-
 
 # run
 
@@ -112,3 +108,31 @@ each file should be: "\n\n" splitted documents that consists of "\n" splitted se
 `--output`: spark output dir (default ./out). need to be empty (if exists).
 
 `--ngwords`: ng-word list (optional). new-line splitted ng-word list (see [chitra ngwords](https://github.com/WorksApplications/SudachiTra/blob/main/pretraining/bert/resources/ng_words.txt)).
+
+## MinHashDeduplicator
+
+類似文書を削除する。
+
+[Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499) における NearDup の再現だが以下の点で異なることに注意。
+
+- spark.ml の MinHashLSH は OR-amplification ([参考](https://en.wikipedia.org/wiki/Locality-sensitive_hashing#:~:text=%5Bhow%3F%5D-,Amplification,-%5Bedit%5D)) のみの実装のため、ハイパーパラメータ b/r の r のみしか設定できない
+- LSH 出力の類似ペア候補に対する exact edit similarity の計算及びフィルタを行っていない
+
+```
+spark-submit --class org.sample.corpus.CorpusCleaner \
+    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
+    --input=./data/nwjc/* --output=./out \
+    --mode C \
+    --ngram 5 \
+    --num-tables 100 \
+    --join-thr 0.1
+```
+
+### args
+
+- `--input`, `--output`: Same as CorpusCleaner.
+- `--save-stats`: Set to output a parquet with document and duplication idx column.
+- `--mode`: Sudachi split mode (A/B/C).
+- `--ngram`: n of n-gram, used to convert document to a set of n-grams.
+- `--num-tables`: Number of hash tables for LSH. The parameter `r` of the reference paper.
+- `--join-thr`: Threshold of document distance (0-1). Pairs with distance lower than this is kept.

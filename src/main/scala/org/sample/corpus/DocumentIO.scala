@@ -49,7 +49,7 @@ object DocumentIO {
       documents: DataFrame,
       output: Path,
       docCol: String = docCol,
-      sep: String = "\n\n\n"
+      sep: String = "\n\n"
   ): Unit = {
     documents.select(docCol).write.option("lineSep", sep).text(output.toString)
   }
@@ -57,7 +57,7 @@ object DocumentIO {
   def loadRawDocuments(
       spark: SparkSession,
       input: Seq[Path],
-      sep: String = "\n\n\n"
+      sep: String = "\n\n"
   ): DataFrame = {
     // load document data.
     //

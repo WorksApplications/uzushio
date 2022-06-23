@@ -104,7 +104,7 @@ class WhitespaceNormalizer extends SentenceNormalizer {
   }
 }
 
-/* Removes citation markers.*/
+/* Removes citation markers (from Wikipedia). */
 class CitationNormalizer extends SentenceNormalizer {
   val citationPattern =
     """\[\d+?\]|\[要.+?\]|\{\{+[^{}]+?\}\}+|\[(要出典|リンク切れ|.+?\?)\]""".r
