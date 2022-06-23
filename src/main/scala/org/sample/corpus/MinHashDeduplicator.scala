@@ -18,8 +18,8 @@ object MinHashDeduplicator {
 
     val mode = opt[String](default = Some("C"))
     val ngram = opt[Int](default = Some(5))
-    val numTables = opt[Int](default = Some(5))
-    val joinThr = opt[Double](default = Some(0.2))
+    val numTables = opt[Int](default = Some(100))
+    val joinThr = opt[Double](default = Some(0.1))
     verify()
   }
 
