@@ -90,24 +90,27 @@ spark 側の設定等は [`spark-submit` のヘルプ](https://spark.apache.org/
 
 ## CorpusCleaner
 
-入力コーパスを整形する
+入力コーパスを整形する。
 
-現状は [sudachitra での整形](https://github.com/WorksApplications/SudachiTra/tree/main/pretraining/bert#2-preprocessing-corpus-cleaning) と同等（のはず）
+現状は [sudachitra での整形](https://github.com/WorksApplications/SudachiTra/tree/main/pretraining/bert#2-preprocessing-corpus-cleaning) と同等（のはず）。
+(ref: [chiTra の前処理について](https://docs.google.com/document/d/1colWQgSc22rzLHKdCH78BgtRLydGMZX-D-FAT6rD8iY/edit#heading=h.msy5fu9l7egn))
 
-ref: [chiTra の前処理について](https://docs.google.com/document/d/1colWQgSc22rzLHKdCH78BgtRLydGMZX-D-FAT6rD8iY/edit#heading=h.msy5fu9l7egn)
+現在フィルタ/ノーマライザの設定は `CorpusCleaner.scala` を直接変更する必要がある。(todo: read from config file, or extend cli option)
 
-現在フィルタ/ノーマライザの設定は `CorpusCleaner.scala` を直接変更する必要がある
+```
+spark-submit --class org.sample.corpus.CorpusCleaner \
+    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
+    --input=../data/*.txt --output=./out \
+    --ngwords ./resources/ng_words.txt
+```
 
-todo: read from config file, or extend cli option
 
 ### args
 
-`--input`: input corpus. path to the file / dir (load all files in the dir). Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
+- `--input`: input corpus. path to the file / dir (load all files in the dir). Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
 each file should be: "\n\n" splitted documents that consists of "\n" splitted sentences.
-
-`--output`: spark output dir (default ./out). need to be empty (if exists).
-
-`--ngwords`: ng-word list (optional). new-line splitted ng-word list (see [chitra ngwords](https://github.com/WorksApplications/SudachiTra/blob/main/pretraining/bert/resources/ng_words.txt)).
+- `--output`: spark output dir (default ./out). need to be empty (if exists).
+- `--ngwords`: ng-word list (optional). new-line splitted ng-word list (see [chitra ngwords](https://github.com/WorksApplications/SudachiTra/blob/main/pretraining/bert/resources/ng_words.txt)).
 
 ## MinHashDeduplicator
 
@@ -119,7 +122,7 @@ each file should be: "\n\n" splitted documents that consists of "\n" splitted se
 - LSH 出力の類似ペア候補に対する exact edit similarity の計算及びフィルタを行っていない
 
 ```
-spark-submit --class org.sample.corpus.CorpusCleaner \
+spark-submit --class org.sample.corpus.MinHashDeduplicator \
     ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
     --input=./data/nwjc/* --output=./out \
     --mode C \
