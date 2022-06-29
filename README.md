@@ -104,11 +104,10 @@ spark-submit --class org.sample.corpus.CorpusCleaner \
     --ngwords ./resources/ng_words.txt
 ```
 
-
 ### args
 
 - `--input`: input corpus. path to the file / dir (load all files in the dir). Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
-each file should be: "\n\n" splitted documents that consists of "\n" splitted sentences.
+  each file should be: "\n\n" splitted documents that consists of "\n" splitted sentences.
 - `--output`: spark output dir (default ./out). need to be empty (if exists).
 - `--ngwords`: ng-word list (optional). new-line splitted ng-word list (see [chitra ngwords](https://github.com/WorksApplications/SudachiTra/blob/main/pretraining/bert/resources/ng_words.txt)).
 
@@ -116,26 +115,53 @@ each file should be: "\n\n" splitted documents that consists of "\n" splitted se
 
 類似文書を削除する。
 
+文書を set of ngram と見て、Jaccard distance に基づき類似文書をリストアップ、削除する。
+
 [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499) における NearDup の再現だが以下の点で異なることに注意。
 
-- spark.ml の MinHashLSH は OR-amplification ([参考](https://en.wikipedia.org/wiki/Locality-sensitive_hashing#:~:text=%5Bhow%3F%5D-,Amplification,-%5Bedit%5D)) のみの実装のため、ハイパーパラメータ b/r の r のみしか設定できない
 - LSH 出力の類似ペア候補に対する exact edit similarity の計算及びフィルタを行っていない
 
 ```
 spark-submit --class org.sample.corpus.MinHashDeduplicator \
     ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
     --input=./data/nwjc/* --output=./out \
+    --save-stats \
     --mode C \
     --ngram 5 \
-    --num-tables 100 \
-    --join-thr 0.1
+    --num-vocab 262144 \
+    --min-df 10.0 \
+    --minhash-b 5 \
+    --minhash-r 10 \
 ```
 
 ### args
 
-- `--input`, `--output`: Same as CorpusCleaner.
-- `--save-stats`: Set to output a parquet with document and duplication idx column.
-- `--mode`: Sudachi split mode (A/B/C).
-- `--ngram`: n of n-gram, used to convert document to a set of n-grams.
-- `--num-tables`: Number of hash tables for LSH. The parameter `r` of the reference paper.
-- `--join-thr`: Threshold of document distance (0-1). Pairs with distance lower than this is kept.
+- `--input`, `--output`: Input files and output directory. Same as CorpusCleaner.
+- `--save-stats`: Set to output a parquet with document and duplication group id column.
+- `--mode`: Sudachi split mode (A/B/C). (default C)
+- `--ngram`: n of n-gram, used to convert document to a set of n-grams. (default 5)
+- `--num-vocab`: How many ngrams to use as feature. (default 2\*\*18)
+- `--min-df`: Minimum document frequency. Uses ngrams that has higher df than this value. If < 1.0, consider it as ratio. (default 1.0)
+- `--minhash-b`: And-amplification value for minhash-lsh. (default 20)
+- `--minhash-r`: Or-amplification value for minhash-lsh. (default 450)
+
+#### preprocess
+
+As a preprocess, documents are converted into a set of ngrams.
+
+- Ngram is generated based on sudachi token (surface).
+- Only `--num-vocab` ngrams are used (selected based on the document frequency).
+- Only ngrams with a DF higher than `--min-df` are used.
+
+#### MinHashLSH
+
+The minhash-lsh lists the pairs of similar documents in a probabilistic way.
+
+Let `s` be a [Jaccard distance]() of a document pair.
+Then the probability of the pair is listed equals to `1 - (1 - x^b)^r`.
+
+You should change hyper parameter `b` and `r` according to the threshold you want.
+The default parameter is taken from the reference paper that uses JD 0.8 as a threshold
+([ref: graph of the matching probability](https://www.desmos.com/calculator/jq7mpurg3m)).
+
+The computation cost will increases linear to `b*r`, which is the number of hashes used in minhash alg.
