@@ -3,12 +3,13 @@ package org.sample.corpus
 import java.nio.file.{Path, Paths}
 import org.rogach.scallop.ScallopConf
 import org.apache.log4j.{LogManager}
+import scala.collection.mutable.ArrayBuffer
 
-import org.apache.spark.sql.{SparkSession, Dataset, DataFrame, Row}
+import org.apache.spark.sql.{SparkSession, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.linalg.{Vector, Vectors}
-import org.apache.spark.ml.feature.{NGram, CountVectorizer, MinHashLSH}
+import org.apache.spark.ml.feature.{NGram}
 import org.apache.spark.graphx.{Graph, Edge}
 
 object MinHashDeduplicator {
@@ -22,138 +23,223 @@ object MinHashDeduplicator {
       validate = (m => m.length == 1 && "aAbBcC".contains(m))
     )
     val ngram = opt[Int](default = Some(5), validate = (_ > 0))
-    val numVocab = opt[Int](default = Some((1 << 18)), validate = (_ > 0))
-    val minDf = opt[Double](default = Some(1.0), validate = (_ >= 0.0))
     val minhashB = opt[Int](default = Some(20), validate = (_ > 0))
     val minhashR = opt[Int](default = Some(450), validate = (_ > 0))
+    val simThr =
+      opt[Double](default = Some(0.8), validate = { v => (0 <= v) && (v <= 1) })
+
+    val pairPartition = opt[Int](default = Some(100), validate = (_ > 0))
     verify()
   }
 
   val docCol = DocumentIO.docCol
   val didCol = DocumentIO.idxCol
   val tokCol = "tokens"
+  val ngramCol = "ngram"
   val featureCol = "feature"
+  val minhashCol = "minhash"
   val ccCol = "cc"
 
   def run(spark: SparkSession, conf: Conf): Unit = {
     import spark.implicits._
     val logger = LogManager.getLogger("MinHashDeduplicator")
+    val outRoot = conf.output()
 
     val documents =
       DocumentIO.addIndex(DocumentIO.loadRawDocuments(spark, conf.input()))
 
-    // preprocess
-    val preprocessed = setupPipeline(
-      mode = conf.mode(),
-      ngram = conf.ngram(),
-      numVocab = conf.numVocab(),
-      minDF = conf.minDf()
-    ).fit(documents).transform(documents)
-
-    /* Filter out documents with empty ngram set, that minhash-lsh cannot handle.
-     * They have no common ngrams thus unique enough to skip.
-     */
-    val candDocs = preprocessed
-      .filter(row => row.getAs[Vector](featureCol).numNonzeros != 0)
-      .select(didCol, featureCol)
-    val vocabSize = candDocs.take(1)(0).getAs[Vector](featureCol).size
-    logger.info(s"ngram vocab size: ${vocabSize}")
-
-    /* List up document pairs which possibly have large Jaccard similarity using MinHashLSH.
-     * The probability of a pair with J-sim s is selected equals to (1-(1-s^b)^r).
-     */
     val b = conf.minhashB()
     val r = conf.minhashR()
-    val rawhashes = new MinHashLSH()
-      .setNumHashTables(b * r)
-      .setInputCol(featureCol)
-      .setOutputCol("rawhash")
-      .fit(candDocs)
-      .transform(candDocs)
 
-    // flatten single-value vector returned by minhashLSH.
-    val formatHash = udf { rawHash: Array[Vector] =>
-      rawHash.map(vec => vec(0))
+    val pipeline = new Pipeline()
+      .setStages(
+        Array(
+          new SudachiTokenizer()
+            .setInputCol(docCol)
+            .setOutputCol(tokCol)
+            .setSplitMode(conf.mode()),
+          new NGram()
+            .setInputCol(tokCol)
+            .setOutputCol(ngramCol)
+            .setN(conf.ngram()),
+          new TokenHasher().setInputCol(ngramCol).setOutputCol(featureCol),
+          new MinHash()
+            .setInputCol(featureCol)
+            .setOutputCol(minhashCol)
+            .setB(b)
+            .setR(r)
+        )
+      )
+      // those transformers does not require actual data to fit
+      .fit(documents.limit(1))
+
+    val preprocessed = pipeline
+      .transform(documents)
+      .select(didCol, tokCol, featureCol, minhashCol)
+      .cache()
+
+    if (conf.saveStats()) {
+      logger.info("save preprocessed data")
+      preprocessed.write.save(outRoot.resolve("prep").toString)
     }
-    val hashes = rawhashes
-      .withColumn("hashes", formatHash(col("rawhash")))
-      .select(col(didCol), col("hashes"))
-      .cache
-    logger.info("calcurate minhash done.")
 
+    /* List up document pairs that possibly have large Jaccard index using MinHashLSH.
+     *
+     * Split minhashes into r groups, each has b values.
+     * Document pair is selected if all of b hashes are same for any of r hash group.
+     * The probability of a pair with a similarity s is selected equals to (1-(1-s^b)^r).
+     */
     val matchRdds = Range(0, r * b, b).map(i => {
-      // for each of r buckets, documents with same b hashes are match group.
-      // list all combination of 2 documents in each group.
-      hashes
-        .groupByKey(row => { row.getAs[Seq[Double]](1).slice(i, i + b) })
+      preprocessed
+        .groupByKey(row => { row.getAs[Seq[Long]](minhashCol).slice(i, i + b) })
         .flatMapGroups((k, iter) => {
-          iter.map(row => row.getLong(0)).toSeq.combinations(2)
+          iter.toSeq
+            .sortBy(r => r.getAs[Long](didCol))
+            .combinations(2)
+            .map(arr =>
+              Tuple6(
+                arr(0).getAs[Long](didCol),
+                arr(1).getAs[Long](didCol),
+                arr(0).getAs[Seq[String]](tokCol),
+                arr(1).getAs[Seq[String]](tokCol),
+                arr(0).getAs[Seq[Long]](featureCol),
+                arr(1).getAs[Seq[Long]](featureCol)
+              )
+            )
         })
         .rdd
     })
-    val allMathches = spark.sparkContext
+    val candidates = spark.sparkContext
       .union(matchRdds)
-      .distinct
-      .map(arr => (arr(0), arr(1)))
-      .toDF
-      .cache
-    logger.info("list candidate matches done.")
+      .toDF(
+        s"${didCol}1",
+        s"${didCol}2",
+        s"${tokCol}1",
+        s"${tokCol}2",
+        s"${featureCol}1",
+        s"${featureCol}2"
+      )
+      .dropDuplicates(s"${didCol}1", s"${didCol}2")
 
-    // construct graph and clc connected components
-    val edgeRdd =
-      allMathches.rdd.map(row => Edge(row.getLong(0), row.getLong(1), "")).cache
-    val graph = Graph.fromEdges(edgeRdd, "")
-    val cc = graph.connectedComponents().vertices.toDF(didCol, ccCol).cache
-    logger.info("calcurate connected component done")
+    // TODO: better repartition
+    val matches = candidates.repartition(conf.pairPartition()).cache()
 
-    // save duplication data for the analysis
+    /* filter out pairs by jaccard index */
+    val clcJaccardIndex = udf { (seq1: Seq[Long], seq2: Seq[Long]) =>
+      jaccardIndex(seq1, seq2)
+    }
+    val jaccard = matches
+      .withColumn(
+        "jaccardIndex",
+        clcJaccardIndex(col(s"${featureCol}1"), col(s"${featureCol}2"))
+      )
+      .select(
+        s"${didCol}1",
+        s"${didCol}2",
+        s"${tokCol}1",
+        s"${tokCol}2",
+        "jaccardIndex"
+      )
+      .cache()
+
     if (conf.saveStats()) {
-      logger.info("save match data")
-      documents
-        .join(cc, Seq(didCol), "inner")
-        .select(ccCol, DocumentIO.docCol)
+      logger.info("save jaccard index")
+      jaccard
+        .select(s"${didCol}1", s"${didCol}2", "jaccardIndex")
         .write
-        .save(conf.output().resolve("match").toString)
+        .save(outRoot.resolve("jaccard").toString)
     }
 
-    // rm duplicated documents (take documents with smallest id in the CC)
-    logger.info("output result")
-    val docsWithCC = documents.join(cc, Seq(didCol), "left").cache
+    /* filter out pairs by actual edit similarity */
+    val clcEditSim = udf { (seq1: Seq[String], seq2: Seq[String]) =>
+      editSimilarity(seq1, seq2)
+    }
+    val editSim = jaccard
+      .filter(col("jaccardIndex") >= conf.simThr())
+      .withColumn("editSim", clcEditSim(col(s"${tokCol}1"), col(s"${tokCol}2")))
+      .select(s"${didCol}1", s"${didCol}2", "editSim")
+      .cache()
+
+    if (conf.saveStats()) {
+      logger.info("save match")
+      editSim.write.save(outRoot.resolve("match").toString)
+    }
+
+    /* Use graph connected components algorithm to merge similar groups */
+    val edgeRdd = editSim
+      .filter(col("editSim") >= conf.simThr())
+      .rdd
+      .map(row =>
+        Edge(row.getAs[Long](s"${didCol}1"), row.getAs[Long](s"${didCol}2"), "")
+      )
+      .cache()
+    val graph = Graph.fromEdges(edgeRdd, "")
+    val cc = graph.connectedComponents().vertices.toDF(didCol, ccCol).cache()
+
+    if (conf.saveStats()) {
+      logger.info("save connection group id")
+      documents
+        .join(cc, Seq(didCol), "inner")
+        .select(ccCol, docCol)
+        .write
+        .save(outRoot.resolve("cc").toString)
+    }
+
+    /* rm duplicated documents */
+    logger.info("save result")
+    val docsWithCC = documents.join(cc, Seq(didCol), "left").cache()
     val dupDocs =
       docsWithCC.filter((!isnull(col(ccCol))) && (col(ccCol) !== col(didCol)))
     val dedupDocs =
       docsWithCC.filter((isnull(col(ccCol))) || (col(ccCol) === col(didCol)))
 
-    DocumentIO.saveRawDocuments(dedupDocs, conf.output().resolve("dedup"))
-    DocumentIO.saveRawDocuments(dupDocs, conf.output().resolve("dup"))
+    DocumentIO.saveRawDocuments(dedupDocs, outRoot.resolve("dedup"))
+    DocumentIO.saveRawDocuments(dupDocs, outRoot.resolve("dup"))
   }
 
-  /* Returns a spark.ml pipeline for the preprocess.
-   *
-   * converts documents into n-gram occurrence flag vector
-   */
-  def setupPipeline(
-      mode: String,
-      ngram: Int,
-      numVocab: Int,
-      minDF: Double,
-      inputCol: String = docCol,
-      outputCol: String = featureCol
-  ) = {
-    val tok = new SudachiTokenizer()
-      .setInputCol(inputCol)
-      .setOutputCol(tokCol)
-      .setSplitMode(mode)
-    val ngramT =
-      new NGram().setInputCol(tokCol).setOutputCol("ngrams").setN(ngram)
-    val count = new CountVectorizer()
-      .setInputCol("ngrams")
-      .setOutputCol(outputCol)
-      .setVocabSize(numVocab)
-      .setMinDF(minDF)
-      .setBinary(true)
+  /* Jaccard index of two set */
+  def jaccardIndex[T](s1: Seq[T], s2: Seq[T]): Double = {
+    val set1 = s1.toSet
+    val set2 = s2.toSet
+    (set1 & set2).size.toDouble / (set1 | set2).size.toDouble
+  }
 
-    new Pipeline().setStages(Array(tok, ngramT, count))
+  /* util functions */
+  def maxInt(nums: Int*): Int = nums.max
+  def minInt(nums: Int*): Int = nums.min
+  def delta[T](left: T, right: T): Int = { if (left == right) 0 else 1 }
+
+  /* levenshtein distance of two sequences */
+  def levenshteinDistance[T](s1: Seq[T], s2: Seq[T]): Int = {
+    val l1 = s1.length
+    val l2 = s2.length
+    if (l1 == 0) return l2
+    if (l2 == 0) return l1
+
+    var p = ArrayBuffer.range(0, l1 + 1)
+    var lastDiag: Int = 0
+    for (i2 <- 1 to l2) {
+      p(0) = i2
+      lastDiag = i2 - 1
+      for (i1 <- 1 to l1) {
+        val tmp = p(i1)
+        p(i1) = minInt(
+          p(i1) + 1,
+          p(i1 - 1) + 1,
+          lastDiag + delta(s1(i1 - 1), s2(i2 - 1))
+        )
+        lastDiag = tmp
+      }
+    }
+    p(l1)
+  }
+
+  /* edit similarity of two sequences */
+  def editSimilarity[T](s1: Seq[T], s2: Seq[T]): Double = {
+    1.0 - levenshteinDistance(s1, s2).toDouble / maxInt(
+      s1.length,
+      s2.length
+    ).toDouble
   }
 
   def main(args: Array[String]): Unit = {
