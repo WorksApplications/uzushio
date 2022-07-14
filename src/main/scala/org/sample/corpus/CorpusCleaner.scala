@@ -24,11 +24,10 @@ object CorpusCleaner {
     val raw = DocumentIO.loadRawDocuments(spark, conf.input())
     val data = raw.as[String].map(docStr => docStr.split("\n").toSeq)
 
-    val normaliser = setupFullNormalizer()
-    val filter = setupFullFilter(conf.ngwords.toOption)
+    val (normalizer, filter) = setupChitraPreprocess(conf.ngwords.toOption)
 
     val cleansed = filter
-      .filter(normaliser.normalize(data))
+      .filter(normalizer.normalize(data))
       .map(doc => doc.mkString("\n"))
       .toDF
 
@@ -39,44 +38,48 @@ object CorpusCleaner {
     )
   }
 
-  def setupFullNormalizer(): Normalizer = {
-    new SequenceDocumentNormalizer(
-      Seq(
-        new SequenceSentenceNormalizer(
-          Seq(
-            new CitationNormalizer,
-            new CharacterNormalizer,
-            new WhitespaceNormalizer
+  /* setup cleaner equivalent to chitra pretraining preprocess */
+  def setupChitraPreprocess(
+      ngwordFile: Option[Path] = None
+  ): (Normalizer, Filter) = {
+    (
+      new SequenceDocumentNormalizer(
+        Seq(
+          new SequenceSentenceNormalizer(
+            Seq(
+              new CitationNormalizer,
+              new CharacterNormalizer,
+              new WhitespaceNormalizer
+            )
+          ),
+          new ConcatShortSentenceNormalizer
+        )
+      ),
+      new SequenceFilter(
+        Seq(
+          new SequenceSentenceFilter(
+            Seq(
+              new EmailFilter,
+              new UrlFilter,
+              new SentenceLengthFilter
+            )
+          ),
+          new SequenceDocumentFilter(
+            Seq(
+              new ShortDocumentFilter,
+              new ScriptFilter
+            )
           )
-        ),
-        new ConcatShortSentenceNormalizer
+        ) ++ option2seq(ngwordFile).map(NgWordFilter.fromFile(_))
       )
     )
   }
 
-  def setupFullFilter(ngwordFile: Option[Path] = None): Filter = {
-    new SequenceFilter(
-      Seq(
-        new SequenceSentenceFilter(
-          Seq(
-            new EmailFilter,
-            new UrlFilter,
-            new SentenceLengthFilter
-          )
-        ),
-        new SequenceDocumentFilter(
-          Seq(
-            new ShortDocumentFilter,
-            new ScriptFilter
-          )
-        )
-      ) ++ {
-        ngwordFile match {
-          case Some(p) => { Seq(NgWordFilter.fromFile(p)) }
-          case None    => { Seq() }
-        }
-      }
-    )
+  def option2seq[T](opt: Option[T]): Seq[T] = {
+    opt match {
+      case Some(t) => { Seq(t) }
+      case None    => { Seq() }
+    }
   }
 
   def main(args: Array[String]): Unit = {
