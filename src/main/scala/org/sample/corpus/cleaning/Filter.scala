@@ -1,8 +1,8 @@
 package org.sample.corpus.cleaning
 
 import collection.JavaConverters._
-import java.nio.file.Path
-import scala.io.Source
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Path, Files}
 import com.worksap.nlp.sudachi.Tokenizer
 
 import org.apache.spark.sql.Dataset
@@ -11,7 +11,7 @@ import org.apache.spark.sql.types._
 import org.sample.corpus.Sudachi
 
 abstract class Filter extends scala.Serializable {
-  /* Filters documents in the dataset.
+  /* Filters out some part of dataset that suffice the condition.
    *
    * Filtering can be per document, sentence, or word etc.
    */
@@ -77,14 +77,10 @@ class NgWordFilter(ngwords: Set[String]) extends Filter {
 }
 
 object NgWordFilter {
-  def fromFile(ngwords_file: Path): NgWordFilter = {
-    val src = Source.fromFile(ngwords_file.toFile, "utf-8")
-    try {
-      val ngwords = src.getLines().map(_.trim).filter(_.nonEmpty).toSet
-      new NgWordFilter(ngwords)
-    } finally {
-      src.close
-    }
+  def fromFile(ngwordsFile: Path): NgWordFilter = {
+    val fullstr =
+      new String(Files.readAllBytes(ngwordsFile), StandardCharsets.UTF_8)
+    new NgWordFilter(fullstr.split("\n").map(_.trim).filter(_.nonEmpty).toSet)
   }
 }
 

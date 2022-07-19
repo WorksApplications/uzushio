@@ -8,13 +8,15 @@ import org.apache.spark.sql.functions._
 
 import org.sample.corpus.cleaning._
 
-object CorpusCleaner {
+object RemoveTemplate {
   private class Conf(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[Path]](required = true)
     val output = opt[Path](default = Some(Paths.get("./out")))
 
-    val ngwords =
-      opt[Path](default = Some(Paths.get("./resources/ng_words.txt")))
+    val minRepeat = opt[Int](default = Some(2))
+    val substrs =
+      opt[Path](default = Some(Paths.get("./resources/template_sentences.txt")))
+    val perSentence = opt[Boolean]()
     verify()
   }
 
@@ -22,12 +24,18 @@ object CorpusCleaner {
     import spark.implicits._
 
     val raw = DocumentIO.loadRawDocuments(spark, conf.input())
-    val data = raw.as[String].map(docStr => docStr.split("\n").toSeq)
 
-    val (normalizer, filter) = setupChitraPreprocess(conf.ngwords.toOption)
+    val uniq = raw.distinct
+
+    val docs = uniq.as[String].map(docStr => docStr.split("\n").toSeq)
+    val (normalizer, filter) = setupRemoveTemplate(
+      conf.minRepeat(),
+      conf.substrs.toOption,
+      conf.perSentence()
+    )
 
     val cleansed = filter
-      .filter(normalizer.normalize(data))
+      .filter(normalizer.normalize(docs))
       .map(doc => doc.mkString("\n"))
       .toDF
 
@@ -38,40 +46,21 @@ object CorpusCleaner {
     )
   }
 
-  /* setup cleaner equivalent to chitra pretraining preprocess */
-  def setupChitraPreprocess(
-      ngwordFile: Option[Path] = None
+  /* setup cleaner to remove specific substrings */
+  def setupRemoveTemplate(
+      minRep: Int = 2,
+      substrFile: Option[Path] = None,
+      perSentence: Boolean
   ): (Normalizer, Filter) = {
     (
       new SequenceDocumentNormalizer(
         Seq(
-          new SequenceSentenceNormalizer(
-            Seq(
-              new CitationNormalizer,
-              new CharacterNormalizer,
-              new WhitespaceNormalizer
-            )
-          ),
-          new ConcatShortSentenceNormalizer
+          new DeduplicateRepeatingSentences(minRep)
+        ) ++ option2seq(substrFile).map(
+          RemoveSubstring.fromFile(_, perSentence = perSentence)
         )
       ),
-      new SequenceFilter(
-        Seq(
-          new SequenceSentenceFilter(
-            Seq(
-              new EmailFilter,
-              new UrlFilter,
-              new SentenceLengthFilter
-            )
-          ),
-          new SequenceDocumentFilter(
-            Seq(
-              new ShortDocumentFilter,
-              new ScriptFilter
-            )
-          )
-        ) ++ option2seq(ngwordFile).map(NgWordFilter.fromFile(_))
-      )
+      new ShortDocumentFilter
     )
   }
 
@@ -85,7 +74,7 @@ object CorpusCleaner {
   def main(args: Array[String]): Unit = {
     val conf = new Conf(args)
     val spark =
-      SparkSession.builder().appName("CorpusCleaner").getOrCreate()
+      SparkSession.builder().appName("RemoveTemplate").getOrCreate()
 
     try { run(spark, conf) }
     finally { spark.stop() }
