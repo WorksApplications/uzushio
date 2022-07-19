@@ -104,13 +104,39 @@ spark-submit --class org.sample.corpus.CorpusCleaner \
     --ngwords ./resources/ng_words.txt
 ```
 
+### args
+
+- `--input`: input corpus. path to the file / dir (load all files in the dir). Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
+  each file should be: "\n\n" splitted documents that consists of "\n" splitted sentences.
+- `--output`: spark output dir (default ./out). need to be empty (if exists).
+- `--ngwords`: ng-word list (optional). new-line splitted ng-word list (see [chitra ngwords](https://github.com/WorksApplications/SudachiTra/blob/main/pretraining/bert/resources/ng_words.txt)).
+
+## RemoveTempleate
+
+以下の削除を行う
+
+- 重複文書（完全一致）
+- 指定したテンプレート文（or 段落）
+- 連続して繰り返される同一文（１文のみ残す）
+
+基本的には CorpusCleaner と同設計のため、コンフィグでの動作指定機能を実装する際に合わせて削除される予定。
+
+```
+spark-submit --class org.sample.corpus.CorpusCleaner \
+    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
+    --input=../data/*.txt --output=./out \
+    --substrs ./resources/template_sentences.txt --per-sentence \
+    --min-repeat 2
+```
 
 ### args
 
 - `--input`: input corpus. path to the file / dir (load all files in the dir). Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
-each file should be: "\n\n" splitted documents that consists of "\n" splitted sentences.
+  each file should be: "\n\n" splitted documents that consists of "\n" splitted sentences.
 - `--output`: spark output dir (default ./out). need to be empty (if exists).
-- `--ngwords`: ng-word list (optional). new-line splitted ng-word list (see [chitra ngwords](https://github.com/WorksApplications/SudachiTra/blob/main/pretraining/bert/resources/ng_words.txt)).
+- `--substrs`: The template substring list to remove. 2 new-line splitted texts. (default `resources/template_sentences.txt`)
+- `--per-sentence`: If set, remove substring only when it starts and ends at new-line.
+- `--min-repeat`: Deduplicate repeating sentences if it repeats more than or equal to this number.
 
 ## MinHashDeduplicator
 
