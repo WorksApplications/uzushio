@@ -1,6 +1,6 @@
 package org.sample.corpus
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Path, Paths, Files}
 import org.rogach.scallop.ScallopConf
 import org.apache.log4j.{LogManager}
 import scala.collection.mutable.ArrayBuffer
@@ -48,39 +48,38 @@ object MinHashDeduplicator {
     val documents =
       DocumentIO.addIndex(DocumentIO.loadRawDocuments(spark, conf.input()))
 
-    val b = conf.minhashB()
-    val r = conf.minhashR()
-
-    val pipeline = new Pipeline()
-      .setStages(
-        Array(
-          new SudachiTokenizer()
-            .setInputCol(docCol)
-            .setOutputCol(tokCol)
-            .setSplitMode(conf.mode()),
-          new NGram()
-            .setInputCol(tokCol)
-            .setOutputCol(ngramCol)
-            .setN(conf.ngram()),
-          new TokenHasher().setInputCol(ngramCol).setOutputCol(featureCol),
-          new MinHash()
-            .setInputCol(featureCol)
-            .setOutputCol(minhashCol)
-            .setB(b)
-            .setR(r)
+    /* preprocess documents into a set of n-gram hashes */
+    val prepPath = outRoot.resolve("prep").toString
+    val preprocessed = if (Files.exists(Paths.get(prepPath))) {
+      spark.read.load(prepPath).cache()
+    } else {
+      val pipeline = new Pipeline()
+        .setStages(
+          Array(
+            new SudachiTokenizer()
+              .setInputCol(docCol)
+              .setOutputCol(tokCol)
+              .setSplitMode(conf.mode()),
+            new NGram()
+              .setInputCol(tokCol)
+              .setOutputCol(ngramCol)
+              .setN(conf.ngram()),
+            new TokenHasher().setInputCol(ngramCol).setOutputCol(featureCol)
+          )
         )
-      )
-      // those transformers does not require actual data to fit
-      .fit(documents.limit(1))
+        // those transformers does not require actual data to fit
+        .fit(documents.limit(1))
 
-    val preprocessed = pipeline
-      .transform(documents)
-      .select(didCol, tokCol, featureCol, minhashCol)
-      .cache()
+      val preprocessed = pipeline
+        .transform(documents)
+        .select(didCol, tokCol, featureCol)
+        .cache()
 
-    if (conf.saveStats()) {
-      logger.info("save preprocessed data")
-      preprocessed.write.save(outRoot.resolve("prep").toString)
+      if (conf.saveStats()) {
+        logger.info("save preprocessed data")
+        preprocessed.write.save(prepPath)
+      }
+      preprocessed
     }
 
     /* List up document pairs that possibly have large Jaccard index using MinHashLSH.
@@ -89,9 +88,19 @@ object MinHashDeduplicator {
      * Document pair is selected if all of b hashes are same for any of r hash group.
      * The probability of a pair with a similarity s is selected equals to (1-(1-s^b)^r).
      */
-    val matchRdds = Range(0, r * b, b).map(i => {
-      preprocessed
-        .groupByKey(row => { row.getAs[Seq[Long]](minhashCol).slice(i, i + b) })
+    val b = conf.minhashB()
+    val r = conf.minhashR()
+    val minhashModel = new MinHash()
+      .setInputCol(featureCol)
+      .setOutputCol(minhashCol)
+      .setB(b)
+      .setR(r)
+      .fit(preprocessed.limit(1))
+
+    val matchRdds = Range(0, r).map(i => {
+      minhashModel
+        .transformBucket(i, preprocessed)
+        .groupByKey(row => { row.getAs[Seq[Long]](minhashCol) })
         .flatMapGroups((k, iter) => {
           iter.toSeq
             .sortBy(r => r.getAs[Long](didCol))
@@ -121,8 +130,10 @@ object MinHashDeduplicator {
       )
       .dropDuplicates(s"${didCol}1", s"${didCol}2")
 
-    // TODO: better repartition
-    val matches = candidates.repartition(conf.pairPartition()).cache()
+    /* save and load to balance partition size */
+    val tmpdir = outRoot.resolve("candidates").toString
+    candidates.write.option("maxRecordsPerFile", 10000).save(tmpdir)
+    val matches = spark.read.load(tmpdir).repartition(conf.pairPartition())
 
     /* filter out pairs by jaccard index */
     val clcJaccardIndex = udf { (seq1: Seq[Long], seq2: Seq[Long]) =>
@@ -174,7 +185,7 @@ object MinHashDeduplicator {
       )
       .cache()
     val graph = Graph.fromEdges(edgeRdd, "")
-    val cc = graph.connectedComponents().vertices.toDF(didCol, ccCol).cache()
+    val cc = graph.connectedComponents().vertices.toDF(didCol, ccCol)
 
     if (conf.saveStats()) {
       logger.info("save connection group id")
@@ -187,7 +198,7 @@ object MinHashDeduplicator {
 
     /* rm duplicated documents */
     logger.info("save result")
-    val docsWithCC = documents.join(cc, Seq(didCol), "left").cache()
+    val docsWithCC = documents.join(cc, Seq(didCol), "left")
     val dupDocs =
       docsWithCC.filter((!isnull(col(ccCol))) && (col(ccCol) !== col(didCol)))
     val dedupDocs =

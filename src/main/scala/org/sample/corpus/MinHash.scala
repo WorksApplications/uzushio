@@ -12,7 +12,7 @@ import org.apache.spark.ml.util.{Identifiable}
 
 /* Reimplementation of spark.ml.feature.MinHashLSH, but in/out types are Array[Long].
  *
- * Currently parameter b/r are used only to caluclate the number of hash functions.
+ * Has r buckets of hashes, each contains b hashes.
  */
 
 trait MinHashParams extends Params with HasInputCol with HasOutputCol {
@@ -106,14 +106,24 @@ class MinHashModel(
 
   override def transform(dataset: Dataset[_]): DataFrame = {
     transformSchema(dataset.schema)
-    val transformUDF = udf(hashFunction(_: Seq[Long]))
+    val transformUDF = udf(
+      hashFunction(0, randCoefficients.length, _: Seq[Long])
+    )
     dataset.withColumn($(outputCol), transformUDF(dataset($(inputCol))))
   }
 
-  def hashFunction(elems: Seq[Long]): Array[Long] = {
+  def transformBucket(bucketIdx: Int, dataset: Dataset[_]): DataFrame = {
+    transformSchema(dataset.schema)
+    val transformUDF = udf(
+      hashFunction(bucketIdx * $(b), (bucketIdx + 1) * $(b), _: Seq[Long])
+    )
+    dataset.withColumn($(outputCol), transformUDF(dataset($(inputCol))))
+  }
+
+  def hashFunction(from: Int, until: Int, elems: Seq[Long]): Array[Long] = {
     require(elems.length > 0, "Must have at least 1 non zero entry.")
 
-    randCoefficients.map { case (a, b) =>
+    randCoefficients.slice(from, until).map { case (a, b) =>
       elems.map(v => ((1L + v) * a.toLong + b.toLong) % MinHash.HASH_PRIME).min
     }
   }
