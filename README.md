@@ -115,53 +115,59 @@ spark-submit --class org.sample.corpus.CorpusCleaner \
 
 類似文書を削除する。
 
-文書を set of ngram と見て、Jaccard distance に基づき類似文書をリストアップ、削除する。
+文書を n-gram の集合とみなし、Jaccard distance に基づき類似文書をリストアップ、削除する。
 
-[Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499) における NearDup の再現だが以下の点で異なることに注意。
-
-- LSH 出力の類似ペア候補に対する exact edit similarity の計算及びフィルタを行っていない
+[Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499) における NearDup を再現したもの。
 
 ```
 spark-submit --class org.sample.corpus.MinHashDeduplicator \
     ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
     --input=./data/nwjc/* --output=./out \
-    --save-stats \
     --mode C \
     --ngram 5 \
-    --num-vocab 262144 \
-    --min-df 10.0 \
     --minhash-b 5 \
     --minhash-r 10 \
+    --jaccard-thr 0.8 \
+    --skip-editsim
 ```
 
 ### args
 
 - `--input`, `--output`: Input files and output directory. Same as CorpusCleaner.
-- `--save-stats`: Set to output a parquet with document and duplication group id column.
+  - Deduplicated documents are written into `${output}/dedup`
+  - Removed documents are written into `${output}/dup`
 - `--mode`: Sudachi split mode (A/B/C). (default C)
 - `--ngram`: n of n-gram, used to convert document to a set of n-grams. (default 5)
-- `--num-vocab`: How many ngrams to use as feature. (default 2\*\*18)
-- `--min-df`: Minimum document frequency. Uses ngrams that has higher df than this value. If < 1.0, consider it as ratio. (default 1.0)
-- `--minhash-b`: And-amplification value for minhash-lsh. (default 20)
-- `--minhash-r`: Or-amplification value for minhash-lsh. (default 450)
-
-#### preprocess
-
-As a preprocess, documents are converted into a set of ngrams.
-
-- Ngram is generated based on sudachi token (surface).
-- Only `--num-vocab` ngrams are used (selected based on the document frequency).
-- Only ngrams with a DF higher than `--min-df` are used.
+- `--minhash-b`: And-amplification value for minhash-lsh. (default 15)
+- `--minhash-r`: Or-amplification value for minhash-lsh. (default 150)
+- `--jaccard-thr`: Threshold for jaccard index. Document pairs with JI less than this will be skipped. (default 0.8)
+- `--editsim-thr`: Threshold for edit similarity. Document pairs with ES less than this will be skipped. (default 0.8)
+- `--skip-editsim`: Set to skip the filtering by the edit similarity.
 
 #### MinHashLSH
 
-The minhash-lsh lists the pairs of similar documents in a probabilistic way.
+The minhash-lsh lists the pairs of similar documents in a probabilistic way, considering a document as a set of n-gram.
 
-Let `s` be a [Jaccard distance]() of a document pair.
-Then the probability of the pair is listed equals to `1 - (1 - x^b)^r`.
+Let `s` be a [Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index) of a document pair.
+Then the probability of the pair is selected equals to `1 - (1 - x^b)^r`.
 
 You should change hyper parameter `b` and `r` according to the threshold you want.
 The default parameter is taken from the reference paper that uses JD 0.8 as a threshold
 ([ref: graph of the matching probability](https://www.desmos.com/calculator/jq7mpurg3m)).
 
 The computation cost will increases linear to `b*r`, which is the number of hashes used in minhash alg.
+Also note that the storage used by minhash increases linear to `r`.
+
+#### Filtering by actual similarity
+
+After the MinHashLSH, we filter out document pairs with low similarity.
+This is neccessarly since MinHash is a probabilistic algorithm.
+
+We use following two metrics:
+
+- Jaccard index
+- Edit similarity
+  - def: EditDistance(d1, d2) / max(d1.length, d2.length)
+    - ref: [edit distance](https://en.wikipedia.org/wiki/Edit_distance)
+  - This takes `O(T^2)` time with a document length `T`, will is so long.
+    - Skip this step with `--skip-editsim` option.
