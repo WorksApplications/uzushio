@@ -11,13 +11,15 @@ object WarcLoader {
   def readFrom(
       spark: SparkSession,
       name: String
-  ): RDD[(LongWritableSerializable, WarcWritable)] = {
-    spark.sparkContext.newAPIHadoopFile(
-      name,
-      classOf[WarcInputFormat],
-      classOf[LongWritableSerializable],
-      classOf[WarcWritable]
-    )
+  ): RDD[WarcRecord] = {
+    spark.sparkContext
+      .newAPIHadoopFile(
+        name,
+        classOf[WarcInputFormat],
+        classOf[LongWritableSerializable],
+        classOf[WarcWritable]
+      )
+      .map { case (k, v) => v.getRecord() }
   }
 
   private class Conf(args: Seq[String]) extends ScallopConf(args) {
@@ -33,7 +35,7 @@ object WarcLoader {
 
     val rdd = readFrom(spark, conf.input().mkString(","))
 
-    rdd.map { case (k, v) => v.getRecord() }.take(conf.take()).foreach(println)
+    rdd.take(conf.take()).foreach(println)
   }
 
   def main(args: Array[String]): Unit = {
