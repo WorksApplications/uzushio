@@ -30,16 +30,15 @@ import org.apache.tika.metadata.Metadata
 import org.apache.tika.sax.{BodyContentHandler, ToXMLContentHandler}
 import org.xml.sax.{ContentHandler, Attributes}
 
-object WarcLoader {
+object WarcLoaderSample {
   private class Conf(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[Path]](required = true)
     val output = opt[Path](default = Some(Paths.get("./out")))
 
     val take = opt[Int](default = Some(10))
+    val bufSize = opt[Int](default = Some(1024 * 128))
     verify()
   }
-
-  val bufSize = 1024
 
   val warcKeys =
     Array("WARC-Target-URI", "WARC-Record-ID", "WARC-Date", "reader-identifier")
@@ -78,7 +77,7 @@ object WarcLoader {
     })
 
     val responseParser = new DefaultHttpResponseParser()
-    val siBuf = new SessionInputBufferImpl(bufSize)
+    val siBuf = new SessionInputBufferImpl(conf.bufSize())
 
     val htmlIter = warcResponseIter
       .map(arc => {
