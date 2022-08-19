@@ -1,10 +1,17 @@
 package org.sample.corpus.warc
 
+import collection.JavaConverters._
+
+import java.io.ByteArrayInputStream
 import java.nio.file.{Path, Paths}
 import org.rogach.scallop.ScallopConf
 import org.apache.log4j.LogManager
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.rdd.RDD
+
+import org.apache.tika.parser.html.HtmlParser
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.sax.BodyContentHandler
 
 object WarcLoader {
   /* Load WARC file as RDD. */
@@ -31,11 +38,55 @@ object WarcLoader {
   }
 
   def run(spark: SparkSession, conf: Conf): Unit = {
+    import spark.implicits._
     val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
     val rdd = readFrom(spark, conf.input().mkString(","))
 
-    rdd.take(conf.take()).foreach(println)
+    val parsed = rdd
+      .filter(arc => arc.isResponse && !arc.isTruncated)
+      .map(arc => {
+        val httpParser = new HttpResponseParser()
+        httpParser.parseWarcRecord(arc)
+      })
+      .filter(resp => {
+        val contentType = resp.getHeader("Content-Type").getOrElse("").trim
+        contentType.startsWith("text/html")
+      })
+      .map(resp => {
+        val tikaParser = new HtmlParser()
+        val handler = new BodyContentHandler()
+        val meta = new Metadata()
+
+        // provide content-type as a hint
+        resp.getHeader("Content-Type") match {
+          case Some(ct) => meta.add("Content-Type", ct)
+          case None     => {}
+        }
+
+        val bodyIs = new ByteArrayInputStream(resp.body)
+
+        try {
+          tikaParser.parse(bodyIs, handler, meta)
+        } catch {
+          // case e: java.io.IOException => {}
+          case e: org.xml.sax.SAXException => { println(s"${e}") }
+          case e: org.apache.tika.exception.TikaException => {
+            println(s"${e}")
+          }
+        } finally {
+          bodyIs.close()
+        }
+
+        (
+          meta.names.map(k => (k -> Option(meta.get(k)).getOrElse(""))).toMap,
+          handler.toString
+        )
+      })
+      .toDF("tikaMetadata", "content")
+      .limit(conf.take())
+
+    parsed.write.save(conf.output().toString)
   }
 
   def main(args: Array[String]): Unit = {
