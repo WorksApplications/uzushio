@@ -45,43 +45,46 @@ object WarcLoader {
 
     val parsed = rdd
       .filter(arc => arc.isResponse && !arc.isTruncated)
-      .map(arc => {
+      .mapPartitions(iter => {
         val httpParser = new HttpResponseParser()
-        httpParser.parseWarcRecord(arc)
+        iter.map(arc => httpParser.parseWarcRecord(arc))
       })
       .filter(resp => {
         val contentType = resp.getHeader("Content-Type").getOrElse("").trim
         contentType.startsWith("text/html")
       })
-      .map(resp => {
+      .mapPartitions(iter => {
         val tikaParser = new HtmlParser()
-        val handler = new BodyContentHandler()
-        val meta = new Metadata()
 
-        // provide content-type as a hint
-        resp.getHeader("Content-Type") match {
-          case Some(ct) => meta.add("Content-Type", ct)
-          case None     => {}
-        }
+        iter.map(resp => {
+          val handler = new BodyContentHandler(new ToParagraphHandler())
+          val meta = new Metadata()
 
-        val bodyIs = new ByteArrayInputStream(resp.body)
-
-        try {
-          tikaParser.parse(bodyIs, handler, meta)
-        } catch {
-          // case e: java.io.IOException => {}
-          case e: org.xml.sax.SAXException => { println(s"${e}") }
-          case e: org.apache.tika.exception.TikaException => {
-            println(s"${e}")
+          // provide content-type as a hint
+          resp.getHeader("Content-Type") match {
+            case Some(ct) => meta.add("Content-Type", ct)
+            case None     => {}
           }
-        } finally {
-          bodyIs.close()
-        }
 
-        (
-          meta.names.map(k => (k -> Option(meta.get(k)).getOrElse(""))).toMap,
-          handler.toString
-        )
+          val bodyIs = new ByteArrayInputStream(resp.body)
+
+          try {
+            tikaParser.parse(bodyIs, handler, meta)
+          } catch {
+            // case e: java.io.IOException => {}
+            case e: org.xml.sax.SAXException => { println(s"${e}") }
+            case e: org.apache.tika.exception.TikaException => {
+              println(s"${e}")
+            }
+          } finally {
+            bodyIs.close()
+          }
+
+          (
+            meta.names.map(k => (k -> Option(meta.get(k)).getOrElse(""))).toMap,
+            handler.toString
+          )
+        })
       })
       .toDF("tikaMetadata", "content")
       .limit(conf.take())
