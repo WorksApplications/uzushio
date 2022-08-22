@@ -22,9 +22,9 @@ class ToParagraphHandler(writer: Writer) extends DefaultHandler {
   }
 
   override def characters(ch: Array[Char], start: Int, length: Int): Unit = {
-    if (tagDepthMap.values.fold(0)(_ + _) > 0) {
-      return
-    }
+    // if (tagDepthMap.values.fold(0)(_ + _) > 0) {
+    //   return
+    // }
 
     try {
       writer.write(ch, start, length)
@@ -64,7 +64,7 @@ class ToParagraphHandler(writer: Writer) extends DefaultHandler {
 
   override def endElement(uri: String, localName: String, qName: String) = {
     // todo: rm
-    writer.write(s"\nee: ${uri}, ${localName}, ${qName}, ${atts}\n")
+    writer.write(s"\nee: ${uri}, ${localName}, ${qName}\n")
 
     val q = qName.toLowerCase()
     tagDepthMap.update(q, tagDepthMap.getOrElse(q, 0) - 1)
