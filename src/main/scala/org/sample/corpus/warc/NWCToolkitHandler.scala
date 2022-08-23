@@ -7,6 +7,12 @@ import java.io.Writer
 import org.xml.sax.{ContentHandler, Attributes, SAXException}
 import org.xml.sax.helpers.DefaultHandler
 
+/** Handler that mimics the behaviour of nwc-toolkit text-extractor.
+  *
+  * You need to use this with AllTagMapper to utilize all tag information.
+  *
+  * ref: [nwc-toolkit](https://github.com/xen/nwc-toolkit)
+  */
 class NWCToolkitHandler(writer: Writer) extends DefaultHandler {
   // TODO: better flag hangling
   val tagDepth = scala.collection.mutable.Map[String, Int]()

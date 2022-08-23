@@ -31,6 +31,14 @@ object WarcLoader {
       .map { case (k, v) => v.getRecord() }
   }
 
+  /* Load WARC response records from file as RDD  */
+  def readFullResponseFrom(
+      spark: SparkSession,
+      name: String
+  ): RDD[WarcRecord] = {
+    readFrom(spark, name).filter(arc => arc.isResponse && !arc.isTruncated)
+  }
+
   private class Conf(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[Path]](required = true)
     val output = opt[Path](default = Some(Paths.get("./out")))
@@ -57,7 +65,7 @@ object WarcLoader {
     val bodyIs = new ByteArrayInputStream(resp.body)
 
     try {
-      tikaParser.parse(bodyIs, handler, meta, context)
+      parser.parse(bodyIs, handler, meta, context)
     } catch {
       // case e: java.io.IOException => {}
       case e: org.xml.sax.SAXException => { println(s"${e}") }

@@ -1,3 +1,5 @@
+package org.sample.corpus.warc
+
 import org.apache.tika.parser.html.HtmlMapper
 
 /** Mapper class that provides all tags to handler.
