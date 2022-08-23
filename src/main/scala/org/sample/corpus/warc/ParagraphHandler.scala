@@ -106,31 +106,28 @@ object ParagraphHandler {
   /** Texts inside these tags will be removed. */
   val ignoreTags = Set("style", "script")
 
-  /** Tags that separate paragraphs.
-    *
-    * Cup of the that of nwc-toolkit and jusText.
-    */
+  /** Tags that separate paragraphs. */
   val blockTags = Set(
     "address",
     "article",
     "aside",
     "blockquote",
-    "br",
+    // "br", // should not separate paragraph
     "caption",
     "center",
-    "col",
-    "colgroup",
-    "dd",
+    // "col", // used inside table
+    // "colgroup", // used inside table
+    // "dd", // concat datalist contents
     "dialog",
-    "dir",
+    "dir", // concat list contents (deprecated in HTML5, instead use "ul")
     "div",
-    "dl",
-    "dt",
+    "dl", // concat datalist contents
+    // "dt", // concat datalist contents
     "fieldset",
-    "figure",
+    "figure", // may contain "figcaption"
     "footer",
     "form",
-    "frame",
+    "frame", // deprecated in HTML5
     "h1",
     "h2",
     "h3",
@@ -139,30 +136,31 @@ object ParagraphHandler {
     "h6",
     "header",
     "hr",
-    "isindex",
+    // "isindex", // deprecated in HTML5, instead use "input"
     "legend",
-    "li",
-    "menu",
-    "multicol",
+    // "li", // concat list contents
+    "main",
+    // "menu", // only FireFox supports
+    // "multicol", // only NetscapeNavigator supports
     "nav",
-    "noframes",
+    "noframes", // deprecated in HTML5
     "noscript",
-    "ol",
+    "ol", // concat list contents
     "optgroup",
     "option",
     "p",
     "pre",
     "section",
-    "table",
-    "tbody",
-    "td",
+    "table", // concat table contents
+    // "tbody", // must contain tr
+    // "td", // concat table contents
     "textarea",
-    "tfoot",
-    "th",
-    "thead",
+    // "tfoot", // must contain tr
+    // "th", // concat table contents
+    // "thead", // must contain tr
     "title",
-    "tr",
-    "ul",
-    "xmp"
+    // "tr", // concat table contents
+    "ul", // concat list contents
+    "xmp" // deprecated in HTML5, instead use "pre"
   )
 }
