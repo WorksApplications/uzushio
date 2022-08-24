@@ -29,6 +29,33 @@ class SequenceFilter(filters: Seq[Filter]) extends Filter {
   }
 }
 
+/** Filters sentences that are duplicate (over documents).
+  *
+  * @param nDup
+  *   Sentences that appears equal or more than this number will be filtered.
+  */
+class DuplicateSentenceFilter(nDup: Int = 2) extends Filter {
+  def filter(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
+    import ds.sparkSession.implicits._
+
+    val count = ds.flatMap(doc => doc).groupBy("value").count()
+    val dupSentSet =
+      count.filter(s"count >= ${nDup}").map(r => r.getString(0)).collect.toSet
+    val firstFlag = scala.collection.mutable.Set(dupSentSet.toSeq: _*)
+
+    ds.map(doc =>
+      doc.filter(sent => {
+        if (!dupSentSet.contains(sent)) { true }
+        else {
+          val isFirst = firstFlag.contains(sent)
+          firstFlag -= sent
+          isFirst
+        }
+      })
+    )
+  }
+}
+
 /* Filters documents that contain one of the specified words.
  *
  *  @constructor create a new filter with ng-word list.
