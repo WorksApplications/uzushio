@@ -9,10 +9,14 @@ import org.apache.log4j.LogManager
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.rdd.RDD
 
-import org.apache.tika.parser.html.HtmlParser
-import org.apache.tika.parser.html.HtmlMapper
-import org.apache.tika.parser.ParseContext
+import org.apache.tika.detect.EncodingDetector
 import org.apache.tika.metadata.Metadata
+import org.apache.tika.parser.html.{
+  HtmlParser,
+  HtmlMapper,
+  HtmlEncodingDetector
+}
+import org.apache.tika.parser.ParseContext
 import org.apache.tika.sax.BodyContentHandler
 
 object WarcToDocument {
@@ -20,6 +24,7 @@ object WarcToDocument {
     val input = opt[List[Path]](required = true)
     val output = opt[Path](default = Some(Paths.get("./out")))
 
+    val textOnly = opt[Boolean]()
     // take [sample] items from head
     val sample = opt[Int]()
     verify()
@@ -35,12 +40,13 @@ object WarcToDocument {
 
     val meta = new Metadata()
     resp.getHeader("Content-Type") match { // provide content-type as a hint
-      case Some(ct) => meta.add("Content-Type", ct)
+      case Some(ct) => { meta.add("Content-Type", ct) }
       case None     => {}
     }
 
     val context = new ParseContext()
     context.set(classOf[HtmlMapper], new AllTagMapper())
+    context.set(classOf[EncodingDetector], new HtmlEncodingDetector())
 
     val bodyIs = new ByteArrayInputStream(resp.body)
 
@@ -104,8 +110,11 @@ object WarcToDocument {
       case Some(n) => parsed.limit(n)
     }
 
-    result.write.save(conf.output().toString)
-    // result.select("content").write.text(conf.output().toString)
+    if (conf.textOnly()) {
+      result.select("content").write.text(conf.output().toString)
+    } else {
+      result.write.save(conf.output().toString)
+    }
   }
 
   def main(args: Array[String]): Unit = {

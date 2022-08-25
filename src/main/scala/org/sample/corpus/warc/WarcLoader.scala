@@ -24,6 +24,11 @@ object WarcLoader {
       spark: SparkSession,
       name: String
   ): RDD[WarcRecord] = {
-    readFrom(spark, name).filter(arc => arc.isResponse && !arc.isTruncated)
+    readFrom(spark, name).filter(arc => {
+      val contentType = arc.headers.getOrElse("Content-Type", "")
+      arc.isResponse && contentType.startsWith(
+        "application/http"
+      ) && !arc.isTruncated
+    })
   }
 }
