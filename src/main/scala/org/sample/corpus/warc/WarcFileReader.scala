@@ -31,6 +31,10 @@ class WarcFileReader(conf: Configuration, filePath: Path) {
     * @throws java.util.NoSuchElementException
     */
   def read(): WarcRecord = {
+    if (!recordIter.hasNext) {
+      throw new java.util.NoSuchElementException()
+    }
+
     val next = recordIter.next()
     val record = new WarcRecord(next)
     recordsRead += 1
