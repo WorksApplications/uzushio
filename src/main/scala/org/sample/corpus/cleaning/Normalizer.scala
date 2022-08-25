@@ -137,13 +137,20 @@ class SequenceSentenceNormalizer(normalizers: Seq[SentenceNormalizer])
   }
 }
 
-/* Removes non-printable characters. */
-class CharacterNormalizer extends SentenceNormalizer {
-  /* Remove unicode general-category "Other" or "Separator" except ascii space,
-   * following python str.isprintable.
-   * We also keep surrogate code points (that are not in python).
-   */
-  val nonPrintablePattern = """[\p{gc=C}\p{gc=Z}&&[^ \p{gc=Cs}]]""".r
+/** Removes non-printable characters.
+  *
+  * Following python's str.isprintable, remove unicode general-category "Other"
+  * or "Separator" except space. We also keep surrogate code points (that are
+  * not in python).
+  *
+  * @param keepWS
+  *   If true, keep whitespaces other than space (" "), including \u3000. This
+  *   is not python compatible behaviour.
+  */
+class CharacterNormalizer(keepWS: Boolean = false) extends SentenceNormalizer {
+  val nonPrintablePattern =
+    if (keepWS) """[\p{gc=C}\p{gc=Z}&&[^\s　\p{gc=Cs}]]""".r
+    else """[\p{gc=C}\p{gc=Z}&&[^ \p{gc=Cs}]]""".r
 
   override def normalizeSentence(sent: String): String = {
     nonPrintablePattern.replaceAllIn(sent, "")
@@ -152,7 +159,7 @@ class CharacterNormalizer extends SentenceNormalizer {
 
 /* Removes excess whitespaces. */
 class WhitespaceNormalizer extends SentenceNormalizer {
-  val continuousWhitespacePattern = """\s+""".r
+  val continuousWhitespacePattern = """[\s　]+""".r
 
   override def normalizeSentence(sent: String): String = {
     continuousWhitespacePattern.replaceAllIn(sent, " ")
