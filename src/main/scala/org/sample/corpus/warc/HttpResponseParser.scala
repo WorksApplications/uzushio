@@ -5,7 +5,6 @@ import java.io.InputStream
 import java.io.SequenceInputStream
 import java.io.Serializable
 import org.apache.commons.io.IOUtils
-import org.apache.hc.core5.http.ClassicHttpResponse
 import org.apache.hc.core5.http.impl.io.{
   DefaultHttpResponseParser,
   SessionInputBufferImpl
@@ -47,12 +46,5 @@ class HttpResponseParser(bufSize: Int) extends Serializable {
         rest
       )
     )
-  }
-}
-
-class HttpResponseSerializable(resp: ClassicHttpResponse, val body: Array[Byte])
-    extends Serializable {
-  def getHeader(name: String): Option[String] = {
-    Option(resp.getHeader(name)).map(_.getValue)
   }
 }
