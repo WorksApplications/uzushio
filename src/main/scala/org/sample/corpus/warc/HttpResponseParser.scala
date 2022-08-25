@@ -25,14 +25,18 @@ class HttpResponseParser(bufSize: Int) extends Serializable {
   def parseWarcRecord(warc: WarcRecord) = {
     val is = new ByteArrayInputStream(warc.content)
 
-    val resp = responseParser.parse(siBuffer, is)
-    val body = readBody(siBuffer, is);
+    try {
+      val resp = responseParser.parse(siBuffer, is)
+      val body = readBody(siBuffer, is);
 
-    // TODO: error handling
-    //   case e: java.io.IOException => {}
-    //   case e: org.apache.hc.core5.http.HttpException => {}
-
-    new HttpResponseSerializable(resp, body)
+      new HttpResponseSerializable(resp, body)
+    } catch {
+      case e: org.apache.hc.core5.http.HttpException => {
+        new HttpResponseSerializable()
+      }
+    } finally {
+      is.close()
+    }
   }
 
   /** Read body bytes from buffers after headers are read. */
