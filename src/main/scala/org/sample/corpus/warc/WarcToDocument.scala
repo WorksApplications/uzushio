@@ -37,15 +37,17 @@ object WarcToDocument {
       // new NWCToolkitHandler()
       // new JusTextHandler()
     )
-
     val meta = new Metadata()
-    resp.getHeader("Content-Type") match { // provide content-type as a hint
+    val context = new ParseContext()
+
+    // provide content-type as a hint for charset detection
+    resp.getHeader("Content-Type") match {
       case Some(ct) => { meta.add("Content-Type", ct) }
       case None     => {}
     }
-
-    val context = new ParseContext()
+    // use all html tags in the handler
     context.set(classOf[HtmlMapper], new AllTagMapper())
+    // auto detect charset from meta-tag
     context.set(classOf[EncodingDetector], new HtmlEncodingDetector())
 
     val bodyIs = new ByteArrayInputStream(resp.body)
@@ -53,7 +55,7 @@ object WarcToDocument {
     try {
       parser.parse(bodyIs, handler, meta, context)
     } catch {
-      // case e: java.io.IOException => {}
+      // In the case of error, meta and handler are empty.
       case e: org.xml.sax.SAXException => { println(s"${e}") }
       case e: org.apache.tika.exception.TikaException => {
         println(s"${e}")
@@ -70,8 +72,14 @@ object WarcToDocument {
     val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
     val parsed = WarcLoader
-      // use warc response record only
-      .readFullResponseFrom(spark, conf.input().mkString(","))
+      .readFrom(spark, conf.input().mkString(","))
+      // use http response record only
+      .filter(arc => {
+        val contentType = arc.headers.getOrElse("Content-Type", "")
+        arc.isResponse && contentType.startsWith(
+          "application/http"
+        ) && !arc.isTruncated
+      })
       // parse body as http response
       .mapPartitions(iter => {
         val httpParser = new HttpResponseParser()
@@ -87,7 +95,7 @@ object WarcToDocument {
           contentType.startsWith("text/html")
         }
       }
-      // parse response body and extract text with paragraph info
+      // parse response body and extract text
       .mapPartitions(iter => {
         val tikaParser = new HtmlParser()
         iter.map(v => {
@@ -98,11 +106,12 @@ object WarcToDocument {
             warcHeaders,
             resp.getHeaders(),
             meta.names.map(k => (k -> Option(meta.get(k)).getOrElse(""))).toMap,
+            new String(resp.body),
             handler.toString
           )
         })
       })
-      .toDF("warcHeaders", "httpHeaders", "tikaMetadata", "content")
+      .toDF("warcHeaders", "httpHeaders", "tikaMetadata", "html", "content")
 
     // sampling for debug purpose
     val result = conf.sample.toOption match {
