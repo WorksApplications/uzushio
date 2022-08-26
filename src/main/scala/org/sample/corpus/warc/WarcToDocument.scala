@@ -41,7 +41,7 @@ object WarcToDocument {
     val context = new ParseContext()
 
     // provide content-type as a hint for charset detection
-    resp.getHeader("Content-Type") match {
+    resp.getFirstHeader("Content-Type") match {
       case Some(ct) => { meta.add("Content-Type", ct) }
       case None     => {}
     }
@@ -91,7 +91,8 @@ object WarcToDocument {
       // filter out non-html records
       .filter {
         case (headers, resp) => {
-          val contentType = resp.getHeader("Content-Type").getOrElse("").trim
+          val contentType =
+            resp.getFirstHeader("Content-Type").getOrElse("").trim
           contentType.startsWith("text/html")
         }
       }
@@ -111,7 +112,7 @@ object WarcToDocument {
           )
         })
       })
-      .toDF("warcHeaders", "httpHeaders", "tikaMetadata", "html", "content")
+      .toDF("warcHeaders", "httpHeaders", "tikaMetadata", "html", "document")
 
     // sampling for debug purpose
     val result = conf.sample.toOption match {
@@ -120,7 +121,7 @@ object WarcToDocument {
     }
 
     if (conf.textOnly()) {
-      result.select("content").write.text(conf.output().toString)
+      result.select("document").write.text(conf.output().toString)
     } else {
       result.write.save(conf.output().toString)
     }

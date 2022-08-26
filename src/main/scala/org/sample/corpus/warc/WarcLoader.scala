@@ -33,16 +33,18 @@ object WarcLoader {
     val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
     // all warc record
-    val warcRecords = readFrom(spark, conf.input().mkString(","))
+    val warcRecords = readFrom(spark, conf.input().mkString(",")).cache
     logger.info(s"num warc record: ${warcRecords.count}")
 
     // http response record
-    val responseRecords = warcRecords.filter(arc => {
-      val contentType = arc.headers.getOrElse("Content-Type", "")
-      arc.isResponse && contentType.startsWith(
-        "application/http"
-      ) && !arc.isTruncated
-    })
+    val responseRecords = warcRecords
+      .filter(arc => {
+        val contentType = arc.headers.getOrElse("Content-Type", "")
+        arc.isResponse && contentType.startsWith(
+          "application/http"
+        ) && !arc.isTruncated
+      })
+      .cache
     logger.info(s"num http/resp record: ${responseRecords.count}")
 
     // content-type text/html
@@ -56,7 +58,8 @@ object WarcLoader {
       })
       .filter {
         case (headers, resp) => {
-          val contentType = resp.getHeader("Content-Type").getOrElse("").trim
+          val contentType =
+            resp.getFirstHeader("Content-Type").getOrElse("").trim
           contentType.startsWith("text/html")
         }
       }

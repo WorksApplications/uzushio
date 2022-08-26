@@ -35,10 +35,16 @@ class WarcFileReader(conf: Configuration, filePath: Path) {
       throw new java.util.NoSuchElementException()
     }
 
-    val next = recordIter.next()
-    val record = new WarcRecord(next)
-    recordsRead += 1
-    return record
+    try {
+      val record = new WarcRecord(recordIter.next())
+      recordsRead += 1
+      return record
+    } catch {
+      case e: java.io.EOFException => {
+        println(s"error while iterating warc, try to skip: ${e}")
+        return read()
+      }
+    }
   }
 
   /** Returns the number of records that have been read. */

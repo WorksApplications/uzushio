@@ -28,10 +28,12 @@ class HttpResponseParser(bufSize: Int) extends Serializable {
     try {
       val resp = responseParser.parse(siBuffer, is)
       val body = readBody(siBuffer, is);
-
       new HttpResponseSerializable(resp, body)
     } catch {
+      // TODO: data handling in the error cases
+      //   currently we just skip them
       case e: org.apache.hc.core5.http.HttpException => {
+        println(s"${e}")
         new HttpResponseSerializable()
       }
     } finally {
