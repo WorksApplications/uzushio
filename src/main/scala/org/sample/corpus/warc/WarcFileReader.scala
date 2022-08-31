@@ -4,10 +4,12 @@ import collection.JavaConverters._
 import java.io.{InputStream, FilterInputStream}
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.log4j.LogManager
 import org.archive.io.warc.WARCReaderFactory
 
 /** Reads {@link WarcRecord}s from a WARC file using Hadoop filesystem APIs. */
 class WarcFileReader(conf: Configuration, filePath: Path) {
+  @transient lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
   /** Opens a warc file and setup an iterator of records. */
   private val fs = filePath.getFileSystem(conf)
@@ -41,7 +43,7 @@ class WarcFileReader(conf: Configuration, filePath: Path) {
       return record
     } catch {
       case e: java.io.EOFException => {
-        println(s"error while iterating warc, try to skip: ${e}")
+        logger.warn(s"error while iterating warc, try to skip: ${e}")
         return read()
       }
     }

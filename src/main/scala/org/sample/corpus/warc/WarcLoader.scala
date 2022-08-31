@@ -7,6 +7,8 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.rdd.RDD
 
 object WarcLoader {
+  @transient lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
+
   /* Load WARC file as RDD. */
   def readFrom(
       spark: SparkSession,
@@ -30,7 +32,6 @@ object WarcLoader {
   /* count and log the number of records.  */
   def run(spark: SparkSession, conf: Conf): Unit = {
     import spark.implicits._
-    val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
     // all warc record
     val warcRecords = readFrom(spark, conf.input().mkString(",")).cache

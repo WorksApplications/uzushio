@@ -20,6 +20,8 @@ import org.apache.tika.parser.ParseContext
 import org.apache.tika.sax.BodyContentHandler
 
 object WarcToDocument {
+  @transient lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
+
   private class Conf(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[Path]](required = true)
     val output = opt[Path](default = Some(Paths.get("./out")))
@@ -56,9 +58,13 @@ object WarcToDocument {
       parser.parse(bodyIs, handler, meta, context)
     } catch {
       // In the case of error, meta and handler are empty.
-      case e: org.xml.sax.SAXException => { println(s"${e}") }
+      // TODO: error handling if recoverable
+      case e: org.xml.sax.SAXException => { logger.warn(s"${e}") }
       case e: org.apache.tika.exception.TikaException => {
-        println(s"${e}")
+        logger.warn(s"${e}")
+      }
+      case e: java.lang.StringIndexOutOfBoundsException => {
+        logger.warn(s"error during tika parsing: ${e}")
       }
     } finally {
       bodyIs.close()
@@ -69,7 +75,6 @@ object WarcToDocument {
 
   def run(spark: SparkSession, conf: Conf): Unit = {
     import spark.implicits._
-    val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
     val parsed = WarcLoader
       .readFrom(spark, conf.input().mkString(","))

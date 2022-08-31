@@ -10,8 +10,11 @@ import org.apache.hc.core5.http.impl.io.{
   SessionInputBufferImpl
 }
 import org.apache.hc.core5.http.io.SessionInputBuffer
+import org.apache.log4j.LogManager
 
 class HttpResponseParser(bufSize: Int) extends Serializable {
+  @transient lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
+
   private val responseParser = new DefaultHttpResponseParser()
   private val siBuffer = new SessionInputBufferImpl(bufSize)
   private val byteBuffer = Array.ofDim[Byte](bufSize)
@@ -33,7 +36,7 @@ class HttpResponseParser(bufSize: Int) extends Serializable {
       // TODO: data handling in the error cases
       //   currently we just skip them
       case e: org.apache.hc.core5.http.HttpException => {
-        println(s"${e}")
+        logger.warn(s"error parsing http response: ${e}")
         new HttpResponseSerializable()
       }
     } finally {
