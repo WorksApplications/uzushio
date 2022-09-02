@@ -6,21 +6,19 @@ import java.io.StringWriter
 import java.io.Writer
 import org.xml.sax.{Attributes, SAXException}
 import org.xml.sax.helpers.DefaultHandler
+import scala.util.matching.Regex
 
 /** Handler to segment text into paragraphs.
   *
   * The delimiter is used to indicate the start/end of paragraphs. It always
   * locates the start of a line, but may contain additional text after it.
   */
-class ParagraphHandler(writer: Writer, val paragraphDelimiter: String)
-    extends DefaultHandler {
+class ParagraphHandler(
+    writer: Writer = new StringWriter(),
+    val paragraphDelimiter: String = ParagraphHandler.paragraphDelimiter
+) extends DefaultHandler {
   // TODO: better flag hangling
   val tagDepth = scala.collection.mutable.Map[String, Int]()
-
-  def this() = this(new StringWriter(), ParagraphHandler.paragraphDelimiter)
-  def this(writer: Writer) = this(writer, ParagraphHandler.paragraphDelimiter)
-  def this(paragraphDelimiter: String) =
-    this(new StringWriter(), paragraphDelimiter)
 
   override def characters(ch: Array[Char], start: Int, length: Int): Unit = {
     // skip texts inside specific tags
@@ -102,6 +100,30 @@ object ParagraphHandler {
 
   /** Default paragraph delimiter. */
   val paragraphDelimiter = "CORPUS_PARAGRAPH_DELIMITER"
+
+  /** Pattern to split text at line with paragraph delimiter.
+    *
+    * The delimiter may contain additional information after it. We need (?m) to
+    * make ^/$ match all newlines.
+    */
+  def toDelimPattern(delim: String) = s"(?m)^${paragraphDelimiter}.+$$".r
+  val paragraphDelimiterPattern = toDelimPattern(paragraphDelimiter)
+
+  /** Clean parsed string (trimming). */
+  def toCleanString(
+      target: String,
+      delimPattern: Regex = paragraphDelimiterPattern,
+      outDelim: String = "\n\n"
+  ) = {
+    // split into paragraphs
+    delimPattern
+      .split(target)
+      // trim each lines and rm empty ones
+      .map(p => p.split("\n").map(_.trim).filter(_.nonEmpty).mkString("\n"))
+      // rm empty paragraphs
+      .filter(_.nonEmpty)
+      .mkString(outDelim)
+  }
 
   /** Texts inside these tags will be removed. */
   val ignoreTags = Set("style", "script")

@@ -4,8 +4,8 @@ import org.apache.tika.parser.html.HtmlMapper
 
 /** Mapper class that provides all tags to handler.
   *
-  * With this class set in context, handler can recognize tags s.t. div, br,
-  * etc. ref:
+  * With this class set in context, handler can recognize tags specific to html
+  * s.t. div, br, etc. ref:
   * https://stackoverflow.com/questions/19368018/parsing-html-elements-in-apache-tika
   */
 class AllTagMapper extends HtmlMapper {

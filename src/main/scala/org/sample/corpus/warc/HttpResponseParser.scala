@@ -12,14 +12,13 @@ import org.apache.hc.core5.http.impl.io.{
 import org.apache.hc.core5.http.io.SessionInputBuffer
 import org.apache.log4j.LogManager
 
-class HttpResponseParser(bufSize: Int) extends Serializable {
+/** Http response parser for warc record. */
+class HttpResponseParser(bufSize: Int = 128 * 1024) extends Serializable {
   @transient lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
   private val responseParser = new DefaultHttpResponseParser()
   private val siBuffer = new SessionInputBufferImpl(bufSize)
   private val byteBuffer = Array.ofDim[Byte](bufSize)
-
-  def this() = this(128 * 1024)
 
   /** Parses WarcRecord body as http response.
     *
@@ -34,7 +33,6 @@ class HttpResponseParser(bufSize: Int) extends Serializable {
       new HttpResponseSerializable(resp, body)
     } catch {
       // TODO: data handling in the error cases
-      //   currently we just skip them
       case e: org.apache.hc.core5.http.HttpException => {
         logger.warn(s"error parsing http response: ${e}")
         new HttpResponseSerializable()

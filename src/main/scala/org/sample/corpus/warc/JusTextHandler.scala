@@ -13,15 +13,13 @@ import org.xml.sax.helpers.DefaultHandler
   *
   * ref: [jusText](http://corpus.tools/wiki/Justext)
   */
-class JusTextHandler(writer: Writer, blockDelimiter: String)
-    extends DefaultHandler {
+class JusTextHandler(
+    writer: Writer = new StringWriter(),
+    blockDelimiter: String = JusTextHandler.blockDelimiter
+) extends DefaultHandler {
   // TODO: better flag hangling
   val tagDepth = scala.collection.mutable.Map[String, Int]()
   var brTagCount: Int = 0
-
-  def this() = this(new StringWriter(), JusTextHandler.blockDelimiter)
-  def this(writer: Writer) = this(writer, JusTextHandler.blockDelimiter)
-  def this(blockDelimiter: String) = this(new StringWriter(), blockDelimiter)
 
   override def characters(ch: Array[Char], start: Int, length: Int): Unit = {
     // skip texts inside specific tags

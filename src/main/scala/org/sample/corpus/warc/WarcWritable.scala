@@ -8,8 +8,9 @@ import org.apache.hadoop.io.Writable;
 /* A mutable wrapper around a {@link WarcRecord} implementing the Hadoop
  * Writable and Serializable (for Spark) interfaces.
  */
-class WarcWritable(var record: WarcRecord) extends Writable with Serializable {
-  def this() = this(null)
+class WarcWritable(var record: WarcRecord = null)
+    extends Writable
+    with Serializable {
 
   /* Returns the record currently wrapped by this writable. */
   def getRecord(): WarcRecord = {
@@ -23,7 +24,7 @@ class WarcWritable(var record: WarcRecord) extends Writable with Serializable {
 
   /* Appends the current record to a {@link DataOutput} stream. */
   override def write(out: DataOutput): Unit = {
-    // TODO: impl
+    // TODO: impl (not neccessary for current use case)
     // if (record != null) record.write(out);
   }
 
@@ -31,7 +32,7 @@ class WarcWritable(var record: WarcRecord) extends Writable with Serializable {
    * the current record.
    */
   override def readFields(in: DataInput): Unit = {
-    // TODO: impl
+    // TODO: impl (not neccessary for current use case)
     // record = new WarcRecord(in);
   }
 }

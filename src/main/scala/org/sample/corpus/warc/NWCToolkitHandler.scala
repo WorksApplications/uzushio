@@ -13,11 +13,10 @@ import org.xml.sax.helpers.DefaultHandler
   *
   * ref: [nwc-toolkit](https://github.com/xen/nwc-toolkit)
   */
-class NWCToolkitHandler(writer: Writer) extends DefaultHandler {
+class NWCToolkitHandler(writer: Writer = new StringWriter)
+    extends DefaultHandler {
   // TODO: better flag hangling
   val tagDepth = scala.collection.mutable.Map[String, Int]()
-
-  def this() = this(new StringWriter())
 
   override def characters(ch: Array[Char], start: Int, length: Int): Unit = {
     if (

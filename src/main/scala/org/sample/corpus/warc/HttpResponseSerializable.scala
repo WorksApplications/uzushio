@@ -5,9 +5,10 @@ import org.apache.hc.core5.http.ClassicHttpResponse
 import org.apache.hc.core5.http.message.BasicClassicHttpResponse
 
 /** Seritalizable wrapper of ClassicHttpResponse. */
-class HttpResponseSerializable(resp: ClassicHttpResponse, val body: Array[Byte])
-    extends Serializable {
-  def this() = this(new BasicClassicHttpResponse(600), Array.empty[Byte])
+class HttpResponseSerializable(
+    resp: ClassicHttpResponse = new BasicClassicHttpResponse(600),
+    val body: Array[Byte] = Array.empty[Byte]
+) extends Serializable {
 
   /** Returns the value of the first header with the given name.
     *
