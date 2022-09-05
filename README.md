@@ -47,6 +47,8 @@ You may also need to setup Java environment.
 
 ## sudachi
 
+Some features uses sudachi. When you want to use those, you need a sudachi dictionary.
+
 [download](http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict/) sudachi dictionary file (.dict) and place in the root dir.
 
 todo: specify dict by config/args
@@ -198,3 +200,37 @@ We use following two metrics:
     - ref: [edit distance](https://en.wikipedia.org/wiki/Edit_distance)
   - This takes `O(T^2)` time with a document length `T`, will is so long.
     - Skip this step with `--skip-editsim` option.
+
+
+## warc.WarcToDocument
+
+Extract text and meta data from WARC file.
+
+Also check README.md in the warc src dir.
+
+```bash
+spark-submit --class org.sample.corpus.warc.WarcToDocument \
+    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
+    --input=./data/nwjc/01warc/ --output=./out \
+
+# this will also create `out_fulldata` dir next to output dir.
+```
+
+## WarcCorpusCleaner
+
+Proccess warc extracted data to the same format to `04textwourl`.
+
+Also check README.md in the warc src dir.
+
+Uses same class to `CorpusCleaner`.
+
+
+# references
+
+## WARC
+- [warc format specification](https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.0)
+  - Note that latest version is v1.1 but CC uses v1.0
+- [org.archive.io](http://crawler.archive.org/apidocs/org/archive/io/package-summary.html)
+  - Iterates over warc records
+- [com.martinkl.warc](https://github.com/ept/warc-hadoop)
+  - Loads warc file using Hadoop API
