@@ -7,6 +7,7 @@ import com.worksap.nlp.sudachi.Tokenizer
 
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.functions.monotonically_increasing_id
 
 import org.sample.corpus.Sudachi
 
@@ -16,6 +17,31 @@ abstract class Filter extends scala.Serializable {
    * Filtering can be per document, sentence, or word etc.
    */
   def filter(ds: Dataset[Seq[String]]): Dataset[Seq[String]]
+}
+
+/** Do nothing. */
+class IdentityFilter extends Filter {
+  override def filter(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = ds
+}
+
+/** Deduplicate elements of sequences, keeping seq order. */
+class DedupElemFilter extends Filter {
+  override def filter(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
+    import ds.sparkSession.implicits._
+
+    // add indices: (doc_id, elem_id, txt)
+    val indexed = ds
+      .withColumn("did", monotonically_increasing_id)
+      .flatMap(r =>
+        r.getSeq[String](0).zipWithIndex.map(z => (r.getLong(1), z._2, z._1))
+      )
+    // drop duplicate paragraphs
+    val dedup = indexed.dropDuplicates("_3")
+    // reconstruct documents
+    dedup
+      .groupByKey(_._1)
+      .mapGroups((k, itr) => itr.toSeq.sortBy(_._2).map(_._3))
+  }
 }
 
 /* Filter with multiple filters combined.
@@ -127,7 +153,7 @@ class ScriptFilter extends DocumentFilter {
  */
 class ShortDocumentFilter(min: Int = 5) extends DocumentFilter {
   override def isFiltered(doc: Seq[String]): Boolean = {
-    min <= doc.length
+    min <= doc.map(_.split("\n").length).reduce(_ + _)
   }
 }
 
@@ -138,7 +164,7 @@ abstract class SentenceFilter extends Filter {
 
   override def filter(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
     import ds.sparkSession.implicits._
-    ds.map(_.filter(isFiltered))
+    ds.map(_.filter(isFiltered)).filter(_.length > 0)
   }
 }
 
@@ -183,5 +209,29 @@ class SentenceLengthFilter(min: Int = 10, max: Int = 200)
     extends SentenceFilter {
   override def isFiltered(sent: String): Boolean = {
     min <= sent.length && sent.length <= max
+  }
+}
+
+/** Filters non Japanese document based on the type of characters.
+  *
+  * Default threshold follows nwc-toolkit:text-filter.
+  *
+  * @param kanaRate
+  *   texts with hiragana/katakana less than this are filtered.
+  * @param jpRate
+  *   texts with kana/kanji less than this are filtered.
+  */
+class CharacterBaseJapaneseFilter(kanaRate: Double = 0.05, jpRate: Double = 0.7)
+    extends SentenceFilter {
+  val kanaPattern = """\p{InHiragana}|\p{InKatakana}""".r
+  val jpCharPattern =
+    """\p{InHiragana}|\p{InKatakana}|\p{InCJKUnifiedIdeographs}""".r
+
+  override def isFiltered(sent: String): Boolean = {
+    val kanaCount = kanaPattern.findAllIn(sent).length.toDouble
+    val jpCount = jpCharPattern.findAllIn(sent).length.toDouble
+    val charCount = sent.length.toDouble
+
+    (kanaCount / charCount) > kanaRate && (jpCount / charCount) > jpRate
   }
 }
