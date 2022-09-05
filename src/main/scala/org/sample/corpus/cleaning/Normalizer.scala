@@ -10,6 +10,11 @@ abstract class Normalizer extends scala.Serializable {
   def normalize(ds: Dataset[Seq[String]]): Dataset[Seq[String]]
 }
 
+/** Do nothing. */
+class IdentityNormalizer extends Normalizer {
+  override def normalize(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = ds
+}
+
 /* Normalizer with multiple ones combined.
  *
  *  @constructor create a new normalizer from given ones.
