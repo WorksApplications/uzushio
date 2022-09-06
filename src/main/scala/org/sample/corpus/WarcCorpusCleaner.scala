@@ -50,33 +50,30 @@ object WarcCorpusCleaner {
       }
     }
 
-    val (normalizer, filter) = setupWarcPreprocess()
+    // cleaning
+    // Dataset[String (document)] -> Dataset[Seq[String]]
+    val pipeline = setupWarcPreprocess()
+    val cleansed = pipeline.transform(data)
 
-    val cleansed = filter
-      .filter(normalizer.normalize(data))
-      // concat paragraphs into single one
-      .map(doc => doc.mkString("\n"))
-      .toDF
+    // Dataset[Seq[String]] -> Dataset[String (document)]
+    val result = cleansed.map(_.mkString("\n")).toDF
 
     DocumentIO.saveRawDocuments(
-      cleansed,
+      result,
       conf.output(),
-      docCol = cleansed.columns(0)
+      docCol = result.columns(0)
     )
   }
 
   /* setup cleaner equivalent to chitra pretraining preprocess */
   def setupWarcPreprocess(
       ngwordFile: Option[Path] = None
-  ): (Normalizer, Filter) = {
-    (
-      new IdentityNormalizer(),
-      new SequenceFilter(
-        Seq(
-          new FilterJapaneseBasedOnCharacter,
-          new DeduplicateElement,
-          new RemoveShortDocument
-        )
+  ): Pipeline = {
+    new Pipeline(
+      Seq(
+        new FilterJapaneseBasedOnCharacter,
+        new DeduplicateElement,
+        new RemoveShortDocument
       )
     )
   }

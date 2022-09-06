@@ -4,8 +4,8 @@ import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions.monotonically_increasing_id
 
 /** Deduplicate elements of sequences, keeping seq order. */
-class DeduplicateElement extends Filter {
-  override def filter(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
+class DeduplicateElement extends Transformer {
+  override def transform(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
     import ds.sparkSession.implicits._
 
     // add indices: (doc_id, elem_id, txt)

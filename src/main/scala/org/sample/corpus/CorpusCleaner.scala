@@ -21,65 +21,45 @@ object CorpusCleaner {
   def run(spark: SparkSession, conf: Conf): Unit = {
     import spark.implicits._
 
+    // Dataset[String (document)]
     val raw = DocumentIO.loadRawDocuments(spark, conf.input())
-    val data = raw.as[String].map(docStr => docStr.split("\n").toSeq)
 
-    val (normalizer, filter) = setupChitraPreprocess(conf.ngwords.toOption)
+    // cleaning
+    // Dataset[String (document)] -> Dataset[Seq[String]]
+    val data = raw.as[String].map(_.split("\n").toSeq)
+    val pipeline = setupChitraPreprocess(conf.ngwords.toOption)
+    val cleansed = pipeline.transform(data)
 
-    val cleansed = filter
-      .filter(normalizer.normalize(data))
-      .map(doc => doc.mkString("\n"))
-      .toDF
+    // Dataset[Seq[String]] -> Dataset[String (document)]
+    val result = cleansed.map(_.mkString("\n")).toDF
 
     DocumentIO.saveRawDocuments(
-      cleansed,
+      result,
       conf.output(),
-      docCol = cleansed.columns(0)
+      docCol = result.columns(0)
     )
   }
 
   /* setup cleaner equivalent to chitra pretraining preprocess */
   def setupChitraPreprocess(
       ngwordFile: Option[Path] = None
-  ): (Normalizer, Filter) = {
-    (
-      new SequenceDocumentNormalizer(
-        Seq(
-          new SequenceSentenceNormalizer(
-            Seq(
-              new RemoveWikipediaCitation,
-              new NormalizeCharacter,
-              new NormalizeWhitespace
-            )
-          ),
-          new ConcatShortSentence
-        )
-      ),
-      new SequenceFilter(
-        Seq(
-          new SequenceSentenceFilter(
-            Seq(
-              new RemoveEmail,
-              new RemoveURL,
-              new FilterBySentenceLength
-            )
-          ),
-          new SequenceDocumentFilter(
-            Seq(
-              new RemoveShortDocument,
-              new RemoveScriptDocument
-            )
-          )
-        ) ++ option2seq(ngwordFile).map(RemoveNGWordDocument.fromFile(_))
+  ): Pipeline = {
+    new Pipeline(
+      Seq(
+        new RemoveWikipediaCitation,
+        new NormalizeCharacter,
+        new NormalizeWhitespace,
+        new ConcatShortSentence,
+        new RemoveEmail,
+        new RemoveURL,
+        new FilterBySentenceLength,
+        new RemoveShortDocument,
+        new RemoveScriptDocument,
+        ngwordFile
+          .map(RemoveNGWordDocument.fromFile(_))
+          .getOrElse(new IdentityTransformer)
       )
     )
-  }
-
-  def option2seq[T](opt: Option[T]): Seq[T] = {
-    opt match {
-      case Some(t) => { Seq(t) }
-      case None    => { Seq() }
-    }
   }
 
   def main(args: Array[String]): Unit = {

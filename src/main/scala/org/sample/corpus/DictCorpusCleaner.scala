@@ -19,20 +19,18 @@ object DictCorpusCleaner {
   def run(spark: SparkSession, conf: Conf): Unit = {
     import spark.implicits._
 
-    // cleaning
     // Dataset[String (document)]
     val raw = DocumentIO.loadRawDocuments(spark, conf.input())
 
     // cleaning
     // Dataset[String (document)] -> Dataset[Seq[String]]
-    val data = raw.as[String].map(docStr => docStr.split("\n").toSeq)
-    val (normalizer, filter) = setupDictCorpusPreprocess()
-    val cleaned = filter.filter(normalizer.normalize(data))
+    val data = raw.as[String].map(_.split("\n").toSeq)
+    val pipeline = setupDictCorpusPreprocess()
+    val cleansed = pipeline.transform(data)
 
     // Dataset[Seq[String]] -> Dataset[String (document)]
-    val result = cleaned.map(_.mkString("\n")).toDF
+    val result = cleansed.map(_.mkString("\n")).toDF
 
-    // write
     DocumentIO.saveRawDocuments(
       result,
       conf.output(),
@@ -42,19 +40,13 @@ object DictCorpusCleaner {
   }
 
   /* setup cleaner equivalent to chitra pretraining preprocess */
-  def setupDictCorpusPreprocess(): (Normalizer, Filter) = {
-    (
-      new SequenceDocumentNormalizer(
-        Seq(
-          new SequenceSentenceNormalizer(
-            Seq(
-              new NormalizeCharacter(keepWS = true),
-              new NormalizeWhitespace
-            )
-          )
-        )
-      ),
-      new DeduplicateElement
+  def setupDictCorpusPreprocess(): Pipeline = {
+    new Pipeline(
+      Seq(
+        new NormalizeCharacter(keepWS = true),
+        new NormalizeWhitespace,
+        new DeduplicateElement
+      )
     )
   }
 

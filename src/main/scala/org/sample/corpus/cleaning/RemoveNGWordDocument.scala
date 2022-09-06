@@ -15,7 +15,7 @@ import org.sample.corpus.Sudachi
   * @param ngwords
   *   the set of words which should not appear in the filtered documents
   */
-class RemoveNGWordDocument(ngwords: Set[String]) extends Filter {
+class RemoveNGWordDocument(ngwords: Set[String]) extends Transformer {
   val ngwordPattern = s"""(${ngwords.mkString("|")})""".r
   val mode = Tokenizer.SplitMode.C
 
@@ -43,7 +43,7 @@ class RemoveNGWordDocument(ngwords: Set[String]) extends Filter {
     false
   }
 
-  def filter(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
+  override def transform(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
     import ds.sparkSession.implicits._
 
     if (ngwords.size == 0) { ds }

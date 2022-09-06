@@ -23,26 +23,27 @@ object RemoveTemplate {
   def run(spark: SparkSession, conf: Conf): Unit = {
     import spark.implicits._
 
+    // Dataset[String (document)]
     val raw = DocumentIO.loadRawDocuments(spark, conf.input())
-
     val uniq = raw.distinct
 
-    val docs = uniq.as[String].map(docStr => docStr.split("\n").toSeq)
-    val (normalizer, filter) = setupRemoveTemplate(
+    // cleaning
+    // Dataset[String (document)] -> Dataset[Seq[String]]
+    val docs = uniq.as[String].map(_.split("\n").toSeq)
+    val pipeline = setupRemoveTemplate(
       conf.minRepeat(),
       conf.substrs.toOption,
       conf.perSentence()
     )
+    val cleansed = pipeline.transform(docs)
 
-    val cleansed = filter
-      .filter(normalizer.normalize(docs))
-      .map(doc => doc.mkString("\n"))
-      .toDF
+    // Dataset[Seq[String]] -> Dataset[String (document)]
+    val result = cleansed.map(doc => doc.mkString("\n")).toDF
 
     DocumentIO.saveRawDocuments(
-      cleansed,
+      result,
       conf.output(),
-      docCol = cleansed.columns(0)
+      docCol = result.columns(0)
     )
   }
 
@@ -50,25 +51,17 @@ object RemoveTemplate {
   def setupRemoveTemplate(
       minRep: Int = 2,
       substrFile: Option[Path] = None,
-      perSentence: Boolean
-  ): (Normalizer, Filter) = {
-    (
-      new SequenceDocumentNormalizer(
-        Seq(
-          new DeduplicateRepeatingSentence(minRep)
-        ) ++ option2seq(substrFile).map(
-          RemoveSubstring.fromFile(_, perSentence = perSentence)
-        )
-      ),
-      new RemoveShortDocument
+      perSentence: Boolean = True
+  ): Pipeline = {
+    new Pipeline(
+      Seq(
+        new DeduplicateRepeatingSentence(minRep),
+        substrFile
+          .map(RemoveSubstring.fromFile(_, perSentence = perSentence))
+          .getOrElse(new IdentityTransformer),
+        new RemoveShortDocument
+      )
     )
-  }
-
-  def option2seq[T](opt: Option[T]): Seq[T] = {
-    opt match {
-      case Some(t) => { Seq(t) }
-      case None    => { Seq() }
-    }
   }
 
   def main(args: Array[String]): Unit = {
