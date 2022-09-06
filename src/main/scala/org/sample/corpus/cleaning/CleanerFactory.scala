@@ -10,16 +10,26 @@ class CleanerFactory(conf: Config) {
   val stageConfs =
     conf.getObjectList("stages").asScala.map(_.asInstanceOf[ConfigObject])
 
-  def build() = {
+  def buildViaConstructor() = {
     val stages = stageConfs.map(co => {
       val name = co.get("class").unwrapped.asInstanceOf[String]
-      val companion = CleanerFactory
-        .findCompanionOf(name)
-        .asInstanceOf[FromConf]
-      companion(co)
+      val constructor = CleanerFactory.getConstructorOf(name)
+      constructor.newInstance(co)
     })
 
-    println(s"build: ${stages}")
+    println(s"build: ${stages}") // for debug
+  }
+
+  def buildViaCompanion() = {
+    val stages = stageConfs.map(co => {
+      val name = co.get("class").unwrapped.asInstanceOf[String]
+      CleanerFactory
+        .getCompanionOf(name)
+        .asInstanceOf[FromConfig]
+        .fromConfig(co)
+    })
+
+    println(s"build: ${stages}") // for debug
   }
 
   override def toString(): String = {
@@ -48,18 +58,22 @@ object CleanerFactory {
     new CleanerFactory(ConfigFactory.parseFile(path.toFile))
   }
 
+  private val classname = this.getClass.getName()
+  private val classPrefix = classname.take(classname.lastIndexOf("."))
+
   private def withClassPrefix(name: String): String = {
-    val thisname = this.getClass.getName()
-    val prefix = thisname.take(thisname.lastIndexOf("."))
-    if (name.startsWith(prefix)) { name }
-    else { s"${prefix}.${name}" }
+    if (name.startsWith(classPrefix)) { name }
+    else { s"${classPrefix}.${name}" }
   }
 
-  private def rmClassPrefix(name: String): String = {
-    name.split(raw"\.").last
+  private val configObjClass = Class.forName("com.typesafe.config.ConfigObject")
+
+  def getConstructorOf(name: String) = {
+    val clz = Class.forName(withClassPrefix(name))
+    clz.getConstructor(configObjClass)
   }
 
-  def findCompanionOf(name: String) = {
+  def getCompanionOf(name: String) = {
     val clz = Class.forName(withClassPrefix(name))
     clz.getClassLoader
       .loadClass(clz.getName + "$")

@@ -21,7 +21,7 @@ object ConfigSample {
   def run(spark: SparkSession, conf: Conf): Unit = {
     val cf = CleanerFactory.from(conf.setting())
 
-    cf.build()
+    cf.buildViaCompanion()
     // println(cf.toString())
 
     // val fconf = setting.confFile.toOption match {
