@@ -73,9 +73,9 @@ object WarcCorpusCleaner {
       new IdentityNormalizer(),
       new SequenceFilter(
         Seq(
-          new CharacterBaseJapaneseFilter(),
-          new DedupElemFilter(),
-          new ShortDocumentFilter
+          new FilterJapaneseBasedOnCharacter,
+          new DeduplicateElement,
+          new RemoveShortDocument
         )
       )
     )

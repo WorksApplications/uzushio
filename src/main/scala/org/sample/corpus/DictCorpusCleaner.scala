@@ -48,21 +48,14 @@ object DictCorpusCleaner {
         Seq(
           new SequenceSentenceNormalizer(
             Seq(
-              new CharacterNormalizer(keepWS = true),
-              new WhitespaceNormalizer
+              new NormalizeCharacter(keepWS = true),
+              new NormalizeWhitespace
             )
           )
         )
       ),
-      new DuplicateSentenceFilter()
+      new DeduplicateElement
     )
-  }
-
-  def option2seq[T](opt: Option[T]): Seq[T] = {
-    opt match {
-      case Some(t) => { Seq(t) }
-      case None    => { Seq() }
-    }
   }
 
   def main(args: Array[String]): Unit = {

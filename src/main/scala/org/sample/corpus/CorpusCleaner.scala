@@ -47,30 +47,30 @@ object CorpusCleaner {
         Seq(
           new SequenceSentenceNormalizer(
             Seq(
-              new CitationNormalizer,
-              new CharacterNormalizer,
-              new WhitespaceNormalizer
+              new RemoveWikipediaCitation,
+              new NormalizeCharacter,
+              new NormalizeWhitespace
             )
           ),
-          new ConcatShortSentenceNormalizer
+          new ConcatShortSentence
         )
       ),
       new SequenceFilter(
         Seq(
           new SequenceSentenceFilter(
             Seq(
-              new EmailFilter,
-              new UrlFilter,
-              new SentenceLengthFilter
+              new RemoveEmail,
+              new RemoveURL,
+              new FilterBySentenceLength
             )
           ),
           new SequenceDocumentFilter(
             Seq(
-              new ShortDocumentFilter,
-              new ScriptFilter
+              new RemoveShortDocument,
+              new RemoveScriptDocument
             )
           )
-        ) ++ option2seq(ngwordFile).map(NgWordFilter.fromFile(_))
+        ) ++ option2seq(ngwordFile).map(RemoveNGWordDocument.fromFile(_))
       )
     )
   }
@@ -85,7 +85,7 @@ object CorpusCleaner {
   def main(args: Array[String]): Unit = {
     val conf = new Conf(args)
     val spark =
-      SparkSession.builder().appName("CorpusCleaner").getOrCreate()
+      SparkSession.builder().appName(this.getClass.getSimpleName).getOrCreate()
 
     try { run(spark, conf) }
     finally { spark.stop() }

@@ -55,12 +55,12 @@ object RemoveTemplate {
     (
       new SequenceDocumentNormalizer(
         Seq(
-          new DeduplicateRepeatingSentences(minRep)
+          new DeduplicateRepeatingSentence(minRep)
         ) ++ option2seq(substrFile).map(
           RemoveSubstring.fromFile(_, perSentence = perSentence)
         )
       ),
-      new ShortDocumentFilter
+      new RemoveShortDocument
     )
   }
 
@@ -74,7 +74,7 @@ object RemoveTemplate {
   def main(args: Array[String]): Unit = {
     val conf = new Conf(args)
     val spark =
-      SparkSession.builder().appName("RemoveTemplate").getOrCreate()
+      SparkSession.builder().appName(this.getClass.getSimpleName).getOrCreate()
 
     try { run(spark, conf) }
     finally { spark.stop() }
