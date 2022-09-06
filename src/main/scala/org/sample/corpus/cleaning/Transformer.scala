@@ -1,10 +1,19 @@
 package org.sample.corpus.cleaning
 
+import com.typesafe.config.ConfigObject
 import org.apache.spark.sql.Dataset
 
 /** Transforms given spark dataset. */
 trait Transformer extends scala.Serializable {
   def transform(ds: Dataset[Seq[String]]): Dataset[Seq[String]]
+}
+
+/** Trait to instanciate transformer based on config file.
+  *
+  * Every Transformers should have a companion object with this trait.
+  */
+trait FromConfig {
+  def fromConfig(conf: ConfigObject): Transformer
 }
 
 /** Transformer that does nothing. */

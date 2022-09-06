@@ -13,7 +13,7 @@ import com.typesafe.config.ConfigObject
   */
 class FilterBySentenceLength(min: Int = 10, max: Int = 200)
     extends SentenceFilter
-    with FieldSettable {
+    with FieldSettable[FilterBySentenceLength] {
   override def isFiltered(sent: String): Boolean = {
     min <= sent.length && sent.length <= max
   }
@@ -24,14 +24,12 @@ class FilterBySentenceLength(min: Int = 10, max: Int = 200)
 }
 
 object FilterBySentenceLength extends FromConfig {
-  def fromConfig(conf: ConfigObject) = {
+  override def fromConfig(conf: ConfigObject): FilterBySentenceLength = {
     val args = Map[String, Option[Any]](
       "min" -> Option(conf.get("min")).map(_.unwrapped.asInstanceOf[Int]),
       "max" -> Option(conf.get("max")).map(_.unwrapped.asInstanceOf[Int])
     ).collect { case (k, Some(v)) => k -> v }
 
-    val ret = new FilterBySentenceLength()
-    ret.setFields(args)
-    ret
+    new FilterBySentenceLength().setFields(args)
   }
 }
