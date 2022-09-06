@@ -49,9 +49,9 @@ object RemoveTemplate {
 
   /* setup cleaner to remove specific substrings */
   def setupRemoveTemplate(
-      minRep: Int = 2,
-      substrFile: Option[Path] = None,
-      perSentence: Boolean = True
+      minRep: Int,
+      substrFile: Option[Path],
+      perSentence: Boolean
   ): Pipeline = {
     new Pipeline(
       Seq(
