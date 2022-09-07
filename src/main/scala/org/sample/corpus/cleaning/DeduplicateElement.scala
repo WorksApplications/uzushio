@@ -1,5 +1,6 @@
 package org.sample.corpus.cleaning
 
+import com.typesafe.config.ConfigObject
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions.monotonically_increasing_id
 
@@ -21,4 +22,9 @@ class DeduplicateElement extends Transformer {
       .groupByKey(_._1)
       .mapGroups((k, itr) => itr.toSeq.sortBy(_._2).map(_._3))
   }
+}
+
+object DeduplicateElement extends FromConfig {
+  override def fromConfig(conf: ConfigObject): Transformer =
+    new DeduplicateElement
 }

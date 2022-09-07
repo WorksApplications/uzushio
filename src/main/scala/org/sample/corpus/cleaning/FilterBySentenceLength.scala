@@ -18,16 +18,15 @@ class FilterBySentenceLength(min: Int = 10, max: Int = 200)
     min <= sent.length && sent.length <= max
   }
 
-  override def toString(): String = {
+  override def toString(): String =
     s"${this.getClass.getSimpleName}(${min}, ${max})"
-  }
 }
 
 object FilterBySentenceLength extends FromConfig {
   override def fromConfig(conf: ConfigObject): FilterBySentenceLength = {
     val args = Map[String, Option[Any]](
-      "min" -> Option(conf.get("min")).map(_.unwrapped.asInstanceOf[Int]),
-      "max" -> Option(conf.get("max")).map(_.unwrapped.asInstanceOf[Int])
+      "min" -> conf.getAs[Int]("min"),
+      "max" -> conf.getAs[Int]("max")
     ).collect { case (k, Some(v)) => k -> v }
 
     new FilterBySentenceLength().setFields(args)

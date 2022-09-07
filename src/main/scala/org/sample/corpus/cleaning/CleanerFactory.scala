@@ -41,7 +41,8 @@ class CleanerFactory(conf: Config) {
 
 object CleanerFactory {
   // todo: way to get this list?
-  val providedSettings = Set("chitra", "sudachiDictCorpus", "rmTemplate")
+  val providedSettings =
+    Set("chitra", "sudachiDictCorpus", "rmTemplate", "warc")
 
   def from(nameOrPath: String) = {
     if (providedSettings.contains(nameOrPath)) {

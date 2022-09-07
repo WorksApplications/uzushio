@@ -1,5 +1,7 @@
 package org.sample.corpus.cleaning
 
+import com.typesafe.config.ConfigObject
+
 /** Filters documents that contain script. */
 class RemoveScriptDocument extends DocumentFilter {
   val curlyBracketsPattern = """[\{|\}]""".r
@@ -11,4 +13,9 @@ class RemoveScriptDocument extends DocumentFilter {
   override def isFiltered(doc: Seq[String]): Boolean = {
     doc.foldLeft(true)((b, sent) => b && isFilteredSent(sent))
   }
+}
+
+object RemoveScriptDocument extends FromConfig {
+  override def fromConfig(conf: ConfigObject): RemoveScriptDocument =
+    new RemoveScriptDocument
 }

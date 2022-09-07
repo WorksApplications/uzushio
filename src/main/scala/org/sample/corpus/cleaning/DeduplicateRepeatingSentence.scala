@@ -1,8 +1,12 @@
 package org.sample.corpus.cleaning
 
+import com.typesafe.config.ConfigObject
+
 /** Deduplicate same sentences repeating many times.
   */
-class DeduplicateRepeatingSentence(minRep: Int = 2) extends DocumentNormalizer {
+class DeduplicateRepeatingSentence(minRep: Int = 2)
+    extends DocumentNormalizer
+    with FieldSettable[DeduplicateRepeatingSentence] {
   override def normalizeDocument(doc: Seq[String]): Seq[String] = {
     var (i, j) = (0, 0)
     var indices: Seq[Int] = Vector()
@@ -15,5 +19,17 @@ class DeduplicateRepeatingSentence(minRep: Int = 2) extends DocumentNormalizer {
       i = j
     }
     for (i <- indices) yield doc(i)
+  }
+
+  override def toString(): String = s"${this.getClass.getSimpleName}(${minRep})"
+}
+
+object DeduplicateRepeatingSentence extends FromConfig {
+  override def fromConfig(conf: ConfigObject): DeduplicateRepeatingSentence = {
+    val args = Map[String, Option[Any]](
+      "minRep" -> conf.getAs[Int]("minRepeat")
+    ).collect { case (k, Some(v)) => k -> v }
+
+    new DeduplicateRepeatingSentence().setFields(args)
   }
 }

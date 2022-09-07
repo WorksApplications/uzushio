@@ -1,9 +1,10 @@
 package org.sample.corpus.cleaning
 
-import collection.JavaConverters._
+import com.typesafe.config.ConfigObject
 import com.worksap.nlp.sudachi.Tokenizer
+import collection.JavaConverters._
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Path, Files}
+import java.nio.file.{Path, Paths, Files}
 import org.apache.spark.sql.Dataset
 
 import org.sample.corpus.Sudachi
@@ -55,14 +56,24 @@ class RemoveNGWordDocument(ngwords: Set[String]) extends Transformer {
       })
     }
   }
+
+  override def toString(): String =
+    s"${this.getClass.getSimpleName}(#word=${ngwords.size})"
 }
 
-object RemoveNGWordDocument {
+object RemoveNGWordDocument extends FromConfig {
+  val defaultPath = "./resources/ng_words.txt"
+
   def fromFile(ngwordsFile: Path): RemoveNGWordDocument = {
     val fullstr =
       new String(Files.readAllBytes(ngwordsFile), StandardCharsets.UTF_8)
     new RemoveNGWordDocument(
       fullstr.split("\n").map(_.trim).filter(_.nonEmpty).toSet
     )
+  }
+
+  override def fromConfig(conf: ConfigObject): RemoveNGWordDocument = {
+    val filePath = conf.getOrElseAs[String]("path", defaultPath)
+    fromFile(Paths.get(filePath))
   }
 }
