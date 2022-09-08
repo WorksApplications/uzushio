@@ -47,4 +47,6 @@ class Pipeline(private var stages: Seq[Transformer] = Seq())
   override def transform(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
     stages.foldLeft(ds)((ds, tr) => tr.transform(ds))
   }
+
+  override def toString(): String = { s"Pipeline(${stages})" }
 }

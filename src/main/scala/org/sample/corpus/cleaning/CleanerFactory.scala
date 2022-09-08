@@ -10,37 +10,40 @@ class CleanerFactory(conf: Config) {
   val stageConfs =
     conf.getObjectList("stages").asScala.map(_.asInstanceOf[ConfigObject])
 
-  def buildViaConstructor() = {
-    val stages = stageConfs.map(co => {
+  /** Instantiate stages based on the config. Use constructor. */
+  def getStagesFromConstructor() = {
+    stageConfs.map(co => {
       val name = co.get("class").unwrapped.asInstanceOf[String]
       val constructor = CleanerFactory.getConstructorOf(name)
       constructor.newInstance(co)
     })
-
-    println(s"build: ${stages}") // for debug
   }
 
-  def buildViaCompanion() = {
-    val stages = stageConfs.map(co => {
+  /** Instantiate stages based on the config. Use companion object. */
+  def getStagesFromCompanion() = {
+    stageConfs.map(co => {
       val name = co.get("class").unwrapped.asInstanceOf[String]
       CleanerFactory
         .getCompanionOf(name)
         .asInstanceOf[FromConfig]
         .fromConfig(co)
     })
+  }
 
-    println(s"build: ${stages}") // for debug
+  /** Build a transformer based on the config. */
+  def build() = {
+    val stages = getStagesFromCompanion()
+    new Pipeline(stages)
   }
 
   override def toString(): String = {
     val sstr = stageConfs.map(_.get("class").unwrapped).mkString(", ")
-
     s"stages: ${sstr}"
   }
 }
 
 object CleanerFactory {
-  // todo: way to get this list?
+  // todo: check if there is a way to get this list
   val providedSettings =
     Set("chitra", "sudachiDictCorpus", "rmTemplate", "warc")
 
@@ -62,18 +65,19 @@ object CleanerFactory {
   private val classname = this.getClass.getName()
   private val classPrefix = classname.take(classname.lastIndexOf("."))
 
+  /** Append class name prefix i.e. org.sample.corpus... */
   private def withClassPrefix(name: String): String = {
     if (name.startsWith(classPrefix)) { name }
     else { s"${classPrefix}.${name}" }
   }
 
-  private val configObjClass = Class.forName("com.typesafe.config.ConfigObject")
-
+  /** Get a constructor of a class from the given name. */
   def getConstructorOf(name: String) = {
     val clz = Class.forName(withClassPrefix(name))
-    clz.getConstructor(configObjClass)
+    clz.getConstructor(Class.forName("com.typesafe.config.ConfigObject"))
   }
 
+  /** Get a companion object of a class from the given name. */
   def getCompanionOf(name: String) = {
     val clz = Class.forName(withClassPrefix(name))
     clz.getClassLoader
