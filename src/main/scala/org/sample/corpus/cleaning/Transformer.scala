@@ -31,22 +31,3 @@ trait FromConfig {
 class IdentityTransformer extends Transformer {
   override def transform(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = ds
 }
-
-/** Sequencially apply multiple transformers.
-  *
-  * @param stages
-  *   list of transformers to apply
-  */
-class Pipeline(private var stages: Seq[Transformer] = Seq())
-    extends Transformer {
-  def setStages(value: Seq[Transformer]): Pipeline = {
-    stages = value
-    this
-  }
-
-  override def transform(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
-    stages.foldLeft(ds)((ds, tr) => tr.transform(ds))
-  }
-
-  override def toString(): String = { s"Pipeline(${stages})" }
-}

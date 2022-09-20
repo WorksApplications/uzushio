@@ -5,8 +5,7 @@ import org.rogach.scallop.ScallopConf
 import org.apache.spark.sql.SparkSession
 
 import com.typesafe.config.ConfigFactory
-
-import org.sample.corpus.cleaning.CleanerFactory
+import org.sample.corpus.cleaning._
 
 object ConfigSample {
   private class Conf(args: Seq[String]) extends ScallopConf(args) {
@@ -19,10 +18,8 @@ object ConfigSample {
   }
 
   def run(spark: SparkSession, conf: Conf): Unit = {
-    val cf = CleanerFactory.from(conf.setting())
-
-    cf.buildViaCompanion()
-    // println(cf.toString())
+    val pipe = Pipeline.from(conf.setting())
+    println(pipe)
 
     // val fconf = setting.confFile.toOption match {
     //   case Some(path) => { ConfigFactory.load(path) }

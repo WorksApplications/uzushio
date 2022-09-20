@@ -8,7 +8,7 @@ import org.apache.spark.sql.functions._
 
 import org.sample.corpus.cleaning._
 
-object CorpusCleaner {
+object ChitraCleaner {
   private class Conf(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[Path]](required = true)
     val output = opt[Path](default = Some(Paths.get("./out")))

@@ -17,7 +17,7 @@ object CorpusCleaner {
     val inputFormat = opt[String](descr =
       "The format of input files (text/parquet). Neccessary when directory is provided as input."
     )
-    val configFile = opt[String](
+    val config = opt[String](
       required = true,
       default = Some("chitra"),
       descr = "Name or Path to the config file."
@@ -28,7 +28,7 @@ object CorpusCleaner {
       descr = "The format of output files (text/parquet)."
     )
 
-    /** Delimiter of documents and paragraphs. */
+    /** Delimiter of documents and paragraphs in input/output. */
     val delimParagraph = opt[String](default = Some("\n\n"))
     val delimDocument = opt[String](default = Some("\n\n\n"))
     val delimParagraphOut = opt[String](default = Some("\n"))
@@ -36,7 +36,7 @@ object CorpusCleaner {
 
     val documentColumn = opt[String](
       default = Some("document"),
-      descr = "Name of input document column (for parquet input)."
+      descr = "Name of the document column (for parquet)."
     )
 
     verify()
@@ -78,7 +78,7 @@ object CorpusCleaner {
           .withColumnRenamed("value", docCol)
       }
     }
-    rawdf.as[String].map(_.split(conf.paragraphDelim()).toSeq)
+    rawdf.as[String].map(_.split(conf.delimParagraph()).toSeq)
   }
 
   def run(spark: SparkSession, conf: Conf): Unit = {
@@ -88,15 +88,15 @@ object CorpusCleaner {
     val data = loadInput(spark, conf)
 
     // setup pipeline and apply
-    // todo keep original non-document column
-    val pipeline = CleanerFactory.from(conf.configFile()).build()
+    // TODO: keep original non-document column
+    val pipeline = Pipeline.from(conf.config())
     logger.info(s"pipeline: ${pipeline}")
     val processed = pipeline.transform(data)
 
     // write
     // TODO: parquet output
     processed
-      .map(_.mkString(conf.delimDocumentOut()))
+      .map(_.mkString(conf.delimParagraphOut()))
       .write
       .option("lineSep", conf.delimDocumentOut())
       .text(conf.output().toString)
