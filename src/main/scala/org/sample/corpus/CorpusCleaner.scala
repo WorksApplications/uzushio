@@ -78,7 +78,8 @@ object CorpusCleaner {
           .withColumnRenamed("value", docCol)
       }
     }
-    rawdf.as[String].map(_.split(conf.delimParagraph()).toSeq)
+    val delim = conf.delimParagraph()
+    rawdf.as[String].map(_.split(delim).toSeq)
   }
 
   def run(spark: SparkSession, conf: Conf): Unit = {
@@ -95,8 +96,9 @@ object CorpusCleaner {
 
     // write
     // TODO: parquet output
+    val delim = conf.delimParagraphOut()
     processed
-      .map(_.mkString(conf.delimParagraphOut()))
+      .map(_.mkString(delim))
       .write
       .option("lineSep", conf.delimDocumentOut())
       .text(conf.output().toString)
