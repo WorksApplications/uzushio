@@ -27,28 +27,7 @@ class Pipeline(private var stages: Seq[Transformer] = Seq())
 }
 
 object Pipeline {
-  // todo: check if there is a way to get this list
-  val providedSettings =
-    Set("chitra", "sudachiDictCorpus", "rmTemplate", "warc")
-
-  def from(nameOrPath: String): Pipeline = {
-    if (providedSettings.contains(nameOrPath)) {
-      fromConfig(ConfigFactory.load(nameOrPath))
-    } else {
-      fromConfigFile(Paths.get(nameOrPath))
-    }
-  }
-
-  def fromConfigFile(path: Path): Pipeline = {
-    if (!Files.exists(path)) {
-      throw new java.nio.file.NoSuchFileException(path.toString())
-    }
-    fromConfig(ConfigFactory.parseFile(path.toFile))
-  }
-
   def fromConfig(conf: Config): Pipeline = {
-    conf.checkValid(ConfigFactory.defaultReference(), "stages")
-
     val stageConfs =
       conf.getObjectList("stages").asScala.map(_.asInstanceOf[ConfigObject])
     val stages = getStagesFromCompanion(stageConfs)

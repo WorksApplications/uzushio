@@ -1,7 +1,8 @@
 package org.sample.corpus
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import org.rogach.scallop.ScallopConf
+import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.log4j.LogManager
 
 import org.apache.spark.sql.{SparkSession, Dataset, DataFrame, Row}
@@ -12,7 +13,7 @@ import org.sample.corpus.cleaning._
 object CorpusCleaner {
   @transient lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
-  /* config from CLI. */
+  /* Config from CLI. */
   private class CLIConf(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[Path]](required = true, descr = "List of input files.")
     val output = opt[Path](default = Some(Paths.get("./out")))
@@ -22,50 +23,86 @@ object CorpusCleaner {
       descr = "Name or Path to the config file."
     )
 
-    val inputFormat = opt[String](descr =
-      "Input file format (text/parquet). " +
-        "If not given, try to estimate from the extension of the first file."
-    )
-    val inputDocDelim =
+    val inputFormat = opt[String](descr = "Input file format (text/parquet).")
+    val inputDelimiter =
       opt[String](descr = "Delimiter of documents (text)")
-    val inputDocCol =
+    val inputColumn =
       opt[String](descr = "Name of the document column (parquet).")
 
     val outputFormat = opt[String](descr = "Output file format (text/parquet).")
-    val outputDocDelim =
+    val outputDelimiter =
       opt[String](descr = "Delimiter of documents (text).")
-    val outputDocCol =
+    val outputColumn =
       opt[String](descr = "Name of the document column (parquet).")
-    val outputElemDelim =
+    val outputElementDelimiter =
       opt[String](descr = "Delimiter of elements e.g. paragraph, sentence.")
 
     verify()
   }
 
-  val availableFormat = Set("text", "txt", "parquet")
+  /* Config that cliconf and configfile merged.
+   *
+   * Prefers cli > config file > default value.
+   * See `src/main/resources/reference.conf` for the default values.
+   */
+  private class Conf(val cliconf: CLIConf) {
+    // args only from cli
+    val input = cliconf.input()
+    val output = cliconf.output()
 
-  def detectInputFormat(
-      input: List[Path],
-      inputFormat: Option[String]
-  ): String = {
-    val ext = inputFormat.getOrElse(input(0).toString.split("\\.").last)
-    if (!availableFormat.contains(ext)) {
-      throw new java.lang.RuntimeException(
-        s"Failed during input format detection: ${ext}."
+    // load config file
+    val fileconf = loadConfig(cliconf.config())
+    fileconf.checkValid(ConfigFactory.defaultReference())
+
+    // args
+    val inputFormat: String = cliconf.inputFormat.toOption.getOrElse(
+      Option(fileconf.getString("input.format")).get
+    )
+    val inputColumn: String = cliconf.inputColumn.toOption.getOrElse(
+      Option(fileconf.getString("input.column")).get
+    )
+    val inputDelimiter: String = cliconf.inputDelimiter.toOption.getOrElse(
+      Option(fileconf.getString("input.delimiter")).get
+    )
+    val outputFormat: String = cliconf.outputFormat.toOption.getOrElse(
+      Option(fileconf.getString("output.format")).get
+    )
+    val outputColumn: String = cliconf.outputColumn.toOption.getOrElse(
+      Option(fileconf.getString("output.column")).get
+    )
+    val outputDelimiter: String = cliconf.outputDelimiter.toOption.getOrElse(
+      Option(fileconf.getString("output.delimiter")).get
+    )
+    val outputElementDelimiter: String =
+      cliconf.outputElementDelimiter.toOption.getOrElse(
+        Option(fileconf.getString("output.elementDelimiter")).get
       )
+  }
+
+  // todo: check if there is a way to get this list
+  private val providedSettings =
+    Set("chitra", "sudachiDictCorpus", "rmTemplate", "warc")
+
+  private def loadConfig(nameOrPath: String): Config = {
+    if (providedSettings.contains(nameOrPath)) {
+      ConfigFactory.load(nameOrPath)
+    } else {
+      val path = Paths.get(nameOrPath)
+      if (!Files.exists(path)) {
+        throw new java.nio.file.NoSuchFileException(path.toString)
+      }
+      ConfigFactory.parseFile(path.toFile)
     }
-    ext
   }
 
   /** load documents as a seq of full text. */
-  def loadInput(spark: SparkSession, conf: CLIConf): Dataset[Seq[String]] = {
+  def loadInput(spark: SparkSession, conf: Conf): Dataset[Seq[String]] = {
     import spark.implicits._
 
-    val fmt = detectInputFormat(conf.input(), conf.inputFormat.toOption)
-    val inputPaths = DocumentIO.formatPathList(conf.input()).map(_.toString)
-    val docCol = conf.inputDocCol()
+    val inputPaths = DocumentIO.formatPathList(conf.input).map(_.toString)
+    val docCol = conf.inputColumn
 
-    val rawdf = fmt match {
+    val rawdf = conf.inputFormat match {
       case "parquet" => {
         spark.read
           .load(inputPaths: _*)
@@ -73,7 +110,7 @@ object CorpusCleaner {
       }
       case "text" | "txt" => {
         spark.read
-          .option("lineSep", conf.inputDocDelim())
+          .option("lineSep", conf.inputDelimiter)
           .text(inputPaths: _*)
           .withColumnRenamed("value", docCol)
       }
@@ -81,7 +118,7 @@ object CorpusCleaner {
     rawdf.as[String].map(Seq(_))
   }
 
-  def run(spark: SparkSession, conf: CLIConf): Unit = {
+  def run(spark: SparkSession, conf: Conf): Unit = {
     import spark.implicits._
 
     // Dataset[Seq[String (paragraph)]]
@@ -89,22 +126,22 @@ object CorpusCleaner {
 
     // setup pipeline and apply
     // TODO: keep original non-document column
-    val pipeline = Pipeline.from(conf.config())
+    val pipeline = Pipeline.fromConfig(conf.fileconf)
     logger.info(s"pipeline: ${pipeline}")
     val processed = pipeline.transform(data)
 
     // write
     // TODO: parquet output
-    val delim = conf.outputElemDelim()
+    val delim = conf.outputElementDelimiter
     processed
       .map(_.mkString(delim))
       .write
-      .option("lineSep", conf.outputDocDelim())
-      .text(conf.output().toString)
+      .option("lineSep", conf.outputDelimiter)
+      .text(conf.output.toString)
   }
 
   def main(args: Array[String]): Unit = {
-    val conf = new CLIConf(args)
+    val conf = new Conf(new CLIConf(args))
     val spark =
       SparkSession.builder().appName(this.getClass.getSimpleName).getOrCreate()
 
