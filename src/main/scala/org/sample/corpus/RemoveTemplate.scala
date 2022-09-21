@@ -57,7 +57,7 @@ object RemoveTemplate {
       Seq(
         new DeduplicateRepeatingSentence(minRep),
         substrFile
-          .map(RemoveSubstring.fromFile(_, perSentence = perSentence))
+          .map(RemoveSubstring.fromFile(_, matchSentence = perSentence))
           .getOrElse(new Identity),
         new RemoveShortDocument
       )
