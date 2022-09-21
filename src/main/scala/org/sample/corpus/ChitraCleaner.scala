@@ -57,7 +57,7 @@ object ChitraCleaner {
         new RemoveScriptDocument,
         ngwordFile
           .map(RemoveNGWordDocument.fromFile(_))
-          .getOrElse(new IdentityTransformer)
+          .getOrElse(new Identity)
       )
     )
   }

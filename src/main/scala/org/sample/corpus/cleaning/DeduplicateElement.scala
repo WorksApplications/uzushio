@@ -25,6 +25,6 @@ class DeduplicateElement extends Transformer {
 }
 
 object DeduplicateElement extends FromConfig {
-  override def fromConfig(conf: ConfigObject): Transformer =
+  override def fromConfig(conf: ConfigObject): DeduplicateElement =
     new DeduplicateElement
 }

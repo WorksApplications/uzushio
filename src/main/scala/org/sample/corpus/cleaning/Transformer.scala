@@ -28,6 +28,10 @@ trait FromConfig {
 }
 
 /** Transformer that does nothing. */
-class IdentityTransformer extends Transformer {
+class Identity extends Transformer {
   override def transform(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = ds
+}
+
+object Identity extends FromConfig {
+  override def fromConfig(conf: ConfigObject): Identity = new Identity
 }
