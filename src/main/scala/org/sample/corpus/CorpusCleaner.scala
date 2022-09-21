@@ -18,7 +18,6 @@ object CorpusCleaner {
     val input = opt[List[Path]](required = true, descr = "List of input files.")
     val output = opt[Path](default = Some(Paths.get("./out")))
     val config = opt[String](
-      required = true,
       default = Some("chitra"),
       descr = "Name or Path to the config file."
     )

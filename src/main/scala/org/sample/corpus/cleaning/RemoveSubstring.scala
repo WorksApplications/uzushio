@@ -26,7 +26,7 @@ class RemoveSubstring(
   }
 
   override def toString(): String =
-    s"${this.getClass.getSimpleName}(#str=${substrs.size})"
+    s"${this.getClass.getSimpleName}(#substr=${substrs.size})"
 }
 
 object RemoveSubstring extends FromConfig {

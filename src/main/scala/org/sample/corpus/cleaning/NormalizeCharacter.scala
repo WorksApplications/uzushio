@@ -22,7 +22,8 @@ class NormalizeCharacter(keepWS: Boolean = NormalizeCharacter.defaultKeepWS)
     nonPrintablePattern.replaceAllIn(sent, "")
   }
 
-  override def toString(): String = s"${this.getClass.getSimpleName}(${keepWS})"
+  override def toString(): String =
+    s"${this.getClass.getSimpleName}(keepWS=${keepWS})"
 }
 
 object NormalizeCharacter extends FromConfig {
