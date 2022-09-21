@@ -12,32 +12,32 @@ import org.sample.corpus.cleaning._
 object CorpusCleaner {
   @transient lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
-  private class Conf(args: Seq[String]) extends ScallopConf(args) {
+  /* config from CLI. */
+  private class CLIConf(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[Path]](required = true, descr = "List of input files.")
-    val inputFormat = opt[String](descr =
-      "The format of input files (text/parquet). Neccessary when directory is provided as input."
-    )
+    val output = opt[Path](default = Some(Paths.get("./out")))
     val config = opt[String](
       required = true,
       default = Some("chitra"),
       descr = "Name or Path to the config file."
     )
-    val output = opt[Path](default = Some(Paths.get("./out")))
-    val outputFormat = opt[String](
-      default = Some("text"),
-      descr = "The format of output files (text/parquet)."
-    )
 
-    /** Delimiter of documents and paragraphs in input/output. */
-    val delimParagraph = opt[String](default = Some("\n\n"))
-    val delimDocument = opt[String](default = Some("\n\n\n"))
-    val delimParagraphOut = opt[String](default = Some("\n"))
-    val delimDocumentOut = opt[String](default = Some("\n\n"))
-
-    val documentColumn = opt[String](
-      default = Some("document"),
-      descr = "Name of the document column (for parquet)."
+    val inputFormat = opt[String](descr =
+      "Input file format (text/parquet). " +
+        "If not given, try to estimate from the extension of the first file."
     )
+    val inputDocDelim =
+      opt[String](descr = "Delimiter of documents (text)")
+    val inputDocCol =
+      opt[String](descr = "Name of the document column (parquet).")
+
+    val outputFormat = opt[String](descr = "Output file format (text/parquet).")
+    val outputDocDelim =
+      opt[String](descr = "Delimiter of documents (text).")
+    val outputDocCol =
+      opt[String](descr = "Name of the document column (parquet).")
+    val outputElemDelim =
+      opt[String](descr = "Delimiter of elements e.g. paragraph, sentence.")
 
     verify()
   }
@@ -57,13 +57,13 @@ object CorpusCleaner {
     ext
   }
 
-  /** load documents as a seq of paragraphs. */
-  def loadInput(spark: SparkSession, conf: Conf): Dataset[Seq[String]] = {
+  /** load documents as a seq of full text. */
+  def loadInput(spark: SparkSession, conf: CLIConf): Dataset[Seq[String]] = {
     import spark.implicits._
 
     val fmt = detectInputFormat(conf.input(), conf.inputFormat.toOption)
     val inputPaths = DocumentIO.formatPathList(conf.input()).map(_.toString)
-    val docCol = conf.documentColumn()
+    val docCol = conf.inputDocCol()
 
     val rawdf = fmt match {
       case "parquet" => {
@@ -73,16 +73,15 @@ object CorpusCleaner {
       }
       case "text" | "txt" => {
         spark.read
-          .option("lineSep", conf.delimDocument())
+          .option("lineSep", conf.inputDocDelim())
           .text(inputPaths: _*)
           .withColumnRenamed("value", docCol)
       }
     }
-    val delim = conf.delimParagraph()
-    rawdf.as[String].map(_.split(delim).toSeq)
+    rawdf.as[String].map(Seq(_))
   }
 
-  def run(spark: SparkSession, conf: Conf): Unit = {
+  def run(spark: SparkSession, conf: CLIConf): Unit = {
     import spark.implicits._
 
     // Dataset[Seq[String (paragraph)]]
@@ -96,16 +95,16 @@ object CorpusCleaner {
 
     // write
     // TODO: parquet output
-    val delim = conf.delimParagraphOut()
+    val delim = conf.outputElemDelim()
     processed
       .map(_.mkString(delim))
       .write
-      .option("lineSep", conf.delimDocumentOut())
+      .option("lineSep", conf.outputDocDelim())
       .text(conf.output().toString)
   }
 
   def main(args: Array[String]): Unit = {
-    val conf = new Conf(args)
+    val conf = new CLIConf(args)
     val spark =
       SparkSession.builder().appName(this.getClass.getSimpleName).getOrCreate()
 
