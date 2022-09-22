@@ -73,7 +73,7 @@ todo: specify dict by config/args
 `spark-submit` に jar とオプションを投げる：
 
 ```
-spark-submit --class [class name] [path/to/jar_file] [args for cli]
+spark-submit [spark options] --class [class name] [path/to/jar_file] [class options]
 ```
 
 各処理のオプションについては下記、
@@ -96,15 +96,16 @@ spark-submit --class org.sample.corpus.CorpusCleaner \
 
 ### args
 
-- `--input`: input corpus. path to the file / dir (load all files in the dir). Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
-  each file should be: "\n\n" splitted documents that consists of "\n" splitted sentences.
-- `--output`: spark output dir (default ./out). need to be empty (if exists).
-- `--config`: name or path of config file.
-  - see `src/main/resources/reference.conf` for reference.
-  - see next section for existing config name.
+- `--input`: Input corpus. List of path to the file or dir (load all files in the dir).
+  - Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
+  - By default, each files are treated as "\n\n" splitted documents that consists of "\n" splitted sentences.
+- `--output`: Spark output dir (default `./out`). Need to be empty if exists.
+- `--config`: Name or path of config file (default: `chitra`).
+  - See `src/main/resources/reference.conf` for reference.
+  - See next section for existing config name.
 - You can override config values by cli arg (check with `-h` option).
 
-### 既存コンフィグ
+### 既存のコンフィグ
 
 既存の処理についてはそれぞれコンフィグファイルとしてまとめてある。
 これらについては `--config` オプションにて名称での指定が可能。
@@ -189,14 +190,14 @@ We use following two metrics:
 
 Extract text and meta data from WARC file.
 
-Also check README.md in the warc src dir.
+See [[./src/main/scala/org/sample/corpus/warc/README.md]] for detail.
 
 ```bash
 spark-submit --class org.sample.corpus.warc.WarcToDocument \
     ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
     --input=./data/nwjc/01warc/ --output=./out \
 
-# this will also create `out_fulldata` dir next to output dir.
+# this will also create `out_fulldata` dir next to the output dir.
 ```
 
 # references
