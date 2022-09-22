@@ -24,6 +24,7 @@ lazy val root = (project in file("."))
       "org.apache.tika" % "tika-parsers-standard-package" % "2.4.1",
       "org.netpreserve.commons" % "webarchive-commons" % "1.1.9" exclude ("org.apache.hadoop", "hadoop-core"), // org.archive.io
       "org.rogach" %% "scallop" % "4.1.0",
+      "com.typesafe" % "config" % "1.4.2",
       "com.worksap.nlp" % "sudachi" % "0.5.3"
     )
   )

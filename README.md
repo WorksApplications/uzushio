@@ -57,15 +57,14 @@ todo: specify dict by config/args
 
 ## build
 
-root (`build.sbt`のあるディレクトリ) にて `sbt assembly` でコンパイルする
-
-`./target/scala-[version]/` 以下に jar が生成される
+ルート (`build.sbt`のあるディレクトリ) にて `sbt assembly` でコンパイルする。
+`./target/scala-[version]/` 以下に jar が生成される。
 
 ### note
 
 - 開発段階などでコンパイルを繰り返すなら `sbt` で sbt-shell を起動しておいた方が速い
 - `sbt compile` ではなく `sbt assembly`を使う
-  - spark に投げる用に必要ライブラリ等もまとめてバンドルするため
+  - spark に投げるために必要ライブラリ等をまとめてバンドルするため
     - なお spark は除外する必要があり、`build.sbt`で設定している
   - `./project/plugins.sbt` にて設定している
 
@@ -74,19 +73,11 @@ root (`build.sbt`のあるディレクトリ) にて `sbt assembly` でコンパ
 `spark-submit` に jar とオプションを投げる：
 
 ```
-spark-submit --class [class name] [path/to/jar_file] [args for cli]
+spark-submit [spark options] --class [class name] [path/to/jar_file] [class options]
 ```
 
-ex.
-
-```
-spark-submit --class org.sample.corpus.CorpusCleaner \
-    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
-    --input=../data/*.txt --output=./out \
-    --ngwords ./resources/ng_words.txt
-```
-
-spark 側の設定等は [`spark-submit` のヘルプ](https://spark.apache.org/docs/latest/submitting-applications.html)を参照
+各処理のオプションについては下記、
+spark 側の詳細は [`spark-submit` のヘルプ](https://spark.apache.org/docs/latest/submitting-applications.html)を参照。
 
 # 実行クラス
 
@@ -94,51 +85,45 @@ spark 側の設定等は [`spark-submit` のヘルプ](https://spark.apache.org/
 
 入力コーパスを整形する。
 
-現状は [sudachitra での整形](https://github.com/WorksApplications/SudachiTra/tree/main/pretraining/bert#2-preprocessing-corpus-cleaning) と同等（のはず）。
-(ref: [chiTra の前処理について](https://docs.google.com/document/d/1colWQgSc22rzLHKdCH78BgtRLydGMZX-D-FAT6rD8iY/edit#heading=h.msy5fu9l7egn))
-
-現在フィルタ/ノーマライザの設定は `CorpusCleaner.scala` を直接変更する必要がある。(todo: read from config file, or extend cli option)
+処理の流れについてはコンフィグファイルで指定する。
 
 ```
 spark-submit --class org.sample.corpus.CorpusCleaner \
     ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
     --input=../data/*.txt --output=./out \
-    --ngwords ./resources/ng_words.txt
+    --config "chitra"
 ```
 
 ### args
 
-- `--input`: input corpus. path to the file / dir (load all files in the dir). Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
-  each file should be: "\n\n" splitted documents that consists of "\n" splitted sentences.
-- `--output`: spark output dir (default ./out). need to be empty (if exists).
-- `--ngwords`: ng-word list (optional). new-line splitted ng-word list (see [chitra ngwords](https://github.com/WorksApplications/SudachiTra/blob/main/pretraining/bert/resources/ng_words.txt)).
+- `--input`: Input corpus. List of path to the file or dir (load all files in the dir).
+  - Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
+  - By default, each files are treated as "\n\n" splitted documents that consists of "\n" splitted sentences.
+- `--output`: Spark output dir (default `./out`). Need to be empty if exists.
+- `--config`: Name or path of config file (default: `chitra`).
+  - See `src/main/resources/reference.conf` for reference.
+  - See next section for existing config name.
+- You can override config values by cli arg (check with `-h` option).
 
-## RemoveTempleate
+### 既存のコンフィグ
 
-以下の削除を行う
+既存の処理についてはそれぞれコンフィグファイルとしてまとめてある。
+これらについては `--config` オプションにて名称での指定が可能。
 
-- 重複文書（完全一致）
-- 指定したテンプレート文（or 段落）
-- 連続して繰り返される同一文（１文のみ残す）
-
-基本的には CorpusCleaner と同設計のため、コンフィグでの動作指定機能を実装する際に合わせて削除される予定。
-
-```
-spark-submit --class org.sample.corpus.CorpusCleaner \
-    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
-    --input=../data/*.txt --output=./out \
-    --substrs ./resources/template_sentences.txt --per-sentence \
-    --min-repeat 2
-```
-
-### args
-
-- `--input`: input corpus. path to the file / dir (load all files in the dir). Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
-  each file should be: "\n\n" splitted documents that consists of "\n" splitted sentences.
-- `--output`: spark output dir (default ./out). need to be empty (if exists).
-- `--substrs`: The template substring list to remove. 2 new-line splitted texts. (default `resources/template_sentences.txt`)
-- `--per-sentence`: If set, remove substring only when it starts and ends at new-line.
-- `--min-repeat`: Deduplicate repeating sentences if it repeats more than or equal to this number.
+- `chitra`
+  - [sudachitra での整形](https://github.com/WorksApplications/SudachiTra/tree/main/pretraining/bert#2-preprocessing-corpus-cleaning) と同等の処理を行う。
+  - ref: [chiTra の前処理について](https://docs.google.com/document/d/1colWQgSc22rzLHKdCH78BgtRLydGMZX-D-FAT6rD8iY/edit#heading=h.msy5fu9l7egn)
+- `rmTemplate`
+  - minhash 適用の調査時に chitra 前処理後の追加処理として作成したもの。
+    - 重複文書（完全一致）
+    - 指定したテンプレート文（or 段落）
+    - 連続して繰り返される同一文（１文のみ残す）
+- `sudachiDictCorpus`
+  - sudachi 辞書検証用コーパスのクリーニング用コンフィグ。
+- `warc`
+  - `warc.WarcToDocument` で抽出したテキストのクリーニング用コンフィグ。
+  - 日本語テキストの選別、段落単位での重複除去の後、`chitra` + `rmTemplate` の処理を行う。
+  - こののち `MinHashDeduplicator` を適用する想定。
 
 ## MinHashDeduplicator
 
@@ -201,33 +186,24 @@ We use following two metrics:
   - This takes `O(T^2)` time with a document length `T`, will is so long.
     - Skip this step with `--skip-editsim` option.
 
-
 ## warc.WarcToDocument
 
 Extract text and meta data from WARC file.
 
-Also check README.md in the warc src dir.
+See [[./src/main/scala/org/sample/corpus/warc/README.md]] for detail.
 
 ```bash
 spark-submit --class org.sample.corpus.warc.WarcToDocument \
     ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
     --input=./data/nwjc/01warc/ --output=./out \
 
-# this will also create `out_fulldata` dir next to output dir.
+# this will also create `out_fulldata` dir next to the output dir.
 ```
-
-## WarcCorpusCleaner
-
-Proccess warc extracted data to the same format to `04textwourl`.
-
-Also check README.md in the warc src dir.
-
-Uses same class to `CorpusCleaner`.
-
 
 # references
 
 ## WARC
+
 - [warc format specification](https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.0)
   - Note that latest version is v1.1 but CC uses v1.0
 - [org.archive.io](http://crawler.archive.org/apidocs/org/archive/io/package-summary.html)
