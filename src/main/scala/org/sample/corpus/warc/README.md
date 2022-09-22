@@ -1,23 +1,23 @@
 # WARC
 
-Source code for handling Web ARChive file.
+Handle WARC (Web ARChive) file, such that NWJC or CommonCrawl data.
 
-## Processing step
+## processing step
 
 - warc record
-    - uses "non-truncated" and "warc-respose type" record, with contents type "application/http".
+    - load records from warc format file into spark RDD.
+    - use "non-truncated" and "warc-respose type" record, with contents type "application/http".
 - http response
     - parse record body as http response.
     - skip if its contents type is not "text/html".
 - html file
     - parse response body as html using Tika.
         - skip when failed to detect encoding from http header or html meta-tag.
-    - split text into paragraphs (see `ParagraphHandler`).
-- text cleaning
+    - split text into paragraphs based on dom structure (see `ParagraphHandler`).
+- text cleaning (minimum)
     - trim each sentences and remove empty lines/paragraphs/documents.
 
-
-# run
+## run
 
 sample:
 
@@ -25,8 +25,7 @@ sample:
 input="/data/nwjc/01warc/NINJAL-2014-4Q/*.warc.gz"
 output="/data/works/nwjc/warc_processed"
 
-nice -n ${pri} spark-submit \
-    --master local[*] \
+nice -n 19 spark-submit \
     --class org.sample.corpus.warc.WarcToDocument \
     ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
     --input ${input} \
@@ -34,11 +33,12 @@ nice -n ${pri} spark-submit \
     &> "./logfile"
 ```
 
-This will output parquet file, with "WARC-Target-URI" column (contains url) and "document" column (contains extracted text).
+This will output parquet files with "WARC-Target-URI" column (contains url) and "document" column (contains extracted text).
 By default the extracted documents consists of paragraphs delimited by "\n\n" (any other empty lines are removed).
 
-This also output full extraced data to `${output}_fulldata` directory.
+This also outputs full extraced data to `${output}_fulldata` directory (suppress with `--result-only` option).
 It contains:
+
 - Warc Headers (Map[String, String])
 - Http response headers (Array[List[String, String]])
 - Meta data extracted by Tika (Map[String, String])
@@ -46,10 +46,12 @@ It contains:
 - Document extracted
 
 It takes about 15 hours to process all NWJC warc files (NINJAL-2014-4Q) with lserv65 server.
+Output file size is 260G (text w/ url) (ref: NINJAL-2014-4Q: 850G, fulldata output: 1.2T).
 
 ## post processing
 
-The output texts (with url) are not clean enough. Before appling chiTra preprocessing, we should apply `WarcCorpusCleaner`, which do followings:
+The output texts (with url) are not clean enough. Apply `CorpusCleaner` with `--config "warc"` before appling MinHash deduplication.
+It will do followings:
 
 - Japanese filtering
     - filter out non-clean-japanese text, i.e. other languages or 文字化け.
@@ -59,12 +61,17 @@ The output texts (with url) are not clean enough. Before appling chiTra preproce
         - It is expected that this will remove template patterns, utilizing paragraph information.
 - Rm short documents and concat paragraphs
     - let text format be same to `04textwourl` (empty line separated documents).
-
-
+- Then apply `chitra` + `rmTemplate` compatible cleaning
 
 # known issues
 
 ## NWJC files
+
+we now skip files with `.warc.gz.open` extension, s.t.
+
+```
+NINJAL-2014-4Q-0-20141023060508543-00098-8451~ccd-lserv-41.ninjal.ac.jp~8443.warc.gz.open
+```
 
 processing following NWJC file cause OOMem error.
 
@@ -132,7 +139,6 @@ We should introduce some encoding detection tool for this problem.
 
 error message logged when encoding detection failed:
 `org.apache.tika.exception.TikaException: Failed to detect the character encoding of a document`.
-
 
 ### error recovery
 
