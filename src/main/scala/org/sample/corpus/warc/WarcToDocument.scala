@@ -96,6 +96,7 @@ object WarcToDocument {
       case Some(n) => warcRecords.coalesce(n, shuffle = true)
     }
 
+    val pDelim = conf.paragraphDelim() // conf is not serializable
     val parsed = repartitioned
       // parse body as http response
       .mapPartitions(iter => {
@@ -125,8 +126,7 @@ object WarcToDocument {
             resp.getHeaders(),
             meta.names.map(k => (k -> Option(meta.get(k)).getOrElse(""))).toMap,
             new String(resp.body),
-            ParagraphHandler
-              .toCleanString(handler.toString, outDelim = conf.paragraphDelim())
+            ParagraphHandler.toCleanString(handler.toString, outDelim = pDelim)
           )
         })
       })
