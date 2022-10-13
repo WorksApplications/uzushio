@@ -91,13 +91,13 @@ object WarcToDocument {
       })
 
     // repartition
-    val repartitioned = conf.repartition.toOption match {
+    val repartitioned = (conf.repartition.toOption match {
       case None    => warcRecords
       case Some(n) => warcRecords.coalesce(n, shuffle = true)
-    }
+    }).persist()
+    logger.info(s"warc http responce record count: ${repartitioned.count}")
 
-    val pDelim = conf.paragraphDelim() // conf is not serializable
-    val parsed = repartitioned
+    val htmlResponces = repartitioned
       // parse body as http response
       .mapPartitions(iter => {
         val httpParser = new HttpResponseParser()
@@ -114,6 +114,12 @@ object WarcToDocument {
           contentType.startsWith("text/html")
         }
       }
+      .persist()
+    logger.info(s"html responce count: ${htmlResponces.count}")
+    repartitioned.unpersist()
+
+    val pDelim = conf.paragraphDelim() // conf is not serializable
+    val textParsed = htmlResponces
       // parse response body and extract text
       .mapPartitions(iter => {
         val tikaParser = new HtmlParser()
@@ -131,11 +137,16 @@ object WarcToDocument {
         })
       })
       .toDF("warcHeaders", "httpHeaders", "tikaMetadata", "html", "document")
+      .persist
+    logger.info(
+      s"persed document count: ${textParsed.filter(_.getAs[String](4) != "").count}"
+    )
+    htmlResponces.unpersist()
 
     // sampling for debug purpose
     val limited = conf.sample.toOption match {
-      case None    => parsed
-      case Some(n) => parsed.limit(n)
+      case None    => textParsed
+      case Some(n) => textParsed.limit(n)
     }
 
     // save full data if specified

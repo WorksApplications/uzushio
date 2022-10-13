@@ -154,3 +154,16 @@ same examples of errors:
 - `error during tika parsing: java.lang.StringIndexOutOfBoundsException: String index out of range: -1`
   - this seems to happend at the end of each warc file.
 
+# statistics
+
+We record document count for the reference.
+
+__v1__
+
+- WARC responce records (application/http): --
+- HTML records (http responces with content-type text/html): 82583838
+- Documents correctly parsed: 72757367
+- Documents skipped due to error: 9826471
+
+It fails to parse about 11.9% of HTMLs.
+Also note that some WARC files are skipped due to the error (see known issues section).
