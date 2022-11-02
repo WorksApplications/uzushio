@@ -69,6 +69,10 @@ object WarcToDocument {
       case e: java.lang.StringIndexOutOfBoundsException => {
         logger.warn(s"error during tika parsing: ${e}")
       }
+      case e: java.lang.NullPointerException => {
+        // TODO: parsing common crawl file (2022-40, 0-9) raises this.
+        logger.warn(s"${e}")
+      }
     } finally {
       bodyIs.close()
     }

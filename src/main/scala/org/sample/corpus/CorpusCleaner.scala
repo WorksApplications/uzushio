@@ -90,7 +90,7 @@ object CorpusCleaner {
       if (!Files.exists(path)) {
         throw new java.nio.file.NoSuchFileException(path.toString)
       }
-      ConfigFactory.parseFile(path.toFile)
+      ConfigFactory.parseFile(path.toFile).withFallback(ConfigFactory.load())
     }
   }
 
