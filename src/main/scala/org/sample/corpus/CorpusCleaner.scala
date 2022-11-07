@@ -117,6 +117,23 @@ object CorpusCleaner {
     rawdf.as[String].map(Seq(_))
   }
 
+  /** save documents in the specified format. */
+  def saveOutput(df: Dataset[Seq[String]], conf: Conf): Unit = {
+    val delim = conf.outputElementDelimiter
+    val dfout = df.map(_.mkString(delim))
+
+    conf.outputFormat match {
+      case "parquet" => {
+        dfout.write.save(conf.output.toString)
+      }
+      case "text" | "txt" => {
+        dfout.write
+          .option("lineSep", conf.outputDelimiter)
+          .text(conf.output.toString)
+      }
+    }
+  }
+
   def run(spark: SparkSession, conf: Conf): Unit = {
     import spark.implicits._
 
@@ -130,13 +147,7 @@ object CorpusCleaner {
     val processed = pipeline.transform(data)
 
     // write
-    // TODO: parquet output
-    val delim = conf.outputElementDelimiter
-    processed
-      .map(_.mkString(delim))
-      .write
-      .option("lineSep", conf.outputDelimiter)
-      .text(conf.output.toString)
+    saveOutput(processed, conf)
   }
 
   def main(args: Array[String]): Unit = {
