@@ -119,6 +119,7 @@ object CorpusCleaner {
 
   /** save documents in the specified format. */
   def saveOutput(df: Dataset[Seq[String]], conf: Conf): Unit = {
+    import df.sparkSession.implicits._
     val delim = conf.outputElementDelimiter
     val dfout = df.map(_.mkString(delim))
 
