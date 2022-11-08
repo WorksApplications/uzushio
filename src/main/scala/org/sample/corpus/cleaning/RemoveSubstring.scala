@@ -3,6 +3,7 @@ package org.sample.corpus.cleaning
 import com.typesafe.config.ConfigObject
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Path, Paths, Files}
+import scala.io.Source
 
 /** Removes given substrings from documents.
   *
@@ -30,7 +31,7 @@ class RemoveSubstring(
 }
 
 object RemoveSubstring extends FromConfig {
-  val defaultPath = "./resources/template_sentences.txt"
+  val defaultPath = "template_sentences.txt"
   val defaultDelim = "\n\n" // Delimiter of substrings in the file.
   val defaultMatchSentence = false // Whether if match only full sentence.
 
@@ -48,11 +49,20 @@ object RemoveSubstring extends FromConfig {
   }
 
   override def fromConfig(conf: ConfigObject): RemoveSubstring = {
-    fromFile(
-      Paths.get(conf.getOrElseAs[String]("path", defaultPath)),
-      delim = conf.getOrElseAs[String]("delim", defaultDelim),
-      matchSentence =
-        conf.getOrElseAs[Boolean]("matchSentence", defaultMatchSentence)
-    )
+    val pathStr = conf.getOrElseAs[String]("path", defaultPath)
+    val delim = conf.getOrElseAs[String]("delim", defaultDelim)
+    val matchSentence =
+      conf.getOrElseAs[Boolean]("matchSentence", defaultMatchSentence)
+
+    val filepath = Paths.get(pathStr)
+    if (filepath.toFile.exists) {
+      fromFile(filepath, delim, matchSentence)
+    } else {
+      val fullstr = Source.fromResource(pathStr).mkString
+      new RemoveSubstring(
+        fullstr.split(delim).map(_.trim).filter(_.nonEmpty).toSet,
+        matchSentence
+      )
+    }
   }
 }
