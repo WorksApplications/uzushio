@@ -8,7 +8,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
 import org.apache.tika.detect.EncodingDetector
-import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.{Metadata, HttpHeaders}
 import org.apache.tika.parser.html.{
   HtmlParser,
   HtmlMapper,
@@ -44,16 +44,17 @@ object WarcToDocument {
     val meta = new Metadata()
     val context = new ParseContext()
 
-    // provide content-type as a hint for charset detection
     // TODO: use charset detection tool instead of relying header or metatag
-    resp.getFirstHeader("Content-Type") match {
-      case Some(ct) => { meta.add("Content-Type", ct) }
+    // provide content-type as a hint for charset detection
+    resp.getFirstHeader(HttpHeaders.CONTENT_TYPE) match {
+      case Some(ct) => { meta.add(HttpHeaders.CONTENT_TYPE, ct) }
       case None     => {}
     }
+    // auto detect charset from meta-tag (if not provided from content-type)
+    context.set(classOf[EncodingDetector], new HtmlEncodingDetector())
+
     // use all html tags in the handler
     context.set(classOf[HtmlMapper], new AllTagMapper())
-    // auto detect charset from meta-tag
-    context.set(classOf[EncodingDetector], new HtmlEncodingDetector())
 
     val bodyIs = new ByteArrayInputStream(resp.body)
 
@@ -67,10 +68,14 @@ object WarcToDocument {
         logger.warn(s"${e}")
       }
       case e: java.lang.StringIndexOutOfBoundsException => {
-        logger.warn(s"error during tika parsing: ${e}")
+        logger.warn(s"${e}")
       }
       case e: java.lang.NullPointerException => {
         // TODO: parsing common crawl file (2022-40, 0-9) raises this.
+        logger.warn(s"${e}")
+      }
+      case e: java.nio.charset.IllegalCharsetNameException => {
+        // TODO: update charset/encoding detection
         logger.warn(s"${e}")
       }
     } finally {
@@ -88,7 +93,7 @@ object WarcToDocument {
       .readFrom(spark, conf.input().mkString(","))
       // use http response record only
       .filter(arc => {
-        val contentType = arc.headers.getOrElse("Content-Type", "")
+        val contentType = arc.headers.getOrElse(HttpHeaders.CONTENT_TYPE, "")
         arc.isResponse && contentType.startsWith(
           "application/http"
         ) && !arc.isTruncated
@@ -114,7 +119,7 @@ object WarcToDocument {
       .filter {
         case (headers, resp) => {
           val contentType =
-            resp.getFirstHeader("Content-Type").getOrElse("").trim
+            resp.getFirstHeader(HttpHeaders.CONTENT_TYPE).getOrElse("").trim
           contentType.startsWith("text/html")
         }
       }
