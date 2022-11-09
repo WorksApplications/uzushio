@@ -125,7 +125,7 @@ object CorpusCleaner {
 
     conf.outputFormat match {
       case "parquet" => {
-        dfout.write.save(conf.output.toString)
+        dfout.toDF(conf.outputColumn).write.save(conf.output.toString)
       }
       case "text" | "txt" => {
         dfout.write
