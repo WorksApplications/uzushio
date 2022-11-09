@@ -6,6 +6,7 @@ import collection.JavaConverters._
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Path, Paths, Files}
 import org.apache.spark.sql.Dataset
+import scala.io.Source
 
 import org.sample.corpus.Sudachi
 
@@ -62,7 +63,7 @@ class RemoveNGWordDocument(ngwords: Set[String]) extends Transformer {
 }
 
 object RemoveNGWordDocument extends FromConfig {
-  val defaultPath = "./resources/ng_words.txt"
+  val defaultPath = "ng_words.txt"
 
   def fromFile(ngwordsFile: Path): RemoveNGWordDocument = {
     val fullstr =
@@ -73,7 +74,16 @@ object RemoveNGWordDocument extends FromConfig {
   }
 
   override def fromConfig(conf: ConfigObject): RemoveNGWordDocument = {
-    val filePath = conf.getOrElseAs[String]("path", defaultPath)
-    fromFile(Paths.get(filePath))
+    val pathStr = conf.getOrElseAs[String]("path", defaultPath)
+
+    val filepath = Paths.get(pathStr)
+    if (filepath.toFile.exists) {
+      fromFile(filepath)
+    } else {
+      val fullstr = Source.fromResource(pathStr).mkString
+      new RemoveNGWordDocument(
+        fullstr.split("\n").map(_.trim).filter(_.nonEmpty).toSet
+      )
+    }
   }
 }

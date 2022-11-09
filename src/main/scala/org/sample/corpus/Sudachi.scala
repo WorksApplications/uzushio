@@ -1,6 +1,7 @@
 package org.sample.corpus
 
-import com.worksap.nlp.sudachi.{DictionaryFactory, Tokenizer}
+import java.nio.file.Paths
+import com.worksap.nlp.sudachi.{DictionaryFactory, Tokenizer, Config}
 
 object Sudachi {
   def parseSplitMode(mode: String): Tokenizer.SplitMode = {
@@ -16,6 +17,8 @@ object Sudachi {
     // create sudachi Tokenizer instance.
     // system_core.dict must be in cwd.
     // TODO: load config file
-    new DictionaryFactory().create().create()
+    val dictPath = Paths.get("system_core.dic")
+    val conf = Config.defaultConfig().systemDictionary(dictPath)
+    new DictionaryFactory().create(conf).create()
   }
 }
