@@ -8,7 +8,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
 import org.apache.tika.detect.EncodingDetector
-import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.{Metadata, HttpHeaders}
 import org.apache.tika.parser.html.{
   HtmlParser,
   HtmlMapper,
@@ -46,8 +46,8 @@ object WarcToDocument {
 
     // TODO: use charset detection tool instead of relying header or metatag
     // provide content-type as a hint for charset detection
-    resp.getFirstHeader(Metadata.CONTENT_TYPE) match {
-      case Some(ct) => { meta.add(Metadata.CONTENT_TYPE, ct) }
+    resp.getFirstHeader(HttpHeaders.CONTENT_TYPE) match {
+      case Some(ct) => { meta.add(HttpHeaders.CONTENT_TYPE, ct) }
       case None     => {}
     }
     // auto detect charset from meta-tag (if not provided from content-type)
@@ -68,7 +68,7 @@ object WarcToDocument {
         logger.warn(s"${e}")
       }
       case e: java.lang.StringIndexOutOfBoundsException => {
-        logger.warn(s"error during tika parsing: ${e}")
+        logger.warn(s"${e}")
       }
       case e: java.lang.NullPointerException => {
         // TODO: parsing common crawl file (2022-40, 0-9) raises this.
@@ -93,7 +93,7 @@ object WarcToDocument {
       .readFrom(spark, conf.input().mkString(","))
       // use http response record only
       .filter(arc => {
-        val contentType = arc.headers.getOrElse(Metadata.CONTENT_TYPE, "")
+        val contentType = arc.headers.getOrElse(HttpHeaders.CONTENT_TYPE, "")
         arc.isResponse && contentType.startsWith(
           "application/http"
         ) && !arc.isTruncated
@@ -119,7 +119,7 @@ object WarcToDocument {
       .filter {
         case (headers, resp) => {
           val contentType =
-            resp.getFirstHeader(Metadata.CONTENT_TYPE).getOrElse("").trim
+            resp.getFirstHeader(HttpHeaders.CONTENT_TYPE).getOrElse("").trim
           contentType.startsWith("text/html")
         }
       }
