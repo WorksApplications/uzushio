@@ -14,17 +14,17 @@ assembly / assemblyMergeStrategy := {
 
 lazy val root = (project in file("."))
   .settings(
-    name := "CorpusCleaning",
+    name := "uzushio",
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % "3.2.4" % Provided, // load warc file using hadoop api
       "org.apache.httpcomponents.core5" % "httpcore5" % "5.2-beta2", // parse http response in warc
-      "org.apache.spark" %% "spark-sql" % "3.2.1" % Provided,
-      "org.apache.spark" %% "spark-mllib" % "3.2.1" % Provided,
-      "org.apache.tika" % "tika-core" % "2.4.1",
-      "org.apache.tika" % "tika-parsers-standard-package" % "2.4.1",
+      "org.apache.spark" %% "spark-sql" % "3.2.4" % Provided,
+      "org.apache.spark" %% "spark-mllib" % "3.2.4" % Provided,
+      "org.apache.tika" % "tika-core" % "2.7.0",
+      "org.apache.tika" % "tika-parsers-standard-package" % "2.7.0",
       "org.netpreserve.commons" % "webarchive-commons" % "1.1.9" exclude ("org.apache.hadoop", "hadoop-core"), // org.archive.io
       "org.rogach" %% "scallop" % "4.1.0",
       "com.typesafe" % "config" % "1.4.2",
-      "com.worksap.nlp" % "sudachi" % "0.7.0"
+      "com.worksap.nlp" % "sudachi" % "0.7.3"
     )
   )
