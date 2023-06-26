@@ -2,6 +2,7 @@
 target/
 .bloop/
 .bsp/
+.idea/
 
 # metal
 .metals/
