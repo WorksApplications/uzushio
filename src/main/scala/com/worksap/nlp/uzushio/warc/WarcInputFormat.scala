@@ -50,7 +50,7 @@ class WarcRecordReader
   override def nextKeyValue(): Boolean = {
     try {
       val record = reader.read();
-      key.set(reader.getRecordsRead());
+      key.set(reader.getRecordsRead);
       value.setRecord(record);
     } catch {
       case e: java.util.NoSuchElementException => { return false }
@@ -68,7 +68,7 @@ class WarcRecordReader
   }
 
   override def getProgress(): Float = {
-    return reader.getProgress();
+    return reader.getProgress
   }
 
   override def close(): Unit = {

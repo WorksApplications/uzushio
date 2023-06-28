@@ -7,7 +7,6 @@ import com.worksap.nlp.uzushio.cleaning.Pipeline
 import org.apache.log4j.LogManager
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 import org.apache.spark.sql.functions._
-import org.sample.corpus.cleaning._
 
 object CorpusCleaner {
   @transient lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
