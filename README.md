@@ -1,15 +1,14 @@
-# Corpus cleaning
+# About Uzushio
 
-大規模日本語コーパス (e.g. Wikipedia, NWJC, etc.) の整形のためのツール
-
-Apach Spark (scala) ベース
+Uzushio is a web-scale corpus text extraction and preprocessing tool.
+It uses Spark and written mostly in Scala.
 
 ## Goal of this project
 
-It is known that ML model training with clean corpus is important.
-There are many many cleaning methods, and each nlp tasks have suitable sets of them.
+LLMs and foundational models require huge clean corpus for training.
+There are many cleaning methods, and each nlp tasks have suitable sets of them.
 
-In this repository, we try to:
+Uzushio has following goals:
 
 - provide a common corpus cleaning tool
   - reduce the implementation cost
@@ -17,35 +16,35 @@ In this repository, we try to:
 - keep it efficient, flexible and updated
   - it should be able to used in every kind of nlp projects (which uses large corpus)
 
-## ref
+## References
 
 - [chiTra の前処理について](https://docs.google.com/document/d/1colWQgSc22rzLHKdCH78BgtRLydGMZX-D-FAT6rD8iY/edit#heading=h.msy5fu9l7egn)
   - preprocess in chitra pretraining
 - [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499)
 
-# setup
+# Setup
 
-You need to install apach-spark, scala (sbt), and sudachi dictionary file.
+You need to install Apache Spark, sbt, and Sudachi dictionary file.
 
-## apach spark
+## Apache Spark (if running locally, if you want to use AWS EMR you do not need it)
 
-[download](https://spark.apache.org/downloads.html) and set path.
+Download it from the [official page](https://spark.apache.org/downloads.html). 
+You can put it in PATH or specify absolute paths to 
 
-The version should be: `spark 3.2.1` + `Scala 2.12.15`.
+At the moment uzushio is built against: `spark 3.4.*` + `Scala 2.12.*`.
 
-check if `spark-submit --version` works.
+Check if `spark-submit --version` works.
 
-## scala (sbt)
+## Scala (sbt)
 
-[download](https://www.scala-sbt.org/download.html) and set path.
+Download sbt (latest 1.* version) from the [official page](https://www.scala-sbt.org/download.html) and make it usable.
+You can often install one from OS package manager.
 
-Note that you should use compatible version to the one used by spark.
+### JDK
 
-### Java
+You need JDK 11+ to run sbt and Spark.
 
-You may also need to setup Java environment.
-
-## sudachi
+## WIP: Sudachi (Outdated, will download dictionary automatically in future if needed)
 
 Some features uses sudachi. When you want to use those, you need a sudachi dictionary.
 
@@ -53,12 +52,14 @@ Some features uses sudachi. When you want to use those, you need a sudachi dicti
 
 todo: specify dict by config/args
 
-# run
+# WIP: Running
 
-## build
+## Build fat JAR for launching
 
-ルート (`build.sbt`のあるディレクトリ) にて `sbt assembly` でコンパイルする。
-`./target/scala-[version]/` 以下に jar が生成される。
+The easiest way to use the tool — build fat JAR with all required dependencies.
+
+Execute `sbt assembly` from project root directory.
+You will have output jar under `./target/scala-[version]/`.
 
 ### note
 
