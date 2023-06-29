@@ -1,11 +1,10 @@
 package com.worksap.nlp.uzushio.lib.lang
 
-import com.worksap.nlp.uzushio.lib.lang.LangTagSniffer.{charsetRegex, extractCharset, metaRegex}
+import com.worksap.nlp.uzushio.lib.lang.LangTagSniffer.{extractCharset, metaRegex}
 
-import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{CodingErrorAction, StandardCharsets}
+import java.nio.{ByteBuffer, CharBuffer}
 import java.util.regex.Pattern
-import scala.util.matching.Regex
 
 
 case class LangTagSniff(charset: String, language: String)

@@ -75,7 +75,7 @@ class ParagraphExtractor(
 }
 
 object ParagraphExtractor {
-  private val spacesRegex = "\\w+".r
+  private val spacesRegex = "\\s+".r
 
   def cleanString(str: String): String = {
     str.split('\n').map(s => spacesRegex.replaceAllIn(s, " ").trim).filter(_.nonEmpty).mkString("\n")

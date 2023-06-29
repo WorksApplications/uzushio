@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta http-equiv="Content-Language" content="ja" />
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>perlfaq4 - データ操作 - perldoc.jp</title>
+    <meta http-equiv="Content-Style-Type" content="text/css" />
+    <meta http-equiv="Content-Script-Type" content="text/javascript" />
+    <meta name="description" content="データ操作" />
+    <meta name="keywords" content="Perl,翻訳,モジュール">
+</head>
+<body onload="prettyPrint();return true;">
+<div class="container">
+    <div class="header span-24 last">
+        <a class="SiteLogo" href="/">perldoc.jp</a>
+    </div>
+    <div class="nav span-24 last">
+        <ul>
+            <li><a href="/">トップ</a></li>
+            <li><a href="/index/core">本体</a></li>
+            <li><a href="/index/function">関数</a></li>
+            <li><a href="/index/variable">変数</a></li>
+            <li><a href="/index/module">モジュール</a></li>
+            <li><a href="/category">カテゴリ別</a></li>
+            <li><a href="/index/article">その他の翻訳</a></li>
+            <li><a href="/translators">翻訳者</a></li>
+            <li><a href="/manners">翻訳の作法</a></li>
+            <li><a href="/about">このサイトについて</a></li>
+        </ul>
+
+        <!-- SiteSearch Google -->
+        <form method=get action="http://www.google.co.jp/search" id="GoogleSearch">
+            <input type=text name=q size=31 maxlength=255 value="">
+            <input type=hidden name=ie value=UTF-8>
+            <input type=hidden name=oe value=UTF-8>
+            <input type=hidden name=hl value="ja">
+            <input type=hidden name=domains value="perldoc.jp">
+            <input type="hidden" name="sitesearch" value="perldoc.jp">
+            <input type=submit name=btnG value="Google 検索">
+        </form>
+        <!-- SiteSearch Google -->
+    </div>
+    <div id="main" class="span-24 last">
+        <div id="content">
+
+            <div class="content">
+                <div class="PodPage">
+
+
+                    <div class="PodInfo">
+                        <div class="PodVersion">5.10.1</div>
+
+                        <div class="CheckAtCPAN"><a href="http://search.cpan.org/perldoc?perlfaq4">CPANで確認する</a></div>
+
+
+                        <div class="OtherVersions">
+                            Other versions:<br />
+
+
+                            <a href="/docs/modules/perlfaq-5.0150039/perlfaq4.pod">perlfaq-5.0150039</a><br />
+
+                            <a href="/docs/perl/5.14.1/perlfaq4.pod">5.14.1</a><br />
+
+                            <a href="/docs/perl/5.12.1/perlfaq4.pod">5.12.1</a><br />
+
+                            <a href="/docs/perl/5.10.0/perlfaq4.pod">5.10.0</a><br />
+
+                            <a href="/docs/perl/5.6.1/perlfaq4.pod">5.6.1</a><br />
+
+
+
+                        </div><form action="/docs/perl/5.10.1/perlfaq4.pod/diff">
+                        <select name="target"><option value="modules/perlfaq-5.0150039/perlfaq4.pod">5.0150039</option><option value="perl/5.14.1/perlfaq4.pod">5.14.1</option><option value="perl/5.12.1/perlfaq4.pod">5.12.1</option><option value="perl/5.10.0/perlfaq4.pod">5.10.0</option><option value="perl/5.6.1/perlfaq4.pod">5.6.1</option></select>
+                        <input type="submit" value="diff" />
+                    </form>
+
+
+
+                        <div class="Source"><a href="http://perldoc.jp/docs/perl/5.10.1/perlfaq4.pod.pod">Source</a></div>
+
+
+                        <div><a target="_blank"  href="http://sourceforge.jp/cvs/view/perldocjp/docs/perl/5.10.1/perlfaq4.pod?view=log">CVS log on sf.jp</a></div>
+
+
+                        <script>
+                            var display_original = false;
+                        </script>
+                        <div>
+                            <a href="#" onclick="$('.original').css('display', display_original ? 'none' : 'block'); display_original = display_original ? false : true; return false;">原文を表示/隠す</a>
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="PodBody">
+                        <ul class="pod_toc">
+                            <li><a href="#NAME">名前</a></li>
+                            <li><a href="#DESCRIPTION">説明</a></li>
+                            <li><a href="#Data:32Numbers">データ: 数</a>
+                                <ul>
+                                    <li><a href="#Why32am32I32getting32long32decimals32eg4419.949999999999941instead32of32the32numbers32I32should32be32getting32eg4419.9541">なぜ 19.95 のような数字ではなく、19.9499999999999 のような長い数字が出てきたんでしょうか?</a></li>
+                                    <li><a href="#Why32is32int40broken63">なぜ int() は壊れているのでしょう?</a></li>
+                                    <li><a href="#Why32isnt32my32octal32data32interpreted32correctly63">なぜ私の 8 進データは正しく解釈されないのでしょうか?</a></li>
+                                    <li><a href="#Does32Perl32have32a32round40function63What32about32ceil40and32floor40Trig32functions63">Perl には丸め関数がありますか? ceil() と floor() とは何ですか? 三角関数は?</a></li>
+                                    <li><a href="#How32do32I32convert32between32numeric32representations47bases47radixes63">数値表現や基底や基数を変換するには?</a></li>
+                                    <li><a href="#Why32doesnt32work32the32way32I32want32it32to63">なぜ & は私の思った通りに動作しないのでしょうか?</a></li>
+                                    <li><a href="#How32do32I32multiply32matrices63">行列の積を計算するには?</a></li>
+                                    <li><a href="#How32do32I32perform32an32operation32on32a32series32of32integers63">整数値の並びに対してある操作を実行するには?</a></li>
+                                    <li><a href="#How32can32I32output32Roman32numerals63">ローマ数字を出力するには?</a></li>
+                                    <li><a href="#Why32arent32my32random32numbers32random63">なぜ私の乱数はランダムでないの?</a></li>
+                                    <li><a href="#How32do32I32get32a32random32number32between32X32and32Y63">X と Y の間の乱数を得るには?</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#Data:32Dates">データ:日付</a>
+                                <ul>
+                                    <li><a href="#How32do32I32find32the32day32or32week32of32the32year63">その年の何日目であるかを知るには?</a></li>
+                                    <li><a href="#How32do32I32find32the32current32century32or32millennium63">現在の世紀や千年紀を知るには?</a></li>
+                                    <li><a href="#How32can32I32compare32two32dates32and32find32the32difference63">二つの日付文字列を比較するには?</a></li>
+                                    <li><a href="#How32can32I32take32a32string32and32turn32it32into32epoch32seconds63">文字列を受け取って、それを紀元からの経過秒数に変換するには?</a></li>
+                                    <li><a href="#How32can32I32find32the32Julian32Day63">ユリウス日を求めるには?</a></li>
+                                    <li><a href="#How32do32I32find32yesterdays32date63">昨日の日付を得るには?</a></li>
+                                    <li><a href="#Does32Perl32have32a32Year32200032problem63Is32Perl32Y2K32compliant63">Perl には 2000 年問題があるのですか? Perl は 2000 年対応ですか?</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#Data:32Strings">データ: 文字列</a>
+                                <ul>
+                                    <li><a href="#How32do32I32validate32input63">入力を検査するには?</a></li>
+                                    <li><a href="#How32do32I32unescape32a32string63">文字列のアンエスケープ (unescape)をするには?</a></li>
+                                    <li><a href="#How32do32I32remove32consecutive32pairs32of32characters63">キャラクタの連続した組を取り除くには?</a></li>
+                                    <li><a href="#How32do32I32expand32function32calls32in32a32string63">文字列中にある関数呼び出しを展開するには?</a></li>
+                                    <li><a href="#How32do32I32find32matching47nesting32anything63">何かがマッチしている/ネストしているということを検出するには?</a></li>
+                                    <li><a href="#How32do32I32reverse32a32string63">文字列をひっくり返すには?</a></li>
+                                    <li><a href="#How32do32I32expand32tabs32in32a32string63">文字列中にあるタブを展開するには?</a></li>
+                                    <li><a href="#How32do32I32reformat32a32paragraph63">段落を整形するには?</a></li>
+                                    <li><a href="#How32can32I32access32or32change32N32characters32of32a32string63">文字列の最初の N 文字にアクセスしたり、それを変更するには?</a></li>
+                                    <li><a href="#How32do32I32change32the32Nth32occurrence32of32something63">何かの N 番目のものを変更するには?</a></li>
+                                    <li><a href="#How32can32I32count32the32number32of32occurrences32of32a32substring32within32a32string63">ある文字列の中に存在する部分文字列が何個あるのかを数えるには?</a></li>
+                                    <li><a href="#Does32Perl32have32a32Year32203832problem63">Perl には 2038 年問題はありますか?</a></li>
+                                    <li><a href="#How32do32I32capitalize32all32the32words32on32one32line63">一行にあるすべての単語をキャピタライズするには?</a></li>
+                                    <li><a href="#How32can32I32split32a32character93delimited32string32except32when32inside32character93">(とある文字)の内側にある時を除き、(とある文字)で終端されている文字列を分割するには?</a></li>
+                                    <li><a href="#How32do32I32strip32blank32space32from32the32beginning47end32of32a32string63">文字列の先頭や末尾にある空白を剥ぎ取るには?</a></li>
+                                    <li><a href="#How32do32I32pad32a32string32with32blanks32or32pad32a32number32with32zeroes63">文字列に空白をパッディングしたり、数値にゼロをパッディングしたりするには?</a></li>
+                                    <li><a href="#How32do32I32extract32selected32columns32from32a32string63">文字列から選択されたカラムを取り出すには?</a></li>
+                                    <li><a href="#How32do32I32find32the32soundex32value32of32a32string63">文字列の soundex 値を見つけるには?</a></li>
+                                    <li><a href="#How32can32I32expand32variables32in32text32strings63">テキスト文字列の中にある変数を展開するには?</a></li>
+                                    <li><a href="#Whats32wrong32with32always32quoting32vars63">常にクォーティング "$vars" することの何が悪いの?</a></li>
+                                    <li><a href="#Why32dont32my32HERE32documents32work63">なぜ私の <<HERE ドキュメントがうまく動かないのでしょう?</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#Data:32Arrays">データ: 配列</a>
+                                <ul>
+                                    <li><a href="#What32is32the32difference32between32a32list32and32an32array63">リストと配列の差とはなんですか?</a></li>
+                                    <li><a href="#What32is32the32difference32between32array91193and32array91193">$array[1] と @array[1] との間の違いはなんですか?</a></li>
+                                    <li><a href="#How32can32I32remove32duplicate32elements32from32a32list32or32array63">配列やリストにある重複した要素を削除するには?</a></li>
+                                    <li><a href="#How32can32I32tell32whether32a32certain32element32is32contained32in32a32list32or32array63">リストや配列の内容にある特定の要素があるかどうかを確かめるには?</a></li>
+                                    <li><a href="#How32do32I32compute32the32difference32of32two32arrays63How32do32I32compute32the32intersection32of32two32arrays63">二つの配列の差(difference)を求めるには? 二つの配列の共通要素(inter section)を求めるには?</a></li>
+                                    <li><a href="#How32do32I32test32whether32two32arrays32or32hashes32are32equal63">二つの配列や二つのハッシュが等しいかどうかを検査するには?</a></li>
+                                    <li><a href="#How32do32I32find32the32first32array32element32for32which32a32condition32is32true63">ある条件が真となる最初の配列要素を見つけだすには?</a></li>
+                                    <li><a href="#How32do32I32handle32linked32lists63">リンク付きリストを扱うには?</a></li>
+                                    <li><a href="#How32do32I32handle32circular32lists63">循環リストを扱うには?</a></li>
+                                    <li><a href="#How32do32I32shuffle32an32array32randomly63">配列をランダムにかき混ぜるには?</a></li>
+                                    <li><a href="#How32do32I32process47modify32each32element32of32an32array63">配列の各要素に対する処理や、変更を行うには?</a></li>
+                                    <li><a href="#How32do32I32select32a32random32element32from32an32array63">ある配列からランダムに要素を選択するには?</a></li>
+                                    <li><a href="#How32do32I32permute32N32elements32of32a32list63">N 要素を持つリストの順列(permute)を求めるには?</a></li>
+                                    <li><a href="#How32do32I32sort32an32array32by32anything41">(なにか)で配列をソートするには?</a></li>
+                                    <li><a href="#How32do32I32manipulate32arrays32of32bits63">ビット配列を扱うには?</a></li>
+                                    <li><a href="#Why32does32defined40return32true32on32empty32arrays32and32hashes63">なぜ空の配列やハッシュに defined() を使ったときに真が返ってくるのでしょう?</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#Data:32Hashes32Associative32Arrays41">データ: ハッシュ(連想配列)</a>
+                                <ul>
+                                    <li><a href="#How32do32I32process32an32entire32hash63">ハッシュ全体を処理するには?</a></li>
+                                    <li><a href="#How32do32I32merge32two32hashes63">二つのハッシュをマージするには?</a></li>
+                                    <li><a href="#What32happens32if32I32add32or32remove32keys32from32a32hash32while32iterating32over32it63">ハッシュに対して反復操作を行っているときにキーの追加や削除をすると何が起きますか?</a></li>
+                                    <li><a href="#How32do32I32look32up32a32hash32element32by32value63">ハッシュの要素をその値で検索するには?</a></li>
+                                    <li><a href="#How32can32I32know32how32many32entries32are32in32a32hash63">ハッシュにどれくらいの要素があるのを知るには?</a></li>
+                                    <li><a href="#How32do32I32sort32a32hash32optionally32by32value32instead32of32key41">ハッシュを(キーではなく値で)ソートするには?</a></li>
+                                    <li><a href="#How32can32I32always32keep32my32hash32sorted63">私のハッシュを常にソートされた状態にしておくには?</a></li>
+                                    <li><a href="#Whats32the32difference32between32delete32and32undef32with32hashes63">ハッシュに対する "delete" と "undef"との間の違いは?</a></li>
+                                    <li><a href="#Why32dont32my32tied32hashes32make32the32defined47exists32distinction63">なぜわたしの tie されたハッシュは defined と exists を区別しないのでしょうか?</a></li>
+                                    <li><a href="#How32do32I32reset32an32each40operation32part-way32through63">each() 操作の途中でリセットしてしまうには?</a></li>
+                                    <li><a href="#How32can32I32get32the32unique32keys32from32two32hashes63">二つのハッシュからユニークなキーを取りだすには?</a></li>
+                                    <li><a href="#How32can32I32store32a32multidimensional32array32in32a32DBM32file63">DBM ファイルに多次元配列を格納するには?</a></li>
+                                    <li><a href="#How32can32I32make32my32hash32remember32the32order32I32put32elements32into32it63">わたしのハッシュが格納した順番を覚えておくようにするには?</a></li>
+                                    <li><a href="#Why32does32passing32a32subroutine32an32undefined32element32in32a32hash32create32it63">なぜあるハッシュの未定義要素をサブルーチンに渡すとそれを作成するのでしょうか?</a></li>
+                                    <li><a href="#How32can32I32make32the32Perl32equivalent32of32a32C32structure47C43class47hash32or32array32of32hashes32or32arrays63">C の構造体/C++ のクラスのハッシュ、配列のハッシュ、配列と等価なものを Perl で作成するには?</a></li>
+                                    <li><a href="#How32can32I32use32a32reference32as32a32hash32key63">ハッシュのキーとしてリファレンスを使うには?</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#Data:32Misc">データ:その他</a>
+                                <ul>
+                                    <li><a href="#How32do32I32handle32binary32data32correctly63">バイナリデータを正しく扱うには?</a></li>
+                                    <li><a href="#How32do32I32determine32whether32a32scalar32is32a32number47whole47integer47float63">あるスカラ値が数値/整数/浮動小数点数かどうかを決定するには?</a></li>
+                                    <li><a href="#How32do32I32keep32persistent32data32across32program32calls63">プログラムの呼び出しの間に、データ構造を永続的に保持するには?</a></li>
+                                    <li><a href="#How32do32I32print32out32or32copy32a32recursive32data32structure63">再帰的なデータ構造を出力したりコピーするには?</a></li>
+                                    <li><a href="#How32do32I32define32methods32for32every32class47object63">すべてのクラス/オブジェクトのためのメソッドを定義するには?</a></li>
+                                    <li><a href="#How32do32I32verify32a32credit32card32checksum63">クレジットカードのチェックサムを検査するには?</a></li>
+                                    <li><a href="#How32do32I32pack32arrays32of32doubles32or32floats32for32XS32code63">XSプログラムのために倍精度実数や単精度実数の配列を pack するには?</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="#REVISION">REVISION</a></li>
+                            <li><a href="#AUTHOR32AND32COPYRIGHT">AUTHOR AND COPYRIGHT</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+
