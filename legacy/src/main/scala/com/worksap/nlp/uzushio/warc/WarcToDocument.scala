@@ -1,5 +1,7 @@
 package com.worksap.nlp.uzushio.warc
 
+import com.worksap.nlp.uzushio.lib.html.AllTagMapper
+
 import java.io.ByteArrayInputStream
 import java.nio.file.{Path, Paths}
 import org.rogach.scallop.ScallopConf

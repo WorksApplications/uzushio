@@ -2,15 +2,21 @@ ThisBuild / version := "0.1-SNAPSHOT"
 ThisBuild / scalaVersion := "2.12.18"
 
 assembly / assemblyMergeStrategy := {
+  case PathList("META-INF", "services", _*) => MergeStrategy.filterDistinctLines
   case PathList("META-INF", _*) => MergeStrategy.discard
   case PathList("module-info.class") => MergeStrategy.discard
   case PathList("org", "apache", "commons", "logging", _*) =>
     MergeStrategy.first
-  case x => {
+  case x =>
     val oldStrategy = (assembly / assemblyMergeStrategy).value
     oldStrategy(x)
-  }
 }
+
+assembly / assemblyShadeRules := Seq(
+  ShadeRule.rename(
+    "com.google.common.**" -> "shaded.com.google.common.@1"
+  ).inAll
+)
 
 val spark = Seq(
   "org.apache.spark" %% "spark-sql" % "3.3.2",
@@ -22,9 +28,14 @@ lazy val root = (project in file("."))
   .settings(
     name := "uzushio",
     libraryDependencies ++= Seq(
-      "com.typesafe" % "config" % "1.4.2",
       "com.worksap.nlp" % "sudachi" % "0.7.3",
     ),
+    libraryDependencies ++= spark.map(_ % Provided),
+  )
+
+lazy val legacy = (project in file("legacy"))
+  .dependsOn(lib)
+  .settings(
     libraryDependencies ++= spark.map(_ % Provided),
   )
 
@@ -41,7 +52,8 @@ lazy val lib = (project in file("lib"))
       "org.apache.httpcomponents.core5" % "httpcore5" % "5.2-beta2", // parse http response in warc
       "org.apache.tika" % "tika-core" % "2.8.0",
       "org.apache.tika" % "tika-parser-html-module" % "2.8.0",
-      "com.github.pemistahl" % "lingua" % "1.2.2", // language detection
+      "com.typesafe" % "config" % "1.4.2",
+      "com.optimaize.languagedetector" % "language-detector" % "0.6", // language detection
       "com.github.albfernandez" % "juniversalchardet" % "2.4.0", // charset detection
       "org.apache.logging.log4j" % "log4j-core" % "2.20.0" % Optional,
       "org.apache.logging.log4j" % "log4j-slf4j-impl" % "2.20.0" % Optional,

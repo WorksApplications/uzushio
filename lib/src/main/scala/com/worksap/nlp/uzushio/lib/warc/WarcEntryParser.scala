@@ -1,20 +1,30 @@
 package com.worksap.nlp.uzushio.lib.warc
 
+import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor}
 import com.worksap.nlp.uzushio.lib.lang.{EstimationFailure, LangEstimation, LangTagSniffer, ProbableLanguage}
 import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.resolveEarliestDate
 import org.apache.hc.core5.http.impl.nio.{DefaultHttpResponseFactory, DefaultHttpResponseParser, SessionBufferAccess}
 import org.apache.hc.core5.http.{HttpException, HttpMessage, MessageHeaders}
+import org.apache.tika.detect.EncodingDetector
+import org.apache.tika.exception.TikaException
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.parser.ParseContext
+import org.apache.tika.parser.html.{HtmlMapper, HtmlParser}
+import org.apache.tika.sax.BodyContentHandler
 import org.mozilla.universalchardet.UniversalDetector
 
-import java.io.IOException
+import java.io.{ByteArrayInputStream, IOException, InputStream}
 import java.nio.charset.{Charset, IllegalCharsetNameException, StandardCharsets, UnsupportedCharsetException}
 import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.util.Locale
+import scala.collection.mutable.ArrayBuffer
+import scala.xml.SAXException
 
 case class CrawlContent(
     url: String,
     language: String,
+    charset: String,
     text: String,
     date: String
 )
@@ -73,20 +83,22 @@ class WarcEntryParser {
       offset: Int
   ): Option[Charset] = {
     val sniff = sniffer.sniffTags(content, offset, content.length - offset)
-    val charsetName = sniff.charset.toLowerCase(Locale.ROOT)
-    lookupNormalizedCharset(charsetName)
+    lookupNormalizedCharset(sniff.charset)
   }
 
-  private def lookupNormalizedCharset(charsetName: String) = {
+  private def lookupNormalizedCharset(name: String) = {
+    val charsetName = name.toLowerCase(Locale.ROOT)
     charsetName match {
-      case "" => None
-      case "utf-8" | "utf8" => Some(StandardCharsets.UTF_8)
+      case ""                        => None
+      case "utf-8" | "utf8"          => Some(StandardCharsets.UTF_8)
       case "shift_jis" | "shift-jis" => lookupCharset("windows-31j")
-      case x => lookupCharset(x)
+      case x                         => lookupCharset(x)
     }
   }
 
-  private def guessCharsetFromHeader(headers: MessageHeaders): Option[Charset] = {
+  private def guessCharsetFromHeader(
+      headers: MessageHeaders
+  ): Option[Charset] = {
     val contentTypeHeader = headers.getHeader("Content-Type")
     if (contentTypeHeader == null) {
       return None
@@ -115,7 +127,7 @@ class WarcEntryParser {
     }
   }
 
-  //noinspection DuplicatedCode
+  // noinspection DuplicatedCode
   private def guessCharsetAndLanguage(
       headers: MessageHeaders,
       data: Array[Byte],
@@ -125,34 +137,81 @@ class WarcEntryParser {
     if (c1.isDefined) {
       langEstimation.estimateLang(data, offset, c1.get) match {
         case ProbableLanguage(lang) => return Some((c1.get, lang))
-        case EstimationFailure => return None
-        case _ => // do nothing
+        case EstimationFailure      => return None
+        case _                      => // do nothing
       }
     }
     val c2 = guessCharsetFromHeader(headers)
     if (c2.isDefined) {
       langEstimation.estimateLang(data, offset, c2.get) match {
         case ProbableLanguage(lang) => return Some((c2.get, lang))
-        case EstimationFailure => return None
-        case _ => // do nothing
+        case EstimationFailure      => return None
+        case _                      => // do nothing
       }
     }
     val c3 = guessCharsetFromBytes(data, offset)
     langEstimation.estimateLang(data, offset, c3) match {
       case ProbableLanguage(lang) => Some((c3, lang))
-      case _ => None
+      case _                      => None
     }
+  }
+
+  private val parser = new HtmlParser()
+  private val metadata = new Metadata()
+
+  /** Extracts paragraphs from HTML document
+    * @param data
+    *   bytes of html file
+    * @param bodyOffset
+    *   offset from the start of data array
+    * @param cs
+    *   document charset
+    * @return
+    *   array of paragraphs in the HTML document
+    */
+  def parseHtml(
+      data: Array[Byte],
+      bodyOffset: Int,
+      cs: Charset
+  ): Seq[String] = {
+    val result = new ArrayBuffer[String]()
+    val handler = new BodyContentHandler(
+      new ParagraphExtractor(result)
+    )
+    val inputStream =
+      new ByteArrayInputStream(data, bodyOffset, data.length - bodyOffset)
+    val parseContext = new ParseContext()
+    parseContext.set(
+      classOf[EncodingDetector],
+      new EncodingDetector {
+        override def detect(input: InputStream, metadata: Metadata): Charset =
+          cs
+      }
+    )
+    parseContext.set(classOf[HtmlMapper], new AllTagMapper)
+
+    try {
+      parser.parse(inputStream, handler, metadata, parseContext)
+    } catch {
+      case _: SAXException                    => // ignore
+      case _: TikaException                   => // ignore
+      case _: StringIndexOutOfBoundsException => // ignore
+      case _: NullPointerException            => // ignore
+    }
+    result
   }
 
   def convert(item: WarcRecord): Option[CrawlContent] = {
     parseHttpHeader(item.content).flatMap { case (header, bodyOffset) =>
-      guessCharsetAndLanguage(header, item.content, bodyOffset).map { case (cs, lang) =>
-        CrawlContent(
-          item.url,
-          "text",
-          lang,
-          resolveEarliestDate(item.accessDate, header)
-        )
+      guessCharsetAndLanguage(header, item.content, bodyOffset).map {
+        case (cs, lang) =>
+          CrawlContent(
+            url = item.url,
+            text = parseHtml(item.content, bodyOffset, cs).mkString("\n\n"),
+            language = lang,
+            charset = cs.name(),
+            date = resolveEarliestDate(item.accessDate, header)
+          )
       }
     }
   }
