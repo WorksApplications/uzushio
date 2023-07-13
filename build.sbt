@@ -60,5 +60,6 @@ lazy val lib = (project in file("lib"))
       "org.apache.logging.log4j" % "log4j-slf4j2-impl" % "2.20.0" % Optional,
       "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.14.2" % Optional,
       "org.scalatest" %% "scalatest" % "3.2.16" % Test
-    )
+    ),
+    scalacOptions ++= Seq("-opt:inline")
   )

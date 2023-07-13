@@ -1,6 +1,7 @@
 package com.worksap.nlp.uzushio.lib.html
 
 import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{blockTags, cleanString, ignoreTags}
+import org.apache.commons.lang.StringUtils
 import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
 
@@ -75,10 +76,10 @@ class ParagraphExtractor(
 }
 
 object ParagraphExtractor {
-  private val spacesRegex = "\\s+".r
+  private val spacesRegex = "[ \t\r]+".r
 
   def cleanString(str: String): String = {
-    str.split('\n').map(s => spacesRegex.replaceAllIn(s, " ").trim).filter(_.nonEmpty).mkString("\n")
+    str.split('\n').map(s => StringUtils.strip(spacesRegex.replaceAllIn(s, " "))).filter(_.nonEmpty).mkString("\n")
   }
 
   /** Texts inside these tags will be removed. */

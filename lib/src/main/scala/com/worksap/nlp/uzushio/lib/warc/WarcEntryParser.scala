@@ -123,6 +123,7 @@ class WarcEntryParser {
     try {
       Charset.forName(charset)
     } catch {
+      case _: UnsupportedCharsetException => StandardCharsets.UTF_8
       case _: IllegalCharsetNameException => StandardCharsets.UTF_8
     }
   }

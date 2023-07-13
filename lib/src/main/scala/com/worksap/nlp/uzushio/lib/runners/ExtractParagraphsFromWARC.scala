@@ -47,7 +47,7 @@ object ExtractParagraphsFromWARC {
       else items.filter(doc => args.languages.contains(doc.language))
 
     val frame = filtered.coalesce(args.maxPartitions).toDF()
-    frame.write.mode(SaveMode.Overwrite).parquet(args.output)
+    frame.write.mode(SaveMode.Overwrite).partitionBy("language").parquet(args.output)
     logger.info(
       s"input docs=${inputDocuments.value}, processed=${convertedDocs.value}"
     )
