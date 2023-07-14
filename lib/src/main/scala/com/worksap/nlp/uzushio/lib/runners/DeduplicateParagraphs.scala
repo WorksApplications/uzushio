@@ -5,8 +5,8 @@ import com.worksap.nlp.uzushio.lib.stats.{CountMinSketch, Hasher, NgramHashExtra
 import com.worksap.nlp.uzushio.lib.utils.MathUtil
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import it.unimi.dsi.fastutil.ints.IntArrays
-import org.apache.spark.sql.functions.{count, posexplode, split, sum, udf}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 import org.rogach.scallop.ScallopConf
 import spire.std.LevenshteinDistance
 
@@ -48,14 +48,14 @@ case class DuplicateCandidateRow(
   }
 
   lazy val ngramBitset: Array[Long] = {
-    val basic = new Array[Long](NGRAM_SIG_LEN)
+    val bitset = new Array[Long](NGRAM_SIG_LEN)
     DuplicateCandidateRow.ngrams.compute(text) { hcode =>
       val idx = ((hcode >>> 32) ^ hcode).toInt
       val bitIdx = idx & BIT_MASK
       val byteIdx = (idx & BYTE_MASK) >>> 6
-      basic(byteIdx) = basic(byteIdx) | (1L << bitIdx)
+      bitset(byteIdx) = bitset(byteIdx) | (1L << bitIdx)
     }
-    basic
+    bitset
   }
 
   // computes Jaccard coefficient on ngram bit signature
@@ -183,6 +183,13 @@ class CandidateRowProcessor(
   }
 }
 
+case class FilteredDoc()
+class DocsFilter(args: DeduplicateParagraphs.Args) extends (Row => List[FilteredDoc]) with Serializable {
+  override def apply(row: Row): List[FilteredDoc] = {
+    Nil
+  }
+}
+
 object DeduplicateParagraphs {
   def process(args: Args, spark: SparkSession): Unit = {
     import spark.implicits._
@@ -200,7 +207,7 @@ object DeduplicateParagraphs {
       propagateReprHashes(bd, i, args)
     }
 
-    val cols = propagated.select("hash", "reprHash", "freq").persist()
+    val cols = propagated.select("hash", "reprHash", "freq").checkpoint()
 
     val totalReprHashes = cols.groupBy("reprHash").agg(
       sum("freq").as("freq"),
@@ -209,13 +216,60 @@ object DeduplicateParagraphs {
     val counts = cols.select("hash", "reprHash")
       .join(totalReprHashes, "reprHash")
       .select("hash", "freq")
-      .dropDuplicates("hash").persist()
+      .dropDuplicates("hash")
 
-    cols.unpersist()
+    // this time keep original columns intact
+    val cookedDocs = rawData
+      .withColumn("text", split($"text", "\n\n"))
+      .withColumn("text", posexplode($"text").as(Seq("pos", "text")))
+      .withColumn("hash", longHash($"text"))
+
+    // join paragraph frequencies
+    val paragraphsWithFreq = cookedDocs.join(counts, "hash")
+
+    val filteredDocs = filterDuplicateDocs(paragraphsWithFreq, args)
 
     val sorted = counts.coalesce(1).sort($"freq".desc)
 
     sorted.write.mode(SaveMode.Overwrite).json(args.output)
+  }
+
+  // compile full documents from paragraphs
+  // paragraphs are shuffled because of join with freqs,
+  // need one more shuffle with groupBy
+  // and use a udf to bring docs back together
+  def filterDuplicateDocs(ds: DataFrame, args: Args): DataFrame = {
+    import ds.sqlContext.implicits._
+    val docParts = Seq("text", "pos", "freq")
+
+    val allColumns = ds.columns
+
+    val passthroughColumns = allColumns
+      .toSeq
+      .filterNot(_ == "docId")
+      .filterNot(docParts.contains(_))
+    val aggQueryBasicColumns = passthroughColumns
+      .map(colName => first(colName).as(colName))
+    val aggColumns = docParts.map(collect_list)
+
+    val aggOpFirst :: aggOpRest = (aggColumns ++ aggQueryBasicColumns).toList
+
+    val aggOpResult = ds.groupBy("docId").agg(aggOpFirst, aggOpRest: _*)
+
+    val convertUdf = udf((text: Array[String], pos: Array[Int], freq: Array[Long]) => {
+      val parts = (pos, text, freq).zipped
+      val sorted = parts.toBuffer.sortBy(_._1)
+      processDocumentParts(args, sorted)
+    })
+
+    val transformCols = Seq(
+      $"docId",
+      convertUdf(docParts.map(column) : _*).as("text")
+    ) ++ passthroughColumns.map(column)
+
+    aggOpResult.select(
+       transformCols: _*
+    ).filter($"text".isNotNull)
   }
 
   private val longHash = udf((s: String) => NgramHashExtractor.hashString(s))
@@ -266,23 +320,8 @@ object DeduplicateParagraphs {
       .toDF()
   }
 
-  def test(ds: DataFrame)(sc: SparkSession): Unit = {
-    import sc.implicits._
-
-    val sketch = new CountMinSketch(
-      10,
-      10000,
-      new NgramHashExtractor(2, 5),
-      Hasher.make(10)
-    )
-
-    ds.select($"test".as[String])
-      .queryExecution
-      .toRdd
-      .aggregate(sketch.zero)(
-        (state, row) => sketch.reduce(state, row.getString(0)),
-        (s1, s2) => sketch.merge(s1, s2)
-      )
+  private def processDocumentParts(args: Args, indices: Seq[(Int, String, Long)]): String = {
+    ???
   }
 
   // noinspection TypeAnnotation
@@ -290,11 +329,13 @@ object DeduplicateParagraphs {
     val input = opt[List[String]]()
     val output = opt[String]()
     val numShifts = opt[Int](default = Some(-1))
+    val checkpoints = opt[String]()
     verify()
 
     def toArgs: Args = Args(
       inputs = input(),
       output = output(),
+      checkpoints = checkpoints(),
       partitions = 1000,
       simHashSize = 128,
       minNgramSize = 2,
@@ -306,6 +347,7 @@ object DeduplicateParagraphs {
   case class Args(
       inputs: Seq[String],
       output: String,
+      checkpoints: String,
       partitions: Int,
       simHashSize: Int,
       minNgramSize: Int,
@@ -338,7 +380,8 @@ object DeduplicateParagraphs {
     val argParser = new ArgParser(args)
     val argObj = argParser.toArgs
 
-    SparkSession.builder().master("local").getOrCreate().use { spark =>
+    SparkSession.builder().master("local[*]").getOrCreate().use { spark =>
+      spark.sparkContext.setCheckpointDir("e:/data/nlp/corpora/cc/checkpoints")
       process(argObj, spark)
     }
   }
