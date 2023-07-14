@@ -1,6 +1,6 @@
 package com.worksap.nlp.uzushio.lib.warc
 
-import com.worksap.nlp.uzushio.lib.warc.WarcRecord.{RECORD_ACCESS_DATE, RECORD_TRUNCATED, RECORD_TYPE, RECORD_URL}
+import com.worksap.nlp.uzushio.lib.warc.WarcRecord.{RECORD_ACCESS_DATE, RECORD_ID, RECORD_TRUNCATED, RECORD_TYPE, RECORD_URL}
 import org.apache.commons.io.IOUtils
 import org.archive.format.warc.WARCConstants
 import org.archive.io.ArchiveRecord
@@ -35,6 +35,10 @@ class WarcRecord(record: ArchiveRecord) extends Serializable {
   def accessDate: String = {
     headers.get(RECORD_ACCESS_DATE).toString
   }
+
+  def docId: String = {
+    headers.get(RECORD_ID).toString
+  }
 }
 
 object WarcRecord {
@@ -42,4 +46,5 @@ object WarcRecord {
   final val RECORD_TRUNCATED = WARCConstants.HEADER_KEY_TRUNCATED
   final val RECORD_URL = WARCConstants.HEADER_KEY_URI
   final val RECORD_ACCESS_DATE = WARCConstants.HEADER_KEY_DATE
+  final val RECORD_ID = WARCConstants.HEADER_KEY_ID
 }

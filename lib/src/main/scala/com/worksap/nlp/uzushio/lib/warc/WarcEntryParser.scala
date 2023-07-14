@@ -1,9 +1,18 @@
 package com.worksap.nlp.uzushio.lib.warc
 
 import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor}
-import com.worksap.nlp.uzushio.lib.lang.{EstimationFailure, LangEstimation, LangTagSniffer, ProbableLanguage}
+import com.worksap.nlp.uzushio.lib.lang.{
+  EstimationFailure,
+  LangEstimation,
+  LangTagSniffer,
+  ProbableLanguage
+}
 import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.resolveEarliestDate
-import org.apache.hc.core5.http.impl.nio.{DefaultHttpResponseFactory, DefaultHttpResponseParser, SessionBufferAccess}
+import org.apache.hc.core5.http.impl.nio.{
+  DefaultHttpResponseFactory,
+  DefaultHttpResponseParser,
+  SessionBufferAccess
+}
 import org.apache.hc.core5.http.{HttpException, HttpMessage, MessageHeaders}
 import org.apache.tika.detect.EncodingDetector
 import org.apache.tika.exception.TikaException
@@ -14,14 +23,20 @@ import org.apache.tika.sax.BodyContentHandler
 import org.mozilla.universalchardet.UniversalDetector
 
 import java.io.{ByteArrayInputStream, IOException, InputStream}
-import java.nio.charset.{Charset, IllegalCharsetNameException, StandardCharsets, UnsupportedCharsetException}
+import java.nio.charset.{
+  Charset,
+  IllegalCharsetNameException,
+  StandardCharsets,
+  UnsupportedCharsetException
+}
 import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
-import java.util.Locale
+import java.util.{Locale, UUID}
 import scala.collection.mutable.ArrayBuffer
 import scala.xml.SAXException
 
 case class CrawlContent(
+    docId: String,
     url: String,
     language: String,
     charset: String,
@@ -207,6 +222,7 @@ class WarcEntryParser {
       guessCharsetAndLanguage(header, item.content, bodyOffset).map {
         case (cs, lang) =>
           CrawlContent(
+            docId = WarcEntryParser.parseWarcUuid(item.docId),
             url = item.url,
             text = parseHtml(item.content, bodyOffset, cs).mkString("\n\n"),
             language = lang,
@@ -241,6 +257,19 @@ object WarcEntryParser {
   }
 
   private val dateCutoff = LocalDateTime.of(1999, 1, 1, 0, 0, 0)
+
+  def parseWarcUuid(strUuid: String): String = {
+    // <urn:uuid:f1a9564a-ae00-40ef-838e-a4486a83fd1d>
+    if (
+      strUuid.startsWith("<urn:uuid:") && strUuid.endsWith(
+        ">"
+      ) && strUuid.length == 47
+    ) {
+      strUuid.substring(10, 46)
+    } else {
+      UUID.randomUUID().toString
+    }
+  }
 
   def parseDate(
       base: Option[LocalDateTime],
