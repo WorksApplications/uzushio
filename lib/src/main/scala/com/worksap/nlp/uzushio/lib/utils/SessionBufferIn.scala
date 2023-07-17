@@ -14,7 +14,8 @@ object SessionBufferAccess {
     override def putBytes(bytes: Array[Byte]): Unit = {
       val b = buffer()
       val totalSize = size.min(bytes.length)
-      b.put(0, bytes, 0, totalSize)
+      b.clear()
+      b.put( bytes, 0, totalSize)
       b.position(totalSize)
       b.limit(b.capacity())
     }
