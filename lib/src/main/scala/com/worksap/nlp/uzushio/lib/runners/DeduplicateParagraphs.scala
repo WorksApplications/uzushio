@@ -1,7 +1,7 @@
 package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow.{BIT_MASK, BYTE_MASK, NGRAM_SIG_LEN, TEXT_NGRAM_MATCHING_THRESHOLD}
-import com.worksap.nlp.uzushio.lib.stats.{CountMinSketch, Hasher, NgramHashExtractor, SimHashProcessor}
+import com.worksap.nlp.uzushio.lib.stats.{NgramHashExtractor, SimHashProcessor}
 import com.worksap.nlp.uzushio.lib.utils.MathUtil
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import it.unimi.dsi.fastutil.ints.IntArrays
@@ -236,8 +236,7 @@ object DeduplicateParagraphs {
 
   // compile full documents from paragraphs
   // paragraphs are shuffled because of join with freqs,
-  // need one more shuffle with groupBy
-  // and use a udf to bring docs back together
+  // groupBy op merges them back together, and we use an udf to perform the actual filtering
   def filterDuplicateDocs(ds: DataFrame, args: Args): DataFrame = {
     import ds.sqlContext.implicits._
     val docParts = Seq("text", "pos", "freq")
