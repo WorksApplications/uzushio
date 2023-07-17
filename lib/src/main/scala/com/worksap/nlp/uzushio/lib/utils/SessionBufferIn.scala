@@ -16,8 +16,6 @@ object SessionBufferAccess {
       val totalSize = size.min(bytes.length)
       b.clear()
       b.put( bytes, 0, totalSize)
-      b.position(totalSize)
-      b.limit(b.capacity())
     }
 
     override def clear(): Unit = super.clear()

@@ -64,13 +64,15 @@ object WarcTextExtractionRaw {
   class ConfigParser(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[String]](required = true)
     val output = opt[String](required = true)
-    val languages = opt[List[String]](default = Some(Nil))
+    val language = opt[List[String]](default = Some(Nil))
+    val maxPartitions = opt[Int](default = Some(2000))
     verify()
 
     def asArgs(): ExtractParagraphsFromWARC.Args = ExtractParagraphsFromWARC.Args(
       input = input.apply(),
       output = output.apply(),
-      languages = languages.apply().toSet
+      languages = language.apply().flatMap(_.split(',')).toSet,
+      maxPartitions = maxPartitions()
     )
   }
 

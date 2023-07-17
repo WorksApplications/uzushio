@@ -61,5 +61,6 @@ lazy val lib = (project in file("lib"))
       "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.14.2" % Optional,
       "org.scalatest" %% "scalatest" % "3.2.16" % Test
     ),
-    scalacOptions ++= Seq("-opt:inline")
+    scalacOptions ++= Seq("-opt:inline"),
+    javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
   )

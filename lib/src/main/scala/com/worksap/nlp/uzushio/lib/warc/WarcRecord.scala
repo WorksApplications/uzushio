@@ -23,7 +23,7 @@ class WarcRecord(record: ArchiveRecord) extends Serializable {
   def isTruncated: Boolean = {
     headers.get(RECORD_TRUNCATED) match {
       case null => false
-      case s: CharSequence => !s.isEmpty
+      case s: CharSequence => s.length() > 0
       case _ => true
     }
   }

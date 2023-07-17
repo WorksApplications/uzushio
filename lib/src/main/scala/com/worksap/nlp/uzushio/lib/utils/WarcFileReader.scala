@@ -54,7 +54,7 @@ class WarcFileReader(conf: Configuration, filePath: Path) {
   /** Returns the number of bytes that have been read. */
   def getBytesRead: Long = bytesRead
 
-  /** Returns the proportion of the file thet has been read. */
+  /** Returns the proportion of the file that has been read. */
   def getProgress: Float = {
     if (fileSize <= 0) return 1.0f
     bytesRead.toFloat / fileSize.toFloat
