@@ -257,8 +257,8 @@ object DeduplicateParagraphs {
 
     val convertUdf = udf((text: Array[String], pos: Array[Int], freq: Array[Long]) => {
       val parts = (pos, text, freq).zipped
-      val sorted = parts.toBuffer.sortBy(_._1)
-      processDocumentParts(args, sorted)
+      // val sorted = parts.toBuffer.sortBy(_._1)
+      // processDocumentParts(args, sorted)
     })
 
     val transformCols = Seq(
