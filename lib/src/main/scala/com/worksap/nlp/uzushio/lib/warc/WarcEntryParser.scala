@@ -101,13 +101,15 @@ class WarcEntryParser {
     lookupNormalizedCharset(sniff.charset)
   }
 
+  private val win31j = Charset.forName("windows-31j")
+
   private def lookupNormalizedCharset(name: String) = {
     val charsetName = name.toLowerCase(Locale.ROOT)
     charsetName match {
-      case ""                        => None
-      case "utf-8" | "utf8"          => Some(StandardCharsets.UTF_8)
-      case "shift_jis" | "shift-jis" => lookupCharset("windows-31j")
-      case x                         => lookupCharset(x)
+      case ""               => None
+      case "utf-8" | "utf8" => Some(StandardCharsets.UTF_8)
+      case "shiftjis" | "shift_jis" | "shift-jis" => Some(win31j)
+      case x                                      => lookupCharset(x)
     }
   }
 

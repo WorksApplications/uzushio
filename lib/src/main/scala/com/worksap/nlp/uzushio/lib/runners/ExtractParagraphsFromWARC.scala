@@ -12,7 +12,8 @@ object ExtractParagraphsFromWARC {
       input: Seq[String],
       output: String,
       languages: Set[String],
-      maxPartitions: Int = 10000
+      maxPartitions: Int = 10000,
+      compression: String = "zstd"
   )
 
   def run(args: Args)(spark: SparkSession): Unit = {
@@ -47,7 +48,11 @@ object ExtractParagraphsFromWARC {
       else items.filter(doc => args.languages.contains(doc.language))
 
     val frame = filtered.coalesce(args.maxPartitions).toDF()
-    frame.write.mode(SaveMode.Overwrite).partitionBy("language").parquet(args.output)
+    frame.write
+      .mode(SaveMode.Overwrite)
+      .partitionBy("language")
+      .option("compression", args.compression)
+      .parquet(args.output)
     logger.info(
       s"input docs=${inputDocuments.value}, processed=${convertedDocs.value}"
     )
@@ -66,13 +71,15 @@ object WarcTextExtractionRaw {
     val output = opt[String](required = true)
     val language = opt[List[String]](default = Some(Nil))
     val maxPartitions = opt[Int](default = Some(2000))
+    val compression = opt[String](default = Some("zstd"))
     verify()
 
     def asArgs(): ExtractParagraphsFromWARC.Args = ExtractParagraphsFromWARC.Args(
       input = input.apply(),
       output = output.apply(),
       languages = language.apply().flatMap(_.split(',')).toSet,
-      maxPartitions = maxPartitions()
+      maxPartitions = maxPartitions(),
+      compression = compression()
     )
   }
 

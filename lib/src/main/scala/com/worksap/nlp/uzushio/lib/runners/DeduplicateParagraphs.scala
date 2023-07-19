@@ -380,7 +380,7 @@ object DeduplicateParagraphs {
     val argObj = argParser.toArgs
 
     SparkSession.builder().master("local[*]").getOrCreate().use { spark =>
-      spark.sparkContext.setCheckpointDir("e:/data/nlp/corpora/cc/checkpoints")
+      spark.sparkContext.setCheckpointDir(argObj.checkpoints)
       process(argObj, spark)
     }
   }
