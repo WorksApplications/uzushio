@@ -76,7 +76,7 @@ class ParagraphExtractor(
 }
 
 object ParagraphExtractor {
-  private val spacesRegex = "[ \t\r]+".r
+  private val spacesRegex = "[ \t\r\u00a0]+".r
 
   def cleanString(str: String): String = {
     str.split('\n').map(s => StringUtils.strip(spacesRegex.replaceAllIn(s, " "))).filter(_.nonEmpty).mkString("\n")
