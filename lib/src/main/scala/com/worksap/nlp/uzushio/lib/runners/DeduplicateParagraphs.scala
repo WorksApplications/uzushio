@@ -1,10 +1,11 @@
 package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow.{BIT_MASK, BYTE_MASK, NGRAM_SIG_LEN, TEXT_NGRAM_MATCHING_THRESHOLD}
-import com.worksap.nlp.uzushio.lib.stats.{NgramHashExtractor, SimHashProcessor}
+import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
 import com.worksap.nlp.uzushio.lib.utils.MathUtil
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import it.unimi.dsi.fastutil.ints.IntArrays
+import org.apache.commons.codec.binary.Hex
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 import org.rogach.scallop.ScallopConf
@@ -37,14 +38,24 @@ case class DuplicateCandidateRow(
     12 + // header
       12 + signature.length + // suppose that arrays also have 12-byte header
       36 + text.length * 2 + // String fields, header + string content header + content data
-      8 * 6 + // fields
-      (if (text.length < TEXT_NGRAM_MATCHING_THRESHOLD) 0 else NGRAM_SIG_LEN * 8) // ngram signature bitmap
+      8 * 7 + // fields
+      (if (text.length < TEXT_NGRAM_MATCHING_THRESHOLD) 0 else 12 + NGRAM_SIG_LEN * 8) // ngram signature bitmap
   }
 
   def matchingSignatureBits(other: DuplicateCandidateRow): Int = {
     val c1 = MathUtil.matchingBits(sign1, other.sign1)
     val c2 = MathUtil.matchingBits(sign2, other.sign2)
     c1 + c2
+  }
+
+  private var shortNgramBitsetField: Array[Long] = _
+  def shortNgramBitset: Array[Long] = {
+    var current = shortNgramBitsetField
+    if (current == null) {
+      current = NgramBitSignatures.computeShortSignature(text)
+      shortNgramBitsetField = current
+    }
+    current
   }
 
   lazy val ngramBitset: Array[Long] = {
@@ -78,16 +89,20 @@ case class DuplicateCandidateRow(
   }
 
   def toRow: RowResult = RowResult(text, signature, freq, hash, reprHash)
+
+  override def toString: String = {
+    s"[${Hex.encodeHexString(signature)}, $freq, ${hash.toHexString}, ${reprHash.toHexString}, $text]"
+  }
 }
 
 object DuplicateCandidateRow {
   private val ngrams = new NgramHashExtractor(3, 4)
-  final val NGRAM_SIG_LEN = 512
+  final val NGRAM_SIG_LEN = 128
   final val BITS_IN_LONG = 64
   final val BIT_MASK = BITS_IN_LONG - 1
   final val BYTE_MASK = (NGRAM_SIG_LEN * BITS_IN_LONG - 1) ^ BIT_MASK
   final val MAX_BITS = NGRAM_SIG_LEN * BITS_IN_LONG
-  final val TEXT_NGRAM_MATCHING_THRESHOLD = 50
+  final val TEXT_NGRAM_MATCHING_THRESHOLD = 30
 }
 
 class CandidateRowProcessor(
@@ -136,6 +151,11 @@ class CandidateRowProcessor(
     if (avgLen > TEXT_NGRAM_MATCHING_THRESHOLD) { // use approximate ngram matching for longer texts
       val ngramSigRatio = r1.matchingNgramSignatureBits(r2)
       return ngramSigRatio >= 0.7f
+    }
+
+    val ratio2 = NgramBitSignatures.computeSignatureOverlap(r1.shortNgramBitset, r2.shortNgramBitset)
+    if (ratio2 < 0.65) {
+      return false
     }
 
     // short texts are compared using levenshtein distance (most paragraphs are short)
@@ -206,6 +226,7 @@ object DeduplicateParagraphs {
     val propagated = args.shiftIndices.foldLeft(basicData) { (bd, i) =>
       propagateReprHashes(bd, i, args)
     }
+    /*
 
     val cols = propagated.select("hash", "reprHash", "freq").checkpoint()
 
@@ -229,9 +250,9 @@ object DeduplicateParagraphs {
 
     val filteredDocs = filterDuplicateDocs(paragraphsWithFreq, args)
 
-    val sorted = counts.coalesce(1).sort($"freq".desc)
+    val sorted = counts.coalesce(1).sort($"freq".desc) */
 
-    sorted.write.mode(SaveMode.Overwrite).json(args.output)
+    propagated.filter($"hash" =!= $"reprHash").coalesce(10).sort($"reprHash".asc).write.mode(SaveMode.Overwrite).json(args.output)
   }
 
   // compile full documents from paragraphs
@@ -307,6 +328,7 @@ object DeduplicateParagraphs {
       udf((x: Array[Byte]) => MathUtil.rotateBitsRight(x, shift))
 
     ds.withColumn("signature", shiftSignature(ds.col("signature")))
+      .persist()
       .sort($"signature".asc)
       .as[DuplicateCandidateRow]
       .mapPartitions(iter =>

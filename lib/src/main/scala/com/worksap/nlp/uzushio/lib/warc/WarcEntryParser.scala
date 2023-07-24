@@ -116,7 +116,7 @@ class WarcEntryParser {
   private def guessCharsetFromHeader(
       headers: MessageHeaders
   ): Option[Charset] = {
-    val contentTypeHeader = headers.getHeader("Content-Type")
+    val contentTypeHeader = headers.getFirstHeader("Content-Type")
     if (contentTypeHeader == null) {
       return None
     }
@@ -250,7 +250,7 @@ object WarcEntryParser {
 
   implicit class MessageExt(val m: HttpMessage) extends AnyVal {
     def headerValue(name: String): String = {
-      val h = m.getHeader(name)
+      val h = m.getFirstHeader(name)
       if (h == null) {
         return null
       }
