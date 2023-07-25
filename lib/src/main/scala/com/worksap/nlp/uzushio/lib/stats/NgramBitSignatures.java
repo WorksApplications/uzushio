@@ -19,8 +19,8 @@ public class NgramBitSignatures {
         return mix(state, value & 0xffffL);
     }
 
-    static class UnigramUpTo16Chars {
-        final static int SIG_LEN = 4;
+    public static class UnigramUpTo16Chars {
+        public final static int SIG_LEN = 4; // 256 bits for unigrams
         final static int BYTE_MASK = (SIG_LEN * BITS_IN_LONG - 1) ^ BIT_MASK;
         static long[] compute(CharSequence data) {
             long[] bitset = new long[SIG_LEN];
@@ -41,10 +41,10 @@ public class NgramBitSignatures {
         }
     }
 
-    static class UnigramBigramMoreThan16Chars {
+    public static class UnigramBigramMoreThan16Chars {
 
-        final static int SIG_LEN1 = UnigramUpTo16Chars.SIG_LEN;
-        final static int SIG_LEN2 = 8;
+        public final static int SIG_LEN1 = UnigramUpTo16Chars.SIG_LEN;
+        public final static int SIG_LEN2 = 8;
         final static int BYTE_MASK1 = (SIG_LEN1 * BITS_IN_LONG - 1) ^ BIT_MASK;
         final static int BYTE_MASK2 = (SIG_LEN2 * BITS_IN_LONG - 1) ^ BIT_MASK;
 
@@ -77,8 +77,10 @@ public class NgramBitSignatures {
         }
     }
 
+    public static final int SHORT_STRING = 16;
+
     public static long[] computeShortSignature(CharSequence data) {
-        if (data.length() < 16) {
+        if (data.length() <= SHORT_STRING) {
             return UnigramUpTo16Chars.compute(data);
         } else {
             return UnigramBigramMoreThan16Chars.compute(data);

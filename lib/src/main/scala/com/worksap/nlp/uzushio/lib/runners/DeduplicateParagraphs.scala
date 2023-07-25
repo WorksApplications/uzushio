@@ -1,10 +1,10 @@
 package com.worksap.nlp.uzushio.lib.runners
 
-import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow.{BIT_MASK, BYTE_MASK, NGRAM_SIG_LEN, TEXT_NGRAM_MATCHING_THRESHOLD}
+import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
 import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
-import com.worksap.nlp.uzushio.lib.utils.MathUtil
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
-import it.unimi.dsi.fastutil.ints.IntArrays
+import com.worksap.nlp.uzushio.lib.utils.{MathUtil, RowBuffer}
+import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
 import org.apache.commons.codec.binary.Hex
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
@@ -22,24 +22,59 @@ case class RowResult(
     reprHash: Long
 )
 
-case class DuplicateCandidateRow(
+final case class DuplicateCandidateRow(
     text: String,
     signature: Array[Byte],
     freq: Long,
     hash: Long,
     var reprHash: Long
 ) {
-
   val sign1: Long = MathUtil.longFromBytes(signature, 0)
   val sign2: Long = MathUtil.longFromBytes(signature, 8)
 
+  private var collection: RowBuffer[DuplicateCandidateRow] = _
+  private var indexInCollection: Int = -1
+
+  def registerInBuffer(buffer: RowBuffer[DuplicateCandidateRow], index: Int): Unit = {
+    collection = buffer
+    indexInCollection = index
+  }
+
+  def removeItselfFromBuffer(): Unit = {
+    val newItem = collection.removeElementAt(indexInCollection)
+    newItem.indexInCollection = indexInCollection
+  }
+
+  def registerInsteadOf(other: DuplicateCandidateRow): Unit = registerInBuffer(other.collection, other.indexInCollection)
+
+  def wasIn(group: RowBuffer[DuplicateCandidateRow]): Boolean = collection eq group
+
   // estimate object size
+  // this some fields are lazy and can not be instantiated at all, but we compute their sizes
+  // based on heuristics
   def sizeInBytes: Int = {
-    12 + // header
-      12 + signature.length + // suppose that arrays also have 12-byte header
-      36 + text.length * 2 + // String fields, header + string content header + content data
-      8 * 7 + // fields
-      (if (text.length < TEXT_NGRAM_MATCHING_THRESHOLD) 0 else 12 + NGRAM_SIG_LEN * 8) // ngram signature bitmap
+    val textLen = text.length
+    var objectSize =
+      HEADER_SIZE + // header
+        HEADER_SIZE + signature.length + // suppose that arrays also have 12-byte header
+        36 + textLen * 2 + // String fields, header + string content header + content data
+        8 * 8 // fields
+
+    if (textLen >= TEXT_NGRAM_MATCHING_THRESHOLD) {
+      objectSize += (HEADER_SIZE + NGRAM_SIG_LEN * 8)
+    }
+
+    if (textLen <= 40) {
+      objectSize += HEADER_SIZE // array header
+      objectSize += textLen match {
+        case _ if textLen <= 16 =>
+          NgramBitSignatures.UnigramUpTo16Chars.SIG_LEN * 8 // unigrams only
+        case _ =>
+          (NgramBitSignatures.UnigramBigramMoreThan16Chars.SIG_LEN1 + NgramBitSignatures.UnigramBigramMoreThan16Chars.SIG_LEN2) * 8
+      }
+    }
+
+    objectSize
   }
 
   def matchingSignatureBits(other: DuplicateCandidateRow): Int = {
@@ -90,6 +125,11 @@ case class DuplicateCandidateRow(
 
   def toRow: RowResult = RowResult(text, signature, freq, hash, reprHash)
 
+  def allowedLength(itemLength: Int): Boolean = {
+    val myLength = text.length
+    math.abs(itemLength - myLength) <= MAX_MATCHING_LENGTH
+  }
+
   override def toString: String = {
     s"[${Hex.encodeHexString(signature)}, $freq, ${hash.toHexString}, ${reprHash.toHexString}, $text]"
   }
@@ -103,6 +143,8 @@ object DuplicateCandidateRow {
   final val BYTE_MASK = (NGRAM_SIG_LEN * BITS_IN_LONG - 1) ^ BIT_MASK
   final val MAX_BITS = NGRAM_SIG_LEN * BITS_IN_LONG
   final val TEXT_NGRAM_MATCHING_THRESHOLD = 30
+  final val HEADER_SIZE = 12
+  final val MAX_MATCHING_LENGTH = 50
 }
 
 class CandidateRowProcessor(
@@ -112,6 +154,10 @@ class CandidateRowProcessor(
 ) extends Iterator[RowResult] {
 
   private val queue = new util.ArrayDeque[DuplicateCandidateRow]()
+  private val lengthBuckets =
+    new Int2ObjectOpenHashMap[RowBuffer[DuplicateCandidateRow]]()
+  private val groups =
+    new RowBuffer[RowBuffer[DuplicateCandidateRow]]()
   private var currentBytes = 0
 
   private def fixHashesInBuffer(oldHash: Long, newHash: Long): Unit = {
@@ -142,43 +188,138 @@ class CandidateRowProcessor(
     val t1 = r1.text
     val t2 = r2.text
 
-    // sequences are distinct enough in length
-    if ((t1.length - t2.length).abs > 50) {
-      return false
-    }
-
     val avgLen = (t1.length + t2.length) / 2
     if (avgLen > TEXT_NGRAM_MATCHING_THRESHOLD) { // use approximate ngram matching for longer texts
       val ngramSigRatio = r1.matchingNgramSignatureBits(r2)
       return ngramSigRatio >= 0.7f
     }
 
-    val ratio2 = NgramBitSignatures.computeSignatureOverlap(r1.shortNgramBitset, r2.shortNgramBitset)
+    val ratio2 = NgramBitSignatures.computeSignatureOverlap(
+      r1.shortNgramBitset,
+      r2.shortNgramBitset
+    )
     if (ratio2 < 0.65) {
       return false
     }
 
-    // short texts are compared using levenshtein distance (most paragraphs are short)
+    // very short texts are compared using levenshtein distance if unigram/bigram prefilter passes
     val dist = LevenshteinDistance.distance(r1.text, r2.text).toDouble
-    val len = r1.text.length.min(r2.text.length).toDouble
-    (dist / len ) < 0.3
+    val len = math.min(r1.text.length, r2.text.length).toDouble
+    (dist / len) < 0.3
+  }
+
+  private def checkTextSimilarity(row: DuplicateCandidateRow, o: DuplicateCandidateRow): Boolean = {
+    val nbits = row.matchingSignatureBits(o)
+    nbits >= matchThreshold && textOverlaps(row, o)
+  }
+
+  private def checkSimilarityGroup(group: RowBuffer[DuplicateCandidateRow], item: DuplicateCandidateRow): Boolean = {
+    val iter = group.iterator()
+    val itemLength = item.text.length
+    while (iter.hasNext) {
+      val other = iter.next()
+      if (other.allowedLength(itemLength) && checkTextSimilarity(item, other)) {
+        return true
+      }
+    }
+    false
+  }
+
+  private def checkLengthBucket(items: RowBuffer[DuplicateCandidateRow], item: DuplicateCandidateRow, initGroup: RowBuffer[DuplicateCandidateRow]): RowBuffer[DuplicateCandidateRow] = {
+    val iter = items.deletingIterator()
+    var group: RowBuffer[DuplicateCandidateRow] = initGroup
+    while (iter.hasNext) {
+      val other = iter.next()
+      if (checkTextSimilarity(item, other)) {
+        iter.removeElement().registerInsteadOf(other)
+        if (group == null) {
+          group = RowBuffer.single(item)
+          item.registerInBuffer(group, 0)
+        }
+        addRowToSimGroup(other, group)
+      }
+    }
+    group
+  }
+
+  private def addRowToSimGroup(row: DuplicateCandidateRow, group: RowBuffer[DuplicateCandidateRow]): Unit = {
+    val first = group.get(0)
+    val reprHash = math.min(row.reprHash, first.reprHash)
+    if (row.reprHash == reprHash) {
+      val iter = group.iterator()
+      while (iter.hasNext) {
+        iter.next().reprHash = reprHash
+      }
+    } else {
+      row.reprHash = reprHash
+    }
+    val idx = group.addToBuffer(row)
+    row.registerInBuffer(group, idx)
+  }
+
+  private def checkSimilarityGroups(row: DuplicateCandidateRow): RowBuffer[DuplicateCandidateRow] = {
+    val groupsIterator = groups.deletingIterator()
+    while (groupsIterator.hasNext) {
+      val group = groupsIterator.next()
+      if (group.isEmpty) {
+        groupsIterator.removeElement()
+      }
+      if (checkSimilarityGroup(group, row)) {
+        addRowToSimGroup(row, group)
+        return group
+      }
+    }
+    null
   }
 
   private def checkReprHashes(row: DuplicateCandidateRow): Unit = {
-    val iter = queue.iterator()
-    while (iter.hasNext) {
-      val o = iter.next()
-      val nbits = row.matchingSignatureBits(o)
-      if (nbits >= matchThreshold && textOverlaps(row, o)) {
-        val reprHash = java.lang.Long.min(row.reprHash, o.reprHash)
-        if (o.reprHash != reprHash) {
-          fixHashesInBuffer(o.reprHash, reprHash)
-        } else if (row.reprHash != reprHash) {
-          row.reprHash = reprHash
+    val rowLength = row.text.length
+    val rowLenIndex = rowLength / 10
+    val rowMaxDiff = math.min((rowLength.toLong * 3 + 9) / 10, 50).toInt
+    val minLenIndex = math.max(rowLength - rowMaxDiff, 0) / 10
+    val maxLenIndex = (rowLength + rowMaxDiff) / 10
+
+    // 1. look matching entry in similarity groups
+    val initSimGroup = checkSimilarityGroups(row)
+
+    var simGroup = initSimGroup
+    // 2. check lengths groups
+    var lenIdx = minLenIndex
+    while (lenIdx <= maxLenIndex) {
+      val bucket = lengthBuckets.get(lenIdx)
+      if (bucket != null) {
+        simGroup = checkLengthBucket(bucket, row, simGroup)
+        if (bucket.isEmpty) {
+          lengthBuckets.remove(lenIdx)
         }
       }
+      lenIdx += 1
     }
 
+    if (simGroup != null) {
+      if (initSimGroup == null) { // newly created simgroup, need to register it
+        groups.add(simGroup)
+      }
+    } else { // need to put item in the length bucket
+      var bucket = lengthBuckets.get(rowLenIndex)
+      if (bucket == null) {
+        bucket = new RowBuffer[DuplicateCandidateRow]()
+        lengthBuckets.put(rowLenIndex, bucket)
+      }
+      val idx = bucket.addToBuffer(row)
+      row.registerInBuffer(bucket, idx)
+    }
+  }
+
+  private def removeLengthBucketIfEmpty(row: DuplicateCandidateRow): Unit = {
+    val rowLength = row.text.length
+    val rowLenIndex = rowLength / 10
+    val group = lengthBuckets.get(rowLenIndex)
+    // group can be null if item came from simgroups
+    // or length bucket was deleted when item was moved to a simgroup
+    if (group != null && row.wasIn(group) && group.isEmpty) {
+      lengthBuckets.remove(rowLenIndex)
+    }
   }
 
   private def fillCandidateBuffer(): Unit = {
@@ -198,13 +339,17 @@ class CandidateRowProcessor(
   override def next(): RowResult = {
     fillCandidateBuffer()
     val obj = queue.poll()
+    obj.removeItselfFromBuffer()
+    removeLengthBucketIfEmpty(obj)
     currentBytes -= obj.sizeInBytes
     obj.toRow
   }
 }
 
 case class FilteredDoc()
-class DocsFilter(args: DeduplicateParagraphs.Args) extends (Row => List[FilteredDoc]) with Serializable {
+class DocsFilter(args: DeduplicateParagraphs.Args)
+    extends (Row => List[FilteredDoc])
+    with Serializable {
   override def apply(row: Row): List[FilteredDoc] = {
     Nil
   }
@@ -252,7 +397,13 @@ object DeduplicateParagraphs {
 
     val sorted = counts.coalesce(1).sort($"freq".desc) */
 
-    propagated.filter($"hash" =!= $"reprHash").coalesce(10).sort($"reprHash".asc).write.mode(SaveMode.Overwrite).json(args.output)
+    propagated
+      .filter($"hash" =!= $"reprHash")
+      .coalesce(10)
+      .sort($"reprHash".asc)
+      .write
+      .mode(SaveMode.Overwrite)
+      .json(args.output)
   }
 
   // compile full documents from paragraphs
@@ -264,8 +415,7 @@ object DeduplicateParagraphs {
 
     val allColumns = ds.columns
 
-    val passthroughColumns = allColumns
-      .toSeq
+    val passthroughColumns = allColumns.toSeq
       .filterNot(_ == "docId")
       .filterNot(docParts.contains(_))
     val aggQueryBasicColumns = passthroughColumns
@@ -276,20 +426,23 @@ object DeduplicateParagraphs {
 
     val aggOpResult = ds.groupBy("docId").agg(aggOpFirst, aggOpRest: _*)
 
-    val convertUdf = udf((text: Array[String], pos: Array[Int], freq: Array[Long]) => {
-      val parts = (pos, text, freq).zipped
-      // val sorted = parts.toBuffer.sortBy(_._1)
-      // processDocumentParts(args, sorted)
-    })
+    val convertUdf =
+      udf((text: Array[String], pos: Array[Int], freq: Array[Long]) => {
+        val parts = (pos, text, freq).zipped
+        // val sorted = parts.toBuffer.sortBy(_._1)
+        // processDocumentParts(args, sorted)
+      })
 
     val transformCols = Seq(
       $"docId",
-      convertUdf(docParts.map(column) : _*).as("text")
+      convertUdf(docParts.map(column): _*).as("text")
     ) ++ passthroughColumns.map(column)
 
-    aggOpResult.select(
-       transformCols: _*
-    ).filter($"text".isNotNull)
+    aggOpResult
+      .select(
+        transformCols: _*
+      )
+      .filter($"text".isNotNull)
   }
 
   private val longHash = udf((s: String) => NgramHashExtractor.hashString(s))
@@ -329,7 +482,8 @@ object DeduplicateParagraphs {
 
     ds.withColumn("signature", shiftSignature(ds.col("signature")))
       .persist()
-      .sort($"signature".asc)
+      .repartitionByRange(64, $"signature".asc)
+      .sortWithinPartitions($"signature".asc)
       .as[DuplicateCandidateRow]
       .mapPartitions(iter =>
         new CandidateRowProcessor(
@@ -341,7 +495,10 @@ object DeduplicateParagraphs {
       .toDF()
   }
 
-  private def processDocumentParts(args: Args, indices: Seq[(Int, String, Long)]): String = {
+  private def processDocumentParts(
+      args: Args,
+      indices: Seq[(Int, String, Long)]
+  ): String = {
     ???
   }
 
