@@ -4,11 +4,11 @@ import com.worksap.nlp.uzushio.lib.stats.SimHashProcessor.addVector
 import com.worksap.nlp.uzushio.lib.utils.Ziggurat
 import it.unimi.dsi.util.XorShiftStarRandomGenerator
 
-class NgramHashExtractor(private val minOrder: Int, private val maxOrder: Int) extends Serializable {
+class NgramHashExtractor(private val minOrder: Int, private val maxOrder: Int)
+    extends Serializable {
   require(minOrder > 0)
   require(maxOrder > 0)
   require(minOrder < maxOrder)
-
 
   @inline
   final def compute(data: CharSequence)(@inline fn: Long => Unit): Unit = {
@@ -21,9 +21,9 @@ class NgramHashExtractor(private val minOrder: Int, private val maxOrder: Int) e
       var hashState = NgramHashExtractor.HASH_SEED
       while (order < maxOrder && i + order < end) {
         val c = data.charAt(i + order)
-        if (c != '\n') {
+        if (c == '\n') {
           order = maxOrder
-        }  else {
+        } else {
           hashState = NgramHashExtractor.mix(hashState, c & 0xffffL)
           if (order >= minOrder) {
             val hash = NgramHashExtractor.mix(hashState, order)
@@ -66,7 +66,11 @@ object NgramHashExtractor {
 class SimHashProcessor(private val size: Int) extends Serializable {
   def init: Array[Float] = new Array[Float](size)
 
-  def update(state: Array[Float], data: CharSequence, ngrams: NgramHashExtractor): Unit = {
+  def update(
+      state: Array[Float],
+      data: CharSequence,
+      ngrams: NgramHashExtractor
+  ): Unit = {
     ngrams.compute(data) { hash =>
       addVector(state, hash)
     }
