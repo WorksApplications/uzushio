@@ -366,7 +366,6 @@ class DeduplicateParagraphs(
   import spark.implicits._
 
   private def computeReprHashes(frame: DataFrame): DataFrame = {
-    // posexplode must be in different select operation than split
     val splitDocs = frame
       .select(posexplode(split(frame.col("text"), "\n\n")).as(Seq("pos", "text")))
 
@@ -546,19 +545,19 @@ class DeduplicateParagraphs(
   def process(): Unit = {
     val rawData = spark.read.parquet(args.inputs: _*)
 
-    val statistics = if (args.hasStage("reprHashes")) {
+    val reprParagraphs = if (args.hasStage("reprHashes")) {
       computeReprHashes(rawData)
     } else {
       spark.read.parquet(args.cache.get)
     }
 
     if (args.hasStage("saveReprHashes")) {
-      saveStats(statistics)
+      saveStats(reprParagraphs)
       return
     }
 
     val stats = if (args.hasStage("stats")) {
-      computeStats(statistics)
+      computeStats(reprParagraphs)
     } else {
       spark.read.parquet(args.cache.get)
     }
