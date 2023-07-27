@@ -21,10 +21,14 @@ class NgramHashExtractor(private val minOrder: Int, private val maxOrder: Int) e
       var hashState = NgramHashExtractor.HASH_SEED
       while (order < maxOrder && i + order < end) {
         val c = data.charAt(i + order)
-        hashState = NgramHashExtractor.mix(hashState, c & 0xffffL)
-        if (order >= minOrder) {
-          val hash = NgramHashExtractor.mix(hashState, order)
-          fn(hash): @inline
+        if (c != '\n') {
+          order = maxOrder
+        }  else {
+          hashState = NgramHashExtractor.mix(hashState, c & 0xffffL)
+          if (order >= minOrder) {
+            val hash = NgramHashExtractor.mix(hashState, order)
+            fn(hash): @inline
+          }
         }
 
         order += 1
