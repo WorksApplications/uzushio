@@ -168,16 +168,6 @@ class CandidateRowProcessor(
     new RowBuffer[RowBuffer[DuplicateCandidateRow]]()
   private var currentBytes = 0
 
-  private def fixHashesInBuffer(oldHash: Long, newHash: Long): Unit = {
-    val iter = queue.iterator()
-    while (iter.hasNext) {
-      val o = iter.next()
-      if (o.reprHash == oldHash) {
-        o.reprHash = newHash
-      }
-    }
-  }
-
   // keep queue size small by not growing it when the prefixes of the signature are distant enough
   private def prefixesAreSimilar(): Boolean = {
     val q = queue
@@ -206,13 +196,13 @@ class CandidateRowProcessor(
       r1.shortNgramBitset,
       r2.shortNgramBitset
     )
-    if (ratio2 < 0.65) {
+    if (ratio2 < 0.60) {
       return false
     }
 
     // very short texts are compared using levenshtein distance if unigram/bigram prefilter passes
     val dist = LevenshteinDistance.distance(r1.text, r2.text).toDouble
-    val len = math.min(r1.text.length, r2.text.length).toDouble
+    val len = avgLen.toDouble
     (dist / len) < 0.3
   }
 
