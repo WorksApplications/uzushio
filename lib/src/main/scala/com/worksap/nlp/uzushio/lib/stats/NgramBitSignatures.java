@@ -1,5 +1,7 @@
 package com.worksap.nlp.uzushio.lib.stats;
 
+import org.jetbrains.annotations.NotNull;
+
 public class NgramBitSignatures {
 
     public final static long HASH_SEED = 15213125612L;
@@ -79,7 +81,8 @@ public class NgramBitSignatures {
 
     public static final int SHORT_STRING = 16;
 
-    public static long[] computeShortSignature(CharSequence data) {
+    @NotNull
+    public static long[] computeShortSignature(@NotNull CharSequence data) {
         if (data.length() <= SHORT_STRING) {
             return UnigramUpTo16Chars.compute(data);
         } else {
@@ -87,7 +90,7 @@ public class NgramBitSignatures {
         }
     }
 
-    public static float computeSignatureOverlap(long[] s1, long[] s2) {
+    public static float computeSignatureOverlap(@NotNull long[] s1, @NotNull long[] s2) {
         int length = Integer.min(s1.length, s2.length);
         int intersectionBits = 0;
         int unionBits = 0;

@@ -7,12 +7,12 @@ import com.worksap.nlp.uzushio.lib.utils.{MathUtil, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
 import org.apache.commons.codec.binary.Hex
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.rogach.scallop.ScallopConf
 import spire.std.LevenshteinDistance
 
 import java.util
-import java.util.Random
+import java.util.{Comparator, Random}
 
 case class RowResult(
     text: String,
@@ -22,6 +22,7 @@ case class RowResult(
     reprHash: Long
 )
 
+//noinspection jol
 final case class DuplicateCandidateRow(
     text: String,
     signature: Array[Byte],
@@ -35,7 +36,10 @@ final case class DuplicateCandidateRow(
   private var collection: RowBuffer[DuplicateCandidateRow] = _
   private var indexInCollection: Int = -1
 
-  def registerInBuffer(buffer: RowBuffer[DuplicateCandidateRow], index: Int): Unit = {
+  def registerInBuffer(
+      buffer: RowBuffer[DuplicateCandidateRow],
+      index: Int
+  ): Unit = {
     collection = buffer
     indexInCollection = index
   }
@@ -45,9 +49,11 @@ final case class DuplicateCandidateRow(
     newItem.indexInCollection = indexInCollection
   }
 
-  def registerInsteadOf(other: DuplicateCandidateRow): Unit = registerInBuffer(other.collection, other.indexInCollection)
+  def registerInsteadOf(other: DuplicateCandidateRow): Unit =
+    registerInBuffer(other.collection, other.indexInCollection)
 
-  def wasIn(group: RowBuffer[DuplicateCandidateRow]): Boolean = collection eq group
+  def wasIn(group: RowBuffer[DuplicateCandidateRow]): Boolean =
+    collection eq group
 
   // estimate object size
   // this some fields are lazy and can not be instantiated at all, but we compute their sizes
@@ -143,7 +149,9 @@ object DuplicateCandidateRow {
   final val BYTE_MASK = (NGRAM_SIG_LEN * BITS_IN_LONG - 1) ^ BIT_MASK
   final val MAX_BITS = NGRAM_SIG_LEN * BITS_IN_LONG
   final val TEXT_NGRAM_MATCHING_THRESHOLD = 30
-  final val HEADER_SIZE = 12
+
+  /** size of JVM object/array header */
+  final val HEADER_SIZE = 16
   final val MAX_MATCHING_LENGTH = 50
 }
 
@@ -208,12 +216,18 @@ class CandidateRowProcessor(
     (dist / len) < 0.3
   }
 
-  private def checkTextSimilarity(row: DuplicateCandidateRow, o: DuplicateCandidateRow): Boolean = {
+  private def checkTextSimilarity(
+      row: DuplicateCandidateRow,
+      o: DuplicateCandidateRow
+  ): Boolean = {
     val nbits = row.matchingSignatureBits(o)
     nbits >= matchThreshold && textOverlaps(row, o)
   }
 
-  private def checkSimilarityGroup(group: RowBuffer[DuplicateCandidateRow], item: DuplicateCandidateRow): Boolean = {
+  private def checkSimilarityGroup(
+      group: RowBuffer[DuplicateCandidateRow],
+      item: DuplicateCandidateRow
+  ): Boolean = {
     val iter = group.iterator()
     val itemLength = item.text.length
     while (iter.hasNext) {
@@ -225,7 +239,11 @@ class CandidateRowProcessor(
     false
   }
 
-  private def checkLengthBucket(items: RowBuffer[DuplicateCandidateRow], item: DuplicateCandidateRow, initGroup: RowBuffer[DuplicateCandidateRow]): RowBuffer[DuplicateCandidateRow] = {
+  private def checkLengthBucket(
+      items: RowBuffer[DuplicateCandidateRow],
+      item: DuplicateCandidateRow,
+      initGroup: RowBuffer[DuplicateCandidateRow]
+  ): RowBuffer[DuplicateCandidateRow] = {
     val iter = items.deletingIterator()
     var group: RowBuffer[DuplicateCandidateRow] = initGroup
     while (iter.hasNext) {
@@ -242,7 +260,10 @@ class CandidateRowProcessor(
     group
   }
 
-  private def addRowToSimGroup(row: DuplicateCandidateRow, group: RowBuffer[DuplicateCandidateRow]): Unit = {
+  private def addRowToSimGroup(
+      row: DuplicateCandidateRow,
+      group: RowBuffer[DuplicateCandidateRow]
+  ): Unit = {
     val first = group.get(0)
     val reprHash = math.min(row.reprHash, first.reprHash)
     if (row.reprHash == reprHash) {
@@ -257,7 +278,9 @@ class CandidateRowProcessor(
     row.registerInBuffer(group, idx)
   }
 
-  private def checkSimilarityGroups(row: DuplicateCandidateRow): RowBuffer[DuplicateCandidateRow] = {
+  private def checkSimilarityGroups(
+      row: DuplicateCandidateRow
+  ): RowBuffer[DuplicateCandidateRow] = {
     val groupsIterator = groups.deletingIterator()
     while (groupsIterator.hasNext) {
       val group = groupsIterator.next()
@@ -346,109 +369,50 @@ class CandidateRowProcessor(
   }
 }
 
-case class FilteredDoc()
-class DocsFilter(args: DeduplicateParagraphs.Args)
-    extends (Row => List[FilteredDoc])
-    with Serializable {
-  override def apply(row: Row): List[FilteredDoc] = {
-    Nil
-  }
-}
+class DeduplicateParagraphs(
+    args: DeduplicateParagraphs.Args,
+    spark: SparkSession
+) {
+  import spark.implicits._
 
-object DeduplicateParagraphs {
-  def process(args: Args, spark: SparkSession): Unit = {
-    import spark.implicits._
-
-    val rawData = spark.read.parquet(args.inputs: _*)
-
+  private def computeReprHashes(frame: DataFrame): DataFrame = {
     // posexplode must be in different select operation than split
-    val splitDocs = rawData
-      .select(split($"text", "\n\n").as("text"))
-      .select(posexplode($"text").as(Seq("pos", "text")))
+    val splitDocs = frame
+      .select(posexplode(split(frame.col("text"), "\n\n")).as(Seq("pos", "text")))
 
-    val basicData = prepareData(splitDocs, args)
+    val basicData = prepareDataset(splitDocs)
 
-    val propagated = args.shiftIndices.foldLeft(basicData) { (bd, i) =>
-      propagateReprHashes(bd, i, args)
+    args.shiftIndices.foldLeft(basicData) { (bd, i) =>
+      propagateReprHashes(bd, i)
     }
-    /*
-
-    val cols = propagated.select("hash", "reprHash", "freq").checkpoint()
-
-    val totalReprHashes = cols.groupBy("reprHash").agg(
-      sum("freq").as("freq"),
-    )
-
-    val counts = cols.select("hash", "reprHash")
-      .join(totalReprHashes, "reprHash")
-      .select("hash", "freq")
-      .dropDuplicates("hash")
-
-    // this time keep original columns intact
-    val cookedDocs = rawData
-      .withColumn("text", split($"text", "\n\n"))
-      .withColumn("text", posexplode($"text").as(Seq("pos", "text")))
-      .withColumn("hash", longHash($"text"))
-
-    // join paragraph frequencies
-    val paragraphsWithFreq = cookedDocs.join(counts, "hash")
-
-    val filteredDocs = filterDuplicateDocs(paragraphsWithFreq, args)
-
-    val sorted = counts.coalesce(1).sort($"freq".desc) */
-
-    propagated
-      .filter($"hash" =!= $"reprHash")
-      .coalesce(10)
-      .sort($"reprHash".asc)
-      .write
-      .mode(SaveMode.Overwrite)
-      .json(args.output)
   }
 
-  // compile full documents from paragraphs
-  // paragraphs are shuffled because of join with freqs,
-  // groupBy op merges them back together, and we use an udf to perform the actual filtering
-  def filterDuplicateDocs(ds: DataFrame, args: Args): DataFrame = {
-    import ds.sqlContext.implicits._
-    val docParts = Seq("text", "pos", "freq")
+  // propagate repr hashes between documents (paragraphs) which are similar
+  def propagateReprHashes(ds: DataFrame, shift: Int): DataFrame = {
+    val args = this.args // do not capture outer object
+    val shiftSignature =
+      udf((x: Array[Byte]) => MathUtil.rotateBitsRight(x, shift))
 
-    val allColumns = ds.columns
-
-    val passthroughColumns = allColumns.toSeq
-      .filterNot(_ == "docId")
-      .filterNot(docParts.contains(_))
-    val aggQueryBasicColumns = passthroughColumns
-      .map(colName => first(colName).as(colName))
-    val aggColumns = docParts.map(collect_list)
-
-    val aggOpFirst :: aggOpRest = (aggColumns ++ aggQueryBasicColumns).toList
-
-    val aggOpResult = ds.groupBy("docId").agg(aggOpFirst, aggOpRest: _*)
-
-    val convertUdf =
-      udf((text: Array[String], pos: Array[Int], freq: Array[Long]) => {
-        val parts = (pos, text, freq).zipped
-        // val sorted = parts.toBuffer.sortBy(_._1)
-        // processDocumentParts(args, sorted)
-      })
-
-    val transformCols = Seq(
-      $"docId",
-      convertUdf(docParts.map(column): _*).as("text")
-    ) ++ passthroughColumns.map(column)
-
-    aggOpResult
-      .select(
-        transformCols: _*
+    ds.withColumn("signature", shiftSignature(ds.col("signature")))
+      // need to persist datasets otherwise mapPartitions is called two times :/
+      // to work around it it is probably required to get into spark sql internals and
+      // write a custom generator (probably) which will call our logic
+      .persist()
+      // sort does not allow to specify number of partitions, so use this sequence of operations
+      .repartitionByRange(args.propagatePartitions, $"signature".asc)
+      .sortWithinPartitions($"signature".asc)
+      .as[DuplicateCandidateRow]
+      .mapPartitions(iter => // all logic is in the CandidateRowProcessor class
+        new CandidateRowProcessor(
+          args.bufferSizeInBytes,
+          args.minBitsToMatch,
+          iter
+        )
       )
-      .filter($"text".isNotNull)
+      .toDF()
   }
 
-  private val longHash = udf((s: String) => NgramHashExtractor.hashString(s))
-
-  def prepareData(ds: DataFrame, args: Args): DataFrame = {
-    import ds.sqlContext.implicits._
+  def prepareDataset(ds: DataFrame): DataFrame = {
     val simHasher = new SimHashProcessor(args.simHashSize)
     val ngrams = new NgramHashExtractor(args.minNgramSize, args.maxNgramSize)
 
@@ -466,7 +430,7 @@ object DeduplicateParagraphs {
       .withColumns(
         Map(
           "signature" -> simHash($"text"),
-          "hash" -> longHash($"text")
+          "hash" -> xxhash64($"text")
         )
       )
       .withColumn("reprHash", $"hash")
@@ -474,65 +438,260 @@ object DeduplicateParagraphs {
     basicData
   }
 
-  // propagate repr hashes between documents (paragraphs) which are similar
-  def propagateReprHashes(ds: DataFrame, shift: Int, args: Args): DataFrame = {
-    import ds.sqlContext.implicits._
-    val shiftSignature =
-      udf((x: Array[Byte]) => MathUtil.rotateBitsRight(x, shift))
+  private def saveStats(statistics: DataFrame) = {
+    if (args.debug) {
+      statistics
+        .filter($"hash" =!= $"reprHash")
+        .coalesce(args.partitions)
+        .sort($"reprHash".asc)
+        .write
+        .mode(SaveMode.Overwrite)
+        .json(args.output)
+    } else {
+      statistics.write
+        .mode(SaveMode.Overwrite)
+        .option("compression", "zstd")
+        .format("parquet")
+        .save(args.output)
+    }
+  }
 
-    ds.withColumn("signature", shiftSignature(ds.col("signature")))
-      .persist()
-      .repartitionByRange(64, $"signature".asc)
-      .sortWithinPartitions($"signature".asc)
-      .as[DuplicateCandidateRow]
-      .mapPartitions(iter =>
-        new CandidateRowProcessor(
-          args.bufferSizeInBytes,
-          args.minBitsToMatch,
-          iter
-        )
+  private def computeStats(reprHashes: DataFrame): DataFrame = {
+    val cols = reprHashes.select("hash", "reprHash", "freq").persist()
+
+    val totalReprHashes = cols
+      .groupBy("reprHash")
+      .agg(
+        sum("freq").as("freq")
       )
-      .toDF()
+      .filter($"freq" > 1)
+
+    cols
+      .select("hash", "reprHash")
+      .join(totalReprHashes, "reprHash")
+      .dropDuplicates("hash")
+  }
+
+  private def prepareParagraphsForFiltering(
+      raw: DataFrame,
+      stats: DataFrame
+  ): DataFrame = {
+
+    val explodeCols = raw.columns.map {
+      case "text" =>
+        posexplode(split(raw.col("text"), "\n\n")).as(Seq("pos", "text"))
+      case col => raw.col(col)
+    }
+
+    val exploded = raw.select(explodeCols: _*)
+
+    val cookedDocs = exploded
+      .withColumn("parHash", xxhash64(exploded.col("text")))
+
+    val joined = cookedDocs.join(stats, $"parHash" === $"hash", "left")
+
+    // remove hash columns from dataset
+    val columns = joined.columns
+      .filter {
+        case "hash" | "reprHash" | "parHash" | "freq" => false
+        case _                                        => true
+      }
+      .map(joined.col) ++ Seq(
+      when($"freq".isNotNull, $"freq").otherwise(lit(1L)).as("freq"),
+      $"reprHash".isNull.or($"reprHash" === $"parHash").as("repr")
+    )
+
+    joined.select(
+      columns: _*
+    )
+  }
+
+  // compile full documents from paragraphs
+  // paragraphs are shuffled because of join with freqs,
+  // groupBy op merges them back together, and we use an udf to perform the actual filtering
+  private def filterDuplicateDocs(ds: DataFrame): DataFrame = {
+    val docParts = Seq("text", "pos", "freq", "repr")
+
+    val allColumns = ds.columns
+
+    val passthroughColumns = allColumns.toSeq
+      .filterNot(_ == "docId")
+      .filterNot(docParts.contains(_))
+
+    val aggQueryBasicColumns = passthroughColumns
+      .map(colName => first(colName).as(colName))
+    val aggColumns = docParts.map(x => collect_list(x).as(x))
+
+    val aggOpFirst :: aggOpRest = (aggColumns ++ aggQueryBasicColumns).toList
+
+    val aggOpResult = ds.groupBy("docId").agg(aggOpFirst, aggOpRest: _*)
+
+    val args = this.args
+    val convertUdf =
+      udf(
+        (
+            text: Array[String],
+            pos: Array[Int],
+            freq: Array[Long],
+            repr: Array[Boolean]
+        ) => {
+          val sorted =
+            DeduplicateParagraphs.collectDocParts(text, pos, freq, repr)
+          DeduplicateParagraphs.processDocumentParts(args, sorted)
+        }
+      )
+
+    val transformCols = Seq(
+      $"docId",
+      convertUdf(docParts.map(column): _*).as("text")
+    ) ++ passthroughColumns.map(column)
+
+    aggOpResult
+      .select(
+        transformCols: _*
+      )
+      .filter($"text".isNotNull)
+  }
+
+  def process(): Unit = {
+    val rawData = spark.read.parquet(args.inputs: _*)
+
+    val statistics = if (args.hasStage("reprHashes")) {
+      computeReprHashes(rawData)
+    } else {
+      spark.read.parquet(args.cache.get)
+    }
+
+    if (args.hasStage("saveReprHashes")) {
+      saveStats(statistics)
+      return
+    }
+
+    val stats = if (args.hasStage("stats")) {
+      computeStats(statistics)
+    } else {
+      spark.read.parquet(args.cache.get)
+    }
+
+    if (args.hasStage("saveStats")) {
+      saveStats(stats)
+      return
+    }
+
+    val paragraphsWithFreqs = prepareParagraphsForFiltering(rawData, stats)
+
+    val filtered = filterDuplicateDocs(paragraphsWithFreqs)
+
+    // filtered.queryExecution.debug.toFile("""e:\data\nlp\corpora\cc\dups\CC-MAIN-2013-20\codegen""")
+
+    filtered
+      .coalesce(args.partitions)
+      .write
+      .mode(SaveMode.Overwrite)
+      .format(args.format)
+      .option("compression", args.compression)
+      .save(args.output)
+  }
+}
+
+object DeduplicateParagraphs {
+
+  case class DocPart(idx: Int, text: String, freq: Long, repr: Boolean)
+
+  def collectDocParts(
+      text: Array[String],
+      pos: Array[Int],
+      freq: Array[Long],
+      repr: Array[Boolean]
+  ): Array[DocPart] = {
+    val len = text.length
+    val result = new Array[DocPart](len)
+    var i = 0
+    while (i < len) {
+      result.update(i, DocPart(pos(i), text(i), freq(i), repr(i)))
+      i += 1
+    }
+    java.util.Arrays.sort(result, TupleComparator)
+    result
+  }
+
+  object TupleComparator extends Comparator[DocPart] {
+    override def compare(o1: DocPart, o2: DocPart): Int =
+      java.lang.Integer.compare(o1.idx, o2.idx)
   }
 
   private def processDocumentParts(
       args: Args,
-      indices: Seq[(Int, String, Long)]
-  ): String = {
-    ???
+      indices: Seq[DocPart]
+  ): String = { // do something smarter than this
+    val result = indices.filter(_.freq <= 1).map(_.text).mkString("\n\n")
+    if (result.nonEmpty) result else null
   }
 
-  // noinspection TypeAnnotation
+  // noinspection TypeAnnotation,ScalaWeakerAccess
   class ArgParser(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[String]]()
     val output = opt[String]()
-    val numShifts = opt[Int](default = Some(-1))
-    val checkpoints = opt[String]()
+    val numShifts = opt[Int](default = Some(5))
+    val cache = opt[String]()
+    val partitions = opt[Int](
+      descr = "number of partitions for output, default=100",
+      default = Some(100)
+    )
+    val propagatePartitions = opt[Int](
+      descr =
+        "how many partitions use to propagate (use ~100MB per partition, e.g. 30 for 3GB dataset)",
+      default = Some(64)
+    )
+    val execution =
+      opt[String](descr = "stages to execute", default = Some("all"))
+    val debug = toggle(default = Some(false))
+    val format = opt[String](default = Some("parquet"))
+    val compression = opt[String](default = Some("zstd"))
     verify()
 
     def toArgs: Args = Args(
       inputs = input(),
       output = output(),
-      checkpoints = checkpoints(),
-      partitions = 1000,
+      cache = cache.toOption,
+      partitions = partitions(),
       simHashSize = 128,
       minNgramSize = 2,
       maxNgramSize = 4,
-      numShifts = numShifts()
+      numShifts = numShifts(),
+      propagatePartitions = propagatePartitions(),
+      execution = execution(),
+      stages = makeStages(),
+      debug = debug(),
+      format = format(),
+      compression = compression()
     )
+
+    def makeStages(): Set[String] = execution.toOption match {
+      case None    => Set("")
+      case Some(s) => s.split(",").map(_.trim).toSet
+    }
+
   }
 
+  // noinspection jol
   case class Args(
       inputs: Seq[String],
       output: String,
-      checkpoints: String,
+      cache: Option[String],
       partitions: Int,
       simHashSize: Int,
       minNgramSize: Int,
       maxNgramSize: Int,
+      execution: String,
+      stages: Set[String],
+      debug: Boolean,
+      format: String,
+      compression: String,
       numShifts: Int = -1,
       bufferSizeInBytes: Int = 10000000,
-      preFilterRatio: Double = 0.6
+      preFilterRatio: Double = 0.6,
+      propagatePartitions: Int = 64
   ) {
     def minBitsToMatch: Int = (simHashSize * preFilterRatio).toInt
 
@@ -552,6 +711,8 @@ object DeduplicateParagraphs {
       }
       arraySlice
     }
+
+    def hasStage(stage: String): Boolean = stages.contains(stage)
   }
 
   def main(args: Array[String]): Unit = {
@@ -559,8 +720,8 @@ object DeduplicateParagraphs {
     val argObj = argParser.toArgs
 
     SparkSession.builder().master("local[*]").getOrCreate().use { spark =>
-      spark.sparkContext.setCheckpointDir(argObj.checkpoints)
-      process(argObj, spark)
+      // argObj.cache.foreach(v => spark.sparkContext.setCheckpointDir(v))
+      new DeduplicateParagraphs(argObj, spark).process()
     }
   }
 
