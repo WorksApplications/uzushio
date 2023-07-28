@@ -367,7 +367,9 @@ class DeduplicateParagraphs(
 
   private def computeReprHashes(frame: DataFrame): DataFrame = {
     val splitDocs = frame
-      .select(posexplode(split(frame.col("text"), "\n\n")).as(Seq("pos", "text")))
+      .select(
+        posexplode(split(frame.col("text"), "\n\n")).as(Seq("pos", "text"))
+      )
 
     val basicData = prepareDataset(splitDocs)
 
@@ -528,18 +530,18 @@ class DeduplicateParagraphs(
             DeduplicateParagraphs.collectDocParts(text, pos, freq, repr)
           DeduplicateParagraphs.processDocumentParts(args, sorted)
         }
-      )
+      ).asNonNullable()
 
     val transformCols = Seq(
       $"docId",
-      convertUdf(docParts.map(column): _*).as("text")
-    ) ++ passthroughColumns.map(column)
+      convertUdf(docParts.map(aggOpResult.col): _*).as("text")
+    ) ++ passthroughColumns.map(aggOpResult.col)
 
     aggOpResult
       .select(
         transformCols: _*
       )
-      .filter($"text".isNotNull)
+      .filter(octet_length($"text") > 0)
   }
 
   def process(): Unit = {
@@ -614,7 +616,7 @@ object DeduplicateParagraphs {
       indices: Seq[DocPart]
   ): String = { // do something smarter than this
     val result = indices.filter(_.freq <= 1).map(_.text).mkString("\n\n")
-    if (result.nonEmpty) result else null
+    result
   }
 
   // noinspection TypeAnnotation,ScalaWeakerAccess
