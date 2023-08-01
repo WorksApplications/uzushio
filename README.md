@@ -8,19 +8,13 @@ It uses Spark and written mostly in Scala.
 LLMs and foundational models require huge clean corpus for training.
 There are many cleaning methods, and each nlp tasks have suitable sets of them.
 
-Uzushio has following goals:
+Uzushio has the following goals:
 
 - provide a common corpus cleaning tool
   - reduce the implementation cost
-  - share same implemantation for the compatibility
+  - share same implementation for the compatibility
 - keep it efficient, flexible and updated
   - it should be able to used in every kind of nlp projects (which uses large corpus)
-
-## References
-
-- [chiTra の前処理について](https://docs.google.com/document/d/1colWQgSc22rzLHKdCH78BgtRLydGMZX-D-FAT6rD8iY/edit#heading=h.msy5fu9l7egn)
-  - preprocess in chitra pretraining
-- [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499)
 
 # Setup
 
@@ -29,9 +23,9 @@ You need to install Apache Spark, sbt, and Sudachi dictionary file.
 ## Apache Spark (if running locally, if you want to use AWS EMR you do not need it)
 
 Download it from the [official page](https://spark.apache.org/downloads.html). 
-You can put it in PATH or specify absolute paths to 
+You can put it in PATH or use absolute paths for Spark startup scripts to launch Uzushio. 
 
-At the moment uzushio is built against: `spark 3.4.*` + `Scala 2.12.*`.
+At the moment uzushio is built against: `spark 3.3.*` + `Scala 2.12.*`.
 
 Check if `spark-submit --version` works.
 
@@ -42,17 +36,12 @@ You can often install one from OS package manager.
 
 ### JDK
 
-You need JDK 11+ to run sbt and Spark.
+You need JDK 8+ to run sbt and Spark. Usually, you can install it from a package manager.
+However, if you plan to launch Uzushio in EMR, you either need to use JDK 8 to compile Uzushio,
+or assemble a custom image for EMR to use JDK 11+ inside EMR (currently it uses JDK 8),
+otherwise you will get MethodNotFoundErrors.
 
-## WIP: Sudachi (Outdated, will download dictionary automatically in future if needed)
-
-Some features uses sudachi. When you want to use those, you need a sudachi dictionary.
-
-[download](http://sudachi.s3-website-ap-northeast-1.amazonaws.com/sudachidict/) sudachi dictionary file (.dict) and place in the root dir.
-
-todo: specify dict by config/args
-
-# WIP: Running
+# Building
 
 ## Build fat JAR for launching
 
@@ -61,147 +50,56 @@ The easiest way to use the tool — build fat JAR with all required dependencies
 Execute `sbt assembly` from project root directory.
 You will have output jar under `./target/scala-[version]/`.
 
-### note
+### For development
 
-- 開発段階などでコンパイルを繰り返すなら `sbt` で sbt-shell を起動しておいた方が速い
-- `sbt compile` ではなく `sbt assembly`を使う
-  - spark に投げるために必要ライブラリ等をまとめてバンドルするため
-    - なお spark は除外する必要があり、`build.sbt`で設定している
-  - `./project/plugins.sbt` にて設定している
+- For development, it is better to launch sbt shell via `sbt` and launch commands inside the sbt.
+- Launch classes located in `com.worksap.nlp.uzushio.lib.runners` are designed to be launched without `spark-submit` script
+  - You can use your IDE functionality which will set up correct classpath or use `lib/run` command in the sbt shell
+- You can do compilation via `assembly` command
+  - Also, see [sbt docs](https://www.scala-sbt.org/1.x/docs/Running.html)
 
-## submit
+## Running via spark environment
 
-`spark-submit` に jar とオプションを投げる：
+Use `spark-submit` with jar built by previous steps：
 
 ```
 spark-submit [spark options] --class [class name] [path/to/jar_file] [class options]
 ```
 
-各処理のオプションについては下記、
-spark 側の詳細は [`spark-submit` のヘルプ](https://spark.apache.org/docs/latest/submitting-applications.html)を参照。
+Also, see [`spark-submit` docs](https://spark.apache.org/docs/latest/submitting-applications.html)
 
-# 実行クラス
+# Runner classes
 
-## CorpusCleaner
+Note that all paths can be on any Hadoop-supported filesystem.
+For S3, specify `s3://` paths if you **use EMR** and `s3a://` paths if you **do not** use EMR.
 
-入力コーパスを整形する。
+Classes in `com.worksap.nlp.uzushio.main` are designed to run from `spark-submit` script
 
-処理の流れについてはコンフィグファイルで指定する。
+## `com.worksap.nlp.uzushio.main.ExtractTextFromWarc`
 
-```
-spark-submit --class org.sample.corpus.CorpusCleaner \
-    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
-    --input=../data/*.txt --output=./out \
-    --config "chitra"
-```
+Extract paragraphs from html documents inside WARC collection.
+Paragraphs are guessed on best effort basis from html structure (e.g. div, p tags).
 
-### args
-
-- `--input`: Input corpus. List of path to the file or dir (load all files in the dir).
-  - Multiple input is allowed (ex. `--input ./file.a ./input_dir/ ./and_more/*.txt`).
-  - By default, each files are treated as "\n\n" splitted documents that consists of "\n" splitted sentences.
-- `--output`: Spark output dir (default `./out`). Need to be empty if exists.
-- `--config`: Name or path of config file (default: `chitra`).
-  - See `src/main/resources/reference.conf` for reference.
-  - See next section for existing config name.
-- You can override config values by cli arg (check with `-h` option).
-
-### 既存のコンフィグ
-
-既存の処理についてはそれぞれコンフィグファイルとしてまとめてある。
-これらについては `--config` オプションにて名称での指定が可能。
-
-- `chitra`
-  - [sudachitra での整形](https://github.com/WorksApplications/SudachiTra/tree/main/pretraining/bert#2-preprocessing-corpus-cleaning) と同等の処理を行う。
-  - ref: [chiTra の前処理について](https://docs.google.com/document/d/1colWQgSc22rzLHKdCH78BgtRLydGMZX-D-FAT6rD8iY/edit#heading=h.msy5fu9l7egn)
-- `rmTemplate`
-  - minhash 適用の調査時に chitra 前処理後の追加処理として作成したもの。
-    - 重複文書（完全一致）
-    - 指定したテンプレート文（or 段落）
-    - 連続して繰り返される同一文（１文のみ残す）
-- `sudachiDictCorpus`
-  - sudachi 辞書検証用コーパスのクリーニング用コンフィグ。
-- `warc`
-  - `warc.WarcToDocument` で抽出したテキストのクリーニング用コンフィグ。
-  - 日本語テキストの選別、段落単位での重複除去の後、`chitra` + `rmTemplate` の処理を行う。
-  - こののち `MinHashDeduplicator` を適用する想定。
-
-## MinHashDeduplicator
-
-類似文書を削除する。
-
-文書を n-gram の集合とみなし、Jaccard distance に基づき類似文書をリストアップ、削除する。
-
-[Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499) における NearDup を再現したもの。
-
-```
-spark-submit --class org.sample.corpus.MinHashDeduplicator \
-    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
-    --input=./data/nwjc/* --output=./out \
-    --mode C \
-    --ngram 5 \
-    --minhash-b 5 \
-    --minhash-r 10 \
-    --jaccard-thr 0.8 \
-    --skip-editsim
-```
-
-### args
-
-- `--input`, `--output`: Input files and output directory. Same as CorpusCleaner.
-  - Deduplicated documents are written into `${output}/dedup`
-  - Removed documents are written into `${output}/dup`
-- `--mode`: Sudachi split mode (A/B/C). (default C)
-- `--ngram`: n of n-gram, used to convert document to a set of n-grams. (default 5)
-- `--minhash-b`: And-amplification value for minhash-lsh. (default 15)
-- `--minhash-r`: Or-amplification value for minhash-lsh. (default 150)
-- `--jaccard-thr`: Threshold for jaccard index. Document pairs with JI less than this will be skipped. (default 0.8)
-- `--editsim-thr`: Threshold for edit similarity. Document pairs with ES less than this will be skipped. (default 0.8)
-- `--skip-editsim`: Set to skip the filtering by the edit similarity.
-
-#### MinHashLSH
-
-The minhash-lsh lists the pairs of similar documents in a probabilistic way, considering a document as a set of n-gram.
-
-Let `s` be a [Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index) of a document pair.
-Then the probability of the pair is selected equals to `1 - (1 - x^b)^r`.
-
-You should change hyper parameter `b` and `r` according to the threshold you want.
-The default parameter is taken from the reference paper that uses JD 0.8 as a threshold
-([ref: graph of the matching probability](https://www.desmos.com/calculator/jq7mpurg3m)).
-
-The computation cost will increases linear to `b*r`, which is the number of hashes used in minhash alg.
-Also note that the storage used by minhash increases linear to `r`.
-
-#### Filtering by actual similarity
-
-After the MinHashLSH, we filter out document pairs with low similarity.
-This is neccessarly since MinHash is a probabilistic algorithm.
-
-We use following two metrics:
-
-- Jaccard index
-- Edit similarity
-  - def: EditDistance(d1, d2) / max(d1.length, d2.length)
-    - ref: [edit distance](https://en.wikipedia.org/wiki/Edit_distance)
-  - This takes `O(T^2)` time with a document length `T`, will is so long.
-    - Skip this step with `--skip-editsim` option.
-
-## warc.WarcToDocument
-
-Extract text and meta data from WARC file.
-
-See [[./src/main/scala/org/sample/corpus/warc/README.md]] for detail.
-
+#### Run Example
 ```bash
-spark-submit --class org.sample.corpus.warc.WarcToDocument \
-    ./target/scala-2.12/CorpusCleaning-assembly-0.1.jar \
-    --input=./data/nwjc/01warc/ --output=./out \
-
-# this will also create `out_fulldata` dir next to the output dir.
+spark-submit \
+    --class=com.worksap.nlp.uzushio.main.ExtractTextFromWarc \
+    --master='local[*]' \
+    /path/to/uzushio-assembly-0.1-SNAPSHOT.jar \
+    --input=/path/to/warc/files \
+    --output=/path/to/output \
+    --language=ja,ru,ko,zh 
 ```
 
-# references
+#### Arguments
+* `--input` path to input data, can be any Hadoop-supported filesystem 
+* `--output` path to where output data will be written, in parquet format
+* `--language` extract documents with following languages. Languages with latin script are **NOT** supported.
+* `--max-partitions` (default 2000) produce at most this number of partitions in output data.
+* `--compression` (default zstd) compress parquet data with this compression algorithm. See [supported algorithms](https://spark.apache.org/docs/latest/sql-data-sources-parquet.html#data-source-option).
+
+
+# References
 
 ## WARC
 
@@ -211,3 +109,9 @@ spark-submit --class org.sample.corpus.warc.WarcToDocument \
   - Iterates over warc records
 - [com.martinkl.warc](https://github.com/ept/warc-hadoop)
   - Loads warc file using Hadoop API
+
+## Other
+
+- [chiTra の前処理について](https://docs.google.com/document/d/1colWQgSc22rzLHKdCH78BgtRLydGMZX-D-FAT6rD8iY/edit#heading=h.msy5fu9l7egn)
+  - preprocess in chitra pretraining
+- [Deduplicating Training Data Makes Language Models Better](https://arxiv.org/abs/2107.06499)
