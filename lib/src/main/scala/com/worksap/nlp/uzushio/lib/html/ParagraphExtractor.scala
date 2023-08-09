@@ -1,6 +1,6 @@
 package com.worksap.nlp.uzushio.lib.html
 
-import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{blockTags, cleanString, ignoreTags}
+import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{HTML_PATH_SEPARATOR, blockTags, cleanString, ignoreTags}
 import org.apache.commons.lang.StringUtils
 import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
@@ -80,7 +80,7 @@ class ParagraphExtractor(
   private def pushParagraph(tag_path_str: String): Unit = {
     val str = cleanString(writer.result())
     if (str.nonEmpty) {
-      paragraphs += tag_path_str + 17.toChar + str
+      paragraphs += tag_path_str + HTML_PATH_SEPARATOR + str
     }
     writer.clear()
   }
@@ -89,7 +89,9 @@ class ParagraphExtractor(
 }
 
 object ParagraphExtractor {
-  private val spacesRegex = "[ \t\r\u00a0]+".r
+  private final val spacesRegex = "[\u0000-\u0020\u00a0]+".r
+
+  final val HTML_PATH_SEPARATOR: Char = 0x1c // ASCII FIELD SEPARATOR
 
   def cleanString(str: String): String = {
     str.split('\n').map(s => StringUtils.strip(spacesRegex.replaceAllIn(s, " "))).filter(_.nonEmpty).mkString("\n")
