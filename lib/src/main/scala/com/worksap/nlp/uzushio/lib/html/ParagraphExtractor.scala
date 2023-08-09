@@ -6,6 +6,7 @@ import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
 
 import java.util.Locale
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 /** Handler to segment text into paragraphs.
@@ -18,6 +19,7 @@ class ParagraphExtractor(
 ) extends DefaultHandler {
   private var ignoreLevel = 0
   private val writer = new StringBuilder()
+  private var tag_path = mutable.Stack[String]()
 
   private def ignoreText: Boolean = ignoreLevel > 0
 
@@ -38,13 +40,20 @@ class ParagraphExtractor(
       atts: Attributes
   ): Unit = {
     val q = qName.toLowerCase(Locale.ROOT)
+    val id = atts.getValue("id")
+    val classes = atts.getValue("class")
+
+    var tag_path_str = s"${q}"
+    if (classes != null) {
+      tag_path_str += s".${classes.split(" ").mkString(".")}"
+    }
+    if (id != null) {
+      tag_path_str += s"#${id}"
+    }
+    tag_path.push(tag_path_str)
 
     if (ignoreTags.contains(q)) {
       ignoreLevel += 1
-    }
-
-    if (blockTags.contains(q)) {
-      pushParagraph()
     }
 
     if ("br" == q) {
@@ -54,6 +63,10 @@ class ParagraphExtractor(
 
   override def endElement(uri: String, localName: String, qName: String): Unit = {
     val q = qName.toLowerCase(Locale.ROOT)
+    if (blockTags.contains(q)) {
+      pushParagraph(tag_path.reverse.mkString(">"))
+    }
+    tag_path.pop()
 
     if (ignoreTags.contains(q)) {
       ignoreLevel -= 1
@@ -61,13 +74,13 @@ class ParagraphExtractor(
   }
 
   override def endDocument(): Unit = {
-    pushParagraph()
+    pushParagraph("")
   }
 
-  private def pushParagraph(): Unit = {
+  private def pushParagraph(tag_path_str: String): Unit = {
     val str = cleanString(writer.result())
     if (str.nonEmpty) {
-      paragraphs += str
+      paragraphs += tag_path_str + 17.toChar + str
     }
     writer.clear()
   }
