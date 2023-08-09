@@ -587,6 +587,13 @@ class DeduplicateParagraphs(
 
 object DeduplicateParagraphs {
 
+  /**
+   *
+   * @param idx index of document part (paragraph)
+   * @param text paragraph text
+   * @param freq how many times text or its variants were in the corpus
+   * @param repr whether this paragraph is representative (its hash is minimum over variants)
+   */
   case class DocPart(idx: Int, text: String, freq: Long, repr: Boolean)
 
   def collectDocParts(
@@ -613,9 +620,9 @@ object DeduplicateParagraphs {
 
   private def processDocumentParts(
       args: Args,
-      indices: Seq[DocPart]
+      parts: Seq[DocPart]
   ): String = { // do something smarter than this
-    val result = indices.filter(_.freq <= 1).map(_.text).mkString("\n\n")
+    val result = parts.filter(_.freq <= 1).map(_.text).mkString("\n\n")
     result
   }
 
