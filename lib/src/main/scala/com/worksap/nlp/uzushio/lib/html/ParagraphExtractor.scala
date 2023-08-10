@@ -18,15 +18,18 @@ class ParagraphExtractor(
     val paragraphs: ArrayBuffer[String]
 ) extends DefaultHandler {
   private var ignoreLevel = 0
-  private val writer = new StringBuilder()
   private var tag_path = mutable.Stack[String]()
+  private var writer_stack = mutable.Stack[StringBuilder]()
+  writer_stack.push(new StringBuilder())
 
   private def ignoreText: Boolean = ignoreLevel > 0
 
   override def characters(ch: Array[Char], start: Int, length: Int): Unit = {
     // skip texts inside specific tags
     if (ignoreText) { return }
-    writer.appendAll(ch, start, length)
+    val top_writer = writer_stack.pop()
+    top_writer.appendAll(ch, start, length)
+    writer_stack.push(top_writer)
   }
 
   override def ignorableWhitespace(ch: Array[Char], start: Int, length: Int): Unit = {
@@ -56,8 +59,13 @@ class ParagraphExtractor(
       ignoreLevel += 1
     }
 
+    if (blockTags.contains(q)) {
+      writer_stack.push(new StringBuilder())
+    }
     if ("br" == q) {
-      writer.append("\n")
+      val top_writer = writer_stack.pop()
+      top_writer.append("\n")
+      writer_stack.push(top_writer)
     }
   }
 
@@ -65,6 +73,7 @@ class ParagraphExtractor(
     val q = qName.toLowerCase(Locale.ROOT)
     if (blockTags.contains(q)) {
       pushParagraph(tag_path.reverse.mkString(">"))
+      writer_stack.pop()
     }
     tag_path.pop()
 
@@ -78,14 +87,15 @@ class ParagraphExtractor(
   }
 
   private def pushParagraph(tag_path_str: String): Unit = {
-    val str = cleanString(writer.result())
+    val str = cleanString(writer_stack.top.result())
     if (str.nonEmpty) {
       paragraphs += tag_path_str + HTML_PATH_SEPARATOR + str
     }
-    writer.clear()
   }
 
-  override def toString: String = { paragraphs.mkString("", "\n", writer.result()) }
+  override def toString: String = {
+    paragraphs.mkString("", "\n", writer_stack.top.result())
+  }
 }
 
 object ParagraphExtractor {
