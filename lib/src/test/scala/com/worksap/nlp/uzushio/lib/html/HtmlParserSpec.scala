@@ -19,9 +19,12 @@ class HtmlParserSpec extends AnyFreeSpec with ClasspathAccess {
       val processor = new WarcEntryParser
       val data = classpathBytes("docs/perldoc_ja_tiny.html")
       val paragraphs = processor.parseHtml(data, 0, StandardCharsets.UTF_8)
-      assert(paragraphs == ArrayBuffer("body>div.container>div#12345>div自然言語処理",
-      "body>div.container>div#12345早稲田大学で\nを",
-      "body>div.containerこんにちは\n勉強する。"
+      assert(paragraphs == ArrayBuffer(
+        "body>div.containerこんにちは",
+        "body>div.container>div#12345早稲田大学で",
+        "body>div.container>div#12345>div自然言語処理",
+        "body>div.container>div#12345を",
+        "body>div.container勉強する。"
       ))
     }
   }

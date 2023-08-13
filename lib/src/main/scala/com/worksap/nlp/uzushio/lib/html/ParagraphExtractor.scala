@@ -10,26 +10,24 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 /** Handler to segment text into paragraphs.
-  *
-  * The delimiter is used to indicate the start/end of paragraphs. It always
-  * locates the start of a line, but may contain additional text after it.
-  */
+ *
+ * The delimiter is used to indicate the start/end of paragraphs. It always
+ * locates the start of a line, but may contain additional text after it.
+ */
 class ParagraphExtractor(
-    val paragraphs: ArrayBuffer[String]
-) extends DefaultHandler {
+                          val paragraphs: ArrayBuffer[String]
+                        ) extends DefaultHandler {
   private var ignoreLevel = 0
+  private val writer = new StringBuilder()
   private var tag_path = mutable.Stack[String]()
-  private var writer_stack = mutable.Stack[StringBuilder]()
-  writer_stack.push(new StringBuilder())
+  private var per_tag_path_str = ""
 
   private def ignoreText: Boolean = ignoreLevel > 0
 
   override def characters(ch: Array[Char], start: Int, length: Int): Unit = {
     // skip texts inside specific tags
     if (ignoreText) { return }
-    val top_writer = writer_stack.pop()
-    top_writer.appendAll(ch, start, length)
-    writer_stack.push(top_writer)
+    writer.appendAll(ch, start, length)
   }
 
   override def ignorableWhitespace(ch: Array[Char], start: Int, length: Int): Unit = {
@@ -37,14 +35,18 @@ class ParagraphExtractor(
   }
 
   override def startElement(
-      uri: String,
-      localName: String,
-      qName: String,
-      atts: Attributes
-  ): Unit = {
+                             uri: String,
+                             localName: String,
+                             qName: String,
+                             atts: Attributes
+                           ): Unit = {
     val q = qName.toLowerCase(Locale.ROOT)
     val id = atts.getValue("id")
     val classes = atts.getValue("class")
+
+    if (blockTags.contains(q)) {
+      pushParagraph(per_tag_path_str)
+    }
 
     var tag_path_str = s"${q}"
     if (classes != null) {
@@ -54,18 +56,14 @@ class ParagraphExtractor(
       tag_path_str += s"#${id}"
     }
     tag_path.push(tag_path_str)
+    per_tag_path_str = tag_path.reverse.mkString(">")
 
     if (ignoreTags.contains(q)) {
       ignoreLevel += 1
     }
 
-    if (blockTags.contains(q)) {
-      writer_stack.push(new StringBuilder())
-    }
     if ("br" == q) {
-      val top_writer = writer_stack.pop()
-      top_writer.append("\n")
-      writer_stack.push(top_writer)
+      writer.append("\n")
     }
   }
 
@@ -73,8 +71,8 @@ class ParagraphExtractor(
     val q = qName.toLowerCase(Locale.ROOT)
     if (blockTags.contains(q)) {
       pushParagraph(tag_path.reverse.mkString(">"))
-      writer_stack.pop()
     }
+    per_tag_path_str = tag_path.reverse.mkString(">")
     tag_path.pop()
 
     if (ignoreTags.contains(q)) {
@@ -87,15 +85,14 @@ class ParagraphExtractor(
   }
 
   private def pushParagraph(tag_path_str: String): Unit = {
-    val str = cleanString(writer_stack.top.result())
+    val str = cleanString(writer.result())
     if (str.nonEmpty) {
       paragraphs += tag_path_str + HTML_PATH_SEPARATOR + str
     }
+    writer.clear()
   }
 
-  override def toString: String = {
-    paragraphs.mkString("", "\n", writer_stack.top.result())
-  }
+  override def toString: String = { paragraphs.mkString("", "\n", writer.result()) }
 }
 
 object ParagraphExtractor {
