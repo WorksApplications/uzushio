@@ -59,6 +59,9 @@ class ParagraphExtractor(
     if ("br" == q) {
       writer.append("\n")
     }
+    else if ("a" == q) {
+      writer.append("<a>")
+    }
   }
 
   override def endElement(uri: String, localName: String, qName: String): Unit = {
