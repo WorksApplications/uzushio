@@ -10,10 +10,10 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 /** Handler to segment text into paragraphs.
-*
-* The delimiter is used to indicate the start/end of paragraphs. It always
-* locates the start of a line, but may contain additional text after it.
-*/
+  *
+  * The delimiter is used to indicate the start/end of paragraphs. It always
+  * locates the start of a line, but may contain additional text after it.
+  */
 class ParagraphExtractor(
     val paragraphs: ArrayBuffer[String]
 ) extends DefaultHandler {
