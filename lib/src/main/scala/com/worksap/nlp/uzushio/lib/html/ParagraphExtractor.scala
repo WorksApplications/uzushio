@@ -44,10 +44,6 @@ class ParagraphExtractor(
     val id = atts.getValue("id")
     val classes = atts.getValue("class")
 
-    if (blockTags.contains(q)) {
-      pushParagraph(per_tag_path_str)
-    }
-
     var tag_path_str = s"${q}"
     if (classes != null) {
       tag_path_str += s".${classes.split(" ").mkString(".")}"
@@ -56,7 +52,11 @@ class ParagraphExtractor(
       tag_path_str += s"#${id}"
     }
     tag_path.push(tag_path_str)
-    per_tag_path_str = tag_path.reverse.mkString(">")
+
+    if (blockTags.contains(q)) {
+      pushParagraph(per_tag_path_str)
+      per_tag_path_str = tag_path.reverse.mkString(">")
+    }
 
     if (ignoreTags.contains(q)) {
       ignoreLevel += 1
@@ -72,7 +72,6 @@ class ParagraphExtractor(
     if (blockTags.contains(q)) {
       pushParagraph(tag_path.reverse.mkString(">"))
     }
-    per_tag_path_str = tag_path.reverse.mkString(">")
     tag_path.pop()
 
     if (ignoreTags.contains(q)) {
