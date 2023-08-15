@@ -1,6 +1,6 @@
 package com.worksap.nlp.uzushio.lib.html
 
-import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{HTML_PATH_SEPARATOR, blockTags, cleanString, ignoreTags}
+import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{HTML_LINK_END, HTML_LINK_START, HTML_PATH_SEPARATOR, blockTags, cleanString, ignoreTags}
 import org.apache.commons.lang.StringUtils
 import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
@@ -60,12 +60,13 @@ class ParagraphExtractor(
       writer.append("\n")
     }
     else if ("a" == q) {
-      writer.append("<a>")
+      writer.append(HTML_LINK_START)
     }
   }
 
   override def endElement(uri: String, localName: String, qName: String): Unit = {
     val q = qName.toLowerCase(Locale.ROOT)
+
     if (blockTags.contains(q)) {
       pushParagraph(tag_path.reverse.mkString(">"))
     }
@@ -73,6 +74,10 @@ class ParagraphExtractor(
 
     if (ignoreTags.contains(q)) {
       ignoreLevel -= 1
+    }
+
+    if ("a" == q) {
+      writer.append(HTML_LINK_END)
     }
   }
 
@@ -92,9 +97,11 @@ class ParagraphExtractor(
 }
 
 object ParagraphExtractor {
-  private final val spacesRegex = "[\u0000-\u0020\u00a0]+".r
+  private final val spacesRegex = "[\u0000-\u0001\u0004-\u0020\u00a0]+".r
 
   final val HTML_PATH_SEPARATOR: Char = 0x1c // ASCII FIELD SEPARATOR
+  final val HTML_LINK_START: Char = 0x02 // ASCII TEXT START
+  final val HTML_LINK_END: Char = 0x03 // ASCII TEXT END
 
   def cleanString(str: String): String = {
     str.split('\n').map(s => StringUtils.strip(spacesRegex.replaceAllIn(s, " "))).filter(_.nonEmpty).mkString("\n")
