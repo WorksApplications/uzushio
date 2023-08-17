@@ -20,6 +20,7 @@ class ParagraphExtractor(
   private var ignoreLevel = 0
   private val writer = new StringBuilder()
   private var tag_path = mutable.Stack[String]()
+  private var per_tag_path_str = ""
 
   private def ignoreText: Boolean = ignoreLevel > 0
 
@@ -51,6 +52,11 @@ class ParagraphExtractor(
       tag_path_str += s"#${id}"
     }
     tag_path.push(tag_path_str)
+
+    if (blockTags.contains(q)) {
+      pushParagraph(per_tag_path_str)
+      per_tag_path_str = tag_path.reverse.mkString(">")
+    }
 
     if (ignoreTags.contains(q)) {
       ignoreLevel += 1
