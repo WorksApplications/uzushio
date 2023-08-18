@@ -1,10 +1,11 @@
 package com.worksap.nlp.uzushio.lib.html
 
-import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{HTML_LINK_END, HTML_LINK_START, HTML_PATH_SEPARATOR, blockTags, cleanString, ignoreTags}
+import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{HTML_LINK_END, HTML_LINK_START, HTML_PATH_SEPARATOR, blockTags, cleanString, hasContent, ignoreTags}
 import org.apache.commons.lang.StringUtils
 import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
 
+import java.lang
 import java.util.Locale
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -44,12 +45,12 @@ class ParagraphExtractor(
     val id = atts.getValue("id")
     val classes = atts.getValue("class")
 
-    var tag_path_str = s"${q}"
+    var tag_path_str = s"$q"
     if (classes != null) {
       tag_path_str += s".${classes.split(" ").mkString(".")}"
     }
     if (id != null) {
-      tag_path_str += s"#${id}"
+      tag_path_str += s"#$id"
     }
     tag_path.push(tag_path_str)
 
@@ -93,7 +94,7 @@ class ParagraphExtractor(
 
   private def pushParagraph(tag_path_str: String): Unit = {
     val str = cleanString(writer.result())
-    if (str.nonEmpty) {
+    if (hasContent(str)) {
       paragraphs += tag_path_str + HTML_PATH_SEPARATOR + str
     }
     writer.clear()
@@ -103,14 +104,64 @@ class ParagraphExtractor(
 }
 
 object ParagraphExtractor {
+  private final val emptyLinks = "\u0002[\u0000-\u0001\u0004-\u0020\u00a0]*\u0003".r
   private final val spacesRegex = "[\u0000-\u0001\u0004-\u0020\u00a0]+".r
 
   final val HTML_PATH_SEPARATOR: Char = 0x1c // ASCII FIELD SEPARATOR
   final val HTML_LINK_START: Char = 0x02 // ASCII TEXT START
   final val HTML_LINK_END: Char = 0x03 // ASCII TEXT END
+  final val FULLWIDTH_SPACE = '　'
 
   def cleanString(str: String): String = {
-    str.split('\n').map(s => StringUtils.strip(spacesRegex.replaceAllIn(s, " "))).filter(_.nonEmpty).mkString("\n")
+    cleanLinks(str).split('\n').map { s =>
+      StringUtils.strip(spacesRegex.replaceAllIn(s, " "))
+    }.filter(_.nonEmpty).mkString("\n")
+  }
+
+  private def cleanLinks(x: String): String = {
+    val idx = x.indexOf('\u0002')
+    val noBreaks = if (idx < 0) {
+      x
+    } else {
+      cleanLinksImpl(new lang.StringBuilder(x), idx)
+    }
+    emptyLinks.replaceAllIn(noBreaks, "")
+  }
+
+  private def cleanLinksImpl(builder: lang.StringBuilder, start: Int): String = {
+    var idx = start
+    val end = builder.length()
+    var inside = false
+
+    while (idx < end) {
+      val c = builder.charAt(idx)
+      if (inside) {
+        c match {
+          case HTML_LINK_END => inside = false
+          case _ if c < 0x20 || c == 0xa0 => builder.setCharAt(idx, ' ')
+          case _ => // do nothing
+        }
+
+      } else if (c == HTML_LINK_START) {
+        inside = true
+      }
+      idx += 1
+    }
+
+    builder.toString
+  }
+
+  def hasContent(seq: CharSequence): Boolean = {
+    var i = 0
+    val len = seq.length()
+    while (i < len) {
+      val c = seq.charAt(i)
+      if (c > 0x20 && c != FULLWIDTH_SPACE) {
+        return true
+      }
+      i += 1
+    }
+    false
   }
 
   /** Texts inside these tags will be removed. */

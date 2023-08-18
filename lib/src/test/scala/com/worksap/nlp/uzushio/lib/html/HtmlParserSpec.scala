@@ -28,5 +28,14 @@ class HtmlParserSpec extends AnyFreeSpec with ClasspathAccess {
         "body>div.container勉強する。"
       ))
     }
+
+    "empty paragraphs are ignored" in {
+      val processor = new WarcEntryParser
+      val data = classpathBytes("docs/links.html")
+      val paragraphs = processor.parseHtml(data, 0, StandardCharsets.UTF_8)
+      assert(paragraphs == Seq(
+        "body>div画像リンク"
+      ))
+    }
   }
 }
