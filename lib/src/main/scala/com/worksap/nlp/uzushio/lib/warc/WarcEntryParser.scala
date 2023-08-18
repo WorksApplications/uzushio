@@ -81,6 +81,7 @@ class WarcEntryParser {
     } catch {
       case _: HttpException => None
       case _: IOException   => None
+      case _: IllegalArgumentException => None
     }
   }
 
