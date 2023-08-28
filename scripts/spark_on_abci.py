@@ -1,5 +1,6 @@
 import argparse
 import dataclasses
+import datetime
 import os
 import socket
 import subprocess
@@ -16,15 +17,21 @@ class Args:
     options: list[str]
     local_dir: str = None
     ping: Path = None
+    driver_mem: str = "30G"
+    executor_mem: str = "63G"
+    offheap_mem: str = "100G"
 
     @staticmethod
     def parse() -> 'Args':
         p = argparse.ArgumentParser()
         p.add_argument('--jar', required=True)
-        p.add_argument('--class', required=True)
+        p.add_argument('--class', required=True, dest='clazz')
         p.add_argument('--spark', required=True, type=Path)
         p.add_argument('--ping', type=Path)
         p.add_argument('--logroot', type=Path, default=_default_scratch())
+        p.add_argument('--driver-mem', default='30G')
+        p.add_argument('--executor-mem', default='63G')
+        p.add_argument('--offheap-mem', default='100G')
         args, opts = p.parse_known_args()
         return Args(options=opts, **vars(args))
 
@@ -75,13 +82,33 @@ class SparkLauncher(object):
         self.head = self.hosts[0]
         self.hostnames = _hostname_opts()
 
+    def print_debug_conf(self):
+        print(self.args)
+        print(self.local_dir)
+        print(self.hosts)
+        print(self.head, self.is_master())
+        print(self.hostnames)
+        print(_default_scratch(), _spark_dfs_logdir())
+
     def is_master(self):
         return self.head in self.hostnames
 
     def ping(self, data):
-        if self.args.ping is None:
+        ping_path = self.args.ping
+        if ping_path is None:
             return
-        with open(self.args.ping, 'at') as f:
+
+        ping_parent = ping_path.parent
+        if not ping_parent.exists():
+            ping_parent.parent.mkdir(parents=True)
+
+        now = datetime.datetime.now()
+
+        with open(ping_path, 'at') as f:
+            f.write(now.isoformat())
+            f.write('\t')
+            f.write(_job_id())
+            f.write('\t')
             f.write(data)
             f.write('\n')
 
@@ -98,18 +125,20 @@ class SparkLauncher(object):
             }
         )
 
-    def worker(self):
+    def launch_worker(self):
+        env = dict(os.environb())
+        env['SPARK_LOCAL_DIRS'] = self.local_dir
+        env['SPARK_LOG_DIR'] = self.args.logroot
+        env['SPARK_NO_DAEMONIZE'] = 'true'
+
+
         return subprocess.Popen(
             executable="bash",
             args=[
                 str(self.args.spark / "sbin/start-executor.sh"),
                 f"spark://{self.head}:7077"
             ],
-            env={
-                'SPARK_LOCAL_DIRS': self.local_dir,
-                'SPARK_LOG_DIR': self.args.logroot,
-                'SPARK_NO_DAEMONIZE': 'true'
-            }
+            env=env
         )
 
     def launch_driver(self):
@@ -133,20 +162,27 @@ class SparkLauncher(object):
                      self.args.jar
                  ] + self.args.options
         )
-        self.ping(f"launched executor http://{self.head}:4040\t-L 4040:{self.head}:4040")
-        proc.wait()
+        self.ping(f"launched driver http://{self.head}:4040\t-L 4040:{self.head}:4040")
+        return proc
 
     def launch(self):
         if self.is_master():
             master = self.launch_master()
-        worker = self.worker()
-        if self.is_master():
+            worker = self.launch_worker()
             time.sleep(5)  # sleep 5 secs
-            self.launch_driver()
+            driver = self.launch_driver()
+            driver.wait()
+            worker.kill()
+            master.kill()
+        else:
+            worker = self.launch_worker()
+            worker.wait()
+
 
 
 def main(args: Args):
-    pass
+    launcher = SparkLauncher(args)
+    launcher.print_debug_conf()
 
 
 if __name__ == '__main__':
