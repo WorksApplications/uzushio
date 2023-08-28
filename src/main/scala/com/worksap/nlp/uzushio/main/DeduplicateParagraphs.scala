@@ -6,9 +6,9 @@ import org.apache.spark.sql.SparkSession
 
 object DeduplicateParagraphs {
   def main(args: Array[String]): Unit = {
-    val args = new DedupTask.ArgParser(args).toArgs
+    val argObj = new DedupTask.ArgParser(args).toArgs
     SparkSession.builder().getOrCreate().use { spark =>
-      new DedupTask(args, spark).process()
+      new DedupTask(argObj, spark).process()
     }
   }
 }
