@@ -11,7 +11,7 @@ class RemoveScriptDocument extends DocumentFilter {
   }
 
   override def isFiltered(doc: Seq[String]): Boolean = {
-    doc.foldLeft(true)((b, sent) => b && isFilteredSent(sent))
+    doc.forall(sent => isFilteredSent(sent))
   }
 }
 
