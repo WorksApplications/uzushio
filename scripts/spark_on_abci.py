@@ -2,10 +2,12 @@ import argparse
 import dataclasses
 import datetime
 import os
+import signal
 import socket
 import subprocess
 import time
 from pathlib import Path
+import psutil
 
 
 @dataclasses.dataclass
@@ -73,6 +75,16 @@ def _hostname_opts() -> set[str]:
         result.add('.'.join(parts[0:i]))
     return result
 
+def killall(root: subprocess.Popen):
+    proc = psutil.Process(root.pid)
+    children = proc.children(recursive=True)
+    children.reverse()
+    for child in children:
+        child.terminate()
+    for child in children:
+        child.wait()
+
+
 
 class SparkLauncher(object):
     def __init__(self, args: Args):
@@ -114,28 +126,32 @@ class SparkLauncher(object):
 
     def launch_master(self):
         self.ping(f"launched master spark://{self.head}:7077, web ui http://{self.head}:8080\t-L 8080:{self.head}:8080")
+        env = dict(os.environb)
+        env['SPARK_LOG_DIR'] = self.args.logroot
+        env['SPARK_NO_DAEMONIZE'] = 'true'
         return subprocess.Popen(
-            executable="bash",
             args=[
+                "/bin/bash",
                 str(self.args.spark / "sbin/start-master.sh")
             ],
-            env={
-                'SPARK_LOG_DIR': self.args.logroot,
-                'SPARK_NO_DAEMONIZE': 'true'
-            }
+            env=env
         )
 
+    def make_dirs(self):
+        Path(_default_scratch()).mkdir(parents=True, exist_ok=True)
+        Path(_spark_dfs_logdir()).mkdir(parents=True, exist_ok=True)
+        self.args.logroot.mkdir(parents=True, exist_ok=True)
+
     def launch_worker(self):
-        env = dict(os.environb())
+        env = dict(os.environb)
         env['SPARK_LOCAL_DIRS'] = self.local_dir
         env['SPARK_LOG_DIR'] = self.args.logroot
         env['SPARK_NO_DAEMONIZE'] = 'true'
 
-
         return subprocess.Popen(
-            executable="bash",
             args=[
-                str(self.args.spark / "sbin/start-executor.sh"),
+                "/bin/bash",
+                str(self.args.spark / "sbin/start-worker.sh"),
                 f"spark://{self.head}:7077"
             ],
             env=env
@@ -143,13 +159,13 @@ class SparkLauncher(object):
 
     def launch_driver(self):
         proc = subprocess.Popen(
-            executable='bash',
             args=[
-                     self.args.spark / "bin/spark-submit.sh",
+                "/bin/bash",
+                     str(self.args.spark / "bin/spark-submit"),
                      "--class", self.args.clazz,
                      "--master", f"spark://{self.head}:7077",
-                     "--conf", "spark.driver.memory=30G",
-                     "--conf", "spark.executor.memory=63G",
+                     "--conf", f"spark.driver.memory={self.args.driver_mem}",
+                     "--conf", f"spark.executor.memory={self.args.executor_mem}",
                      "--conf", "spark.executor.extraJavaOptions=-XX:ObjectAlignmentInBytes=16",
                      "--conf", "spark.driver.log.persistToDfs.enabled=true",
                      "--conf", f"spark.driver.log.dfsDir={_spark_dfs_logdir()}",
@@ -158,7 +174,7 @@ class SparkLauncher(object):
                      "--conf", "spark.eventLog.compress=true",
                      "--conf", "spark.checkpoint.compress=true",
                      "--conf", "spark.memory.offHeap.enabled=true",
-                     "--conf", "spark.memory.offHeap.size=100G",
+                     "--conf", f"spark.memory.offHeap.size={self.args.offheap_mem}",
                      self.args.jar
                  ] + self.args.options
         )
@@ -166,14 +182,17 @@ class SparkLauncher(object):
         return proc
 
     def launch(self):
+        self.make_dirs()
         if self.is_master():
             master = self.launch_master()
             worker = self.launch_worker()
             time.sleep(5)  # sleep 5 secs
             driver = self.launch_driver()
             driver.wait()
-            worker.kill()
-            master.kill()
+            killall(worker)
+            killall(master)
+            master.wait()
+            worker.wait()
         else:
             worker = self.launch_worker()
             worker.wait()
@@ -182,7 +201,7 @@ class SparkLauncher(object):
 
 def main(args: Args):
     launcher = SparkLauncher(args)
-    launcher.print_debug_conf()
+    launcher.launch()
 
 
 if __name__ == '__main__':
