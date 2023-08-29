@@ -47,7 +47,7 @@ class WarcFileReader(conf: Configuration, filePath: Path) {
         recordsRead += 1
         read()
       } else {
-        val record = new WarcRecord(rec)
+        val record = new WarcRecord(rec, filePath)
         recordsRead += 1
         record
       }

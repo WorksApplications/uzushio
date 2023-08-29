@@ -1,18 +1,10 @@
 package com.worksap.nlp.uzushio.lib.warc
 
-import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor}
-import com.worksap.nlp.uzushio.lib.lang.{
-  EstimationFailure,
-  LangEstimation,
-  LangTagSniffer,
-  ProbableLanguage
-}
-import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.resolveEarliestDate
-import org.apache.hc.core5.http.impl.nio.{
-  DefaultHttpResponseFactory,
-  DefaultHttpResponseParser,
-  SessionBufferAccess
-}
+import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor, ParseAbortException}
+import com.worksap.nlp.uzushio.lib.lang.{EstimationFailure, LangEstimation, LangTagSniffer, ProbableLanguage}
+import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.{logger, resolveEarliestDate}
+import org.apache.hadoop.fs.Path
+import org.apache.hc.core5.http.impl.nio.{DefaultHttpResponseFactory, DefaultHttpResponseParser, SessionBufferAccess}
 import org.apache.hc.core5.http.{HttpException, HttpMessage, MessageHeaders}
 import org.apache.tika.detect.EncodingDetector
 import org.apache.tika.exception.TikaException
@@ -21,14 +13,10 @@ import org.apache.tika.parser.ParseContext
 import org.apache.tika.parser.html.{HtmlMapper, HtmlParser}
 import org.apache.tika.sax.BodyContentHandler
 import org.mozilla.universalchardet.UniversalDetector
+import org.slf4j.LoggerFactory
 
 import java.io.{ByteArrayInputStream, IOException, InputStream}
-import java.nio.charset.{
-  Charset,
-  IllegalCharsetNameException,
-  StandardCharsets,
-  UnsupportedCharsetException
-}
+import java.nio.charset.{Charset, IllegalCharsetNameException, StandardCharsets, UnsupportedCharsetException}
 import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.util.{Locale, UUID}
@@ -43,7 +31,10 @@ case class CrawlContent(
     text: String,
     date: String
 )
-class WarcEntryParser {
+class WarcEntryParser(
+                       acceptedLanguage: String => Boolean = _ => true,
+                       failedCount: Int => Unit = _ => ()
+) {
 
   private val charsetDetector = new UniversalDetector()
   private val sniffer = new LangTagSniffer()
@@ -79,8 +70,8 @@ class WarcEntryParser {
       }
       Some((resp, sessionInputBuffer.position()))
     } catch {
-      case _: HttpException => None
-      case _: IOException   => None
+      case _: HttpException            => None
+      case _: IOException              => None
       case _: IllegalArgumentException => None
     }
   }
@@ -139,7 +130,7 @@ class WarcEntryParser {
       return StandardCharsets.UTF_8
     }
     try {
-      Charset.forName(charset)
+      lookupNormalizedCharset(charset).getOrElse(StandardCharsets.UTF_8)
     } catch {
       case _: UnsupportedCharsetException => StandardCharsets.UTF_8
       case _: IllegalCharsetNameException => StandardCharsets.UTF_8
@@ -189,7 +180,7 @@ class WarcEntryParser {
     *   array of paragraphs in the HTML document
     */
   def parseHtml(
-      data: Array[Byte],
+      record: WarcRecord,
       bodyOffset: Int,
       cs: Charset
   ): Seq[String] = {
@@ -197,6 +188,7 @@ class WarcEntryParser {
     val handler = new BodyContentHandler(
       new ParagraphExtractor(result)
     )
+    val data = record.content
     val inputStream =
       new ByteArrayInputStream(data, bodyOffset, data.length - bodyOffset)
     val parseContext = new ParseContext()
@@ -212,32 +204,44 @@ class WarcEntryParser {
     try {
       parser.parse(inputStream, handler, metadata, parseContext)
     } catch {
-      case _: SAXException                    => // ignore
-      case _: TikaException                   => // ignore
-      case _: StringIndexOutOfBoundsException => // ignore
-      case _: NullPointerException            => // ignore
+      case e: SAXException                    => reportSkippedDoc(result, record, e)
+      case e: TikaException                   => reportSkippedDoc(result, record, e)
+      case e: StringIndexOutOfBoundsException => reportSkippedDoc(result, record, e)
+      case e: NullPointerException            => reportSkippedDoc(result, record, e)
+      case e: ParseAbortException             => reportSkippedDoc(result, record, e)
     }
     result
   }
 
+  private def reportSkippedDoc(data: ArrayBuffer[String], record: WarcRecord, e: Throwable): Unit = {
+    data.clear()
+    logger.warn(s"parse failed ${record.docId} from ${record.url} in ${record.path}, cause: ${e.toString}")
+    failedCount(1)
+  }
+
   def convert(item: WarcRecord): Option[CrawlContent] = {
     parseHttpHeader(item.content).flatMap { case (header, bodyOffset) =>
-      guessCharsetAndLanguage(header, item.content, bodyOffset).map {
-        case (cs, lang) =>
-          CrawlContent(
-            docId = WarcEntryParser.parseWarcUuid(item.docId),
-            url = item.url,
-            text = parseHtml(item.content, bodyOffset, cs).mkString("\n\n"),
-            language = lang,
-            charset = cs.name(),
-            date = resolveEarliestDate(item.accessDate, header)
+      guessCharsetAndLanguage(header, item.content, bodyOffset).flatMap {
+        case (cs, lang) if acceptedLanguage(lang) =>
+          val content = parseHtml(item, bodyOffset, cs)
+          Some(
+            CrawlContent(
+              docId = WarcEntryParser.parseWarcUuid(item.docId),
+              url = item.url,
+              text = content.mkString("\n\n"),
+              language = lang,
+              charset = cs.name(),
+              date = resolveEarliestDate(item.accessDate, header)
+            )
           )
+        case _ => None
       }
     }
   }
 }
 
 object WarcEntryParser {
+  private val logger = LoggerFactory.getLogger(classOf[WarcEntryParser])
   private val UTC = ZoneId.of("UTC")
   private val httpDateFormat = DateTimeFormatter.RFC_1123_DATE_TIME
   private val isoDateFormat = DateTimeFormatter.ISO_DATE_TIME.withZone(UTC)

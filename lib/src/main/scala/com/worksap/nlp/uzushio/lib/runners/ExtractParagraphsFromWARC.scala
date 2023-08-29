@@ -14,7 +14,17 @@ object ExtractParagraphsFromWARC {
       languages: Set[String],
       maxPartitions: Int = 10000,
       compression: String = "zstd"
-  )
+  ) {
+    def acceptedLanguageFn(): String => Boolean = {
+      if (languages.isEmpty) { _ =>
+        true
+      } else {
+        val langs = languages // do not capture this
+        langs.contains
+      }
+    }
+
+  }
 
   def run(args: Args)(spark: SparkSession): Unit = {
     import spark.implicits._
@@ -28,10 +38,14 @@ object ExtractParagraphsFromWARC {
 
     val inputDocuments = spark.sparkContext.longAccumulator("inputDocs")
     val convertedDocs = spark.sparkContext.longAccumulator("convertedDocs")
+    val parseFailed = spark.sparkContext.longAccumulator("parseFailed")
 
     val items = crawlResponses.mapPartitions(
       { iter =>
-        val converter = new WarcEntryParser()
+        val converter = new WarcEntryParser(
+          acceptedLanguage = args.acceptedLanguageFn(),
+          failedCount = parseFailed.add(_)
+        )
         iter.flatMap { item =>
           inputDocuments.add(1)
           converter.convert(item).map { x =>
@@ -43,11 +57,7 @@ object ExtractParagraphsFromWARC {
       preservesPartitioning = true
     )
 
-    val filtered =
-      if (args.languages.isEmpty) items
-      else items.filter(doc => args.languages.contains(doc.language))
-
-    val frame = filtered.coalesce(args.maxPartitions).toDF()
+    val frame = items.coalesce(args.maxPartitions).toDF()
     frame.write
       .mode(SaveMode.Overwrite)
       .partitionBy("language")
@@ -60,9 +70,9 @@ object ExtractParagraphsFromWARC {
   }
 }
 
-/**
- * This is entry point for WARC text extraction run as a simple application, e.g. from IDE
- */
+/** This is entry point for WARC text extraction run as a simple application,
+  * e.g. from IDE
+  */
 object WarcTextExtractionRaw {
 
   // noinspection TypeAnnotation
@@ -74,13 +84,14 @@ object WarcTextExtractionRaw {
     val compression = opt[String](default = Some("zstd"))
     verify()
 
-    def asArgs(): ExtractParagraphsFromWARC.Args = ExtractParagraphsFromWARC.Args(
-      input = input.apply(),
-      output = output.apply(),
-      languages = language.apply().flatMap(_.split(',')).toSet,
-      maxPartitions = maxPartitions(),
-      compression = compression()
-    )
+    def asArgs(): ExtractParagraphsFromWARC.Args =
+      ExtractParagraphsFromWARC.Args(
+        input = input.apply(),
+        output = output.apply(),
+        languages = language.apply().flatMap(_.split(',')).toSet,
+        maxPartitions = maxPartitions(),
+        compression = compression()
+      )
   }
 
   def main(args: Array[String]): Unit = {
@@ -89,7 +100,7 @@ object WarcTextExtractionRaw {
     val cfg = new ConfigParser(args)
     SparkSession
       .builder()
-      .master("local")
+      .master("local[*]")
       .appName("WarcTextExtractor")
       .getOrCreate()
       .use { sc =>

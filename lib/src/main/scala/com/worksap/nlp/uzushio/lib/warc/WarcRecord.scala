@@ -2,13 +2,14 @@ package com.worksap.nlp.uzushio.lib.warc
 
 import com.worksap.nlp.uzushio.lib.warc.WarcRecord.{RECORD_ACCESS_DATE, RECORD_ID, RECORD_TRUNCATED, RECORD_TYPE, RECORD_URL}
 import org.apache.commons.io.IOUtils
+import org.apache.hadoop.fs.Path
 import org.archive.format.warc.WARCConstants
 import org.archive.io.ArchiveRecord
 
 import java.io.Serializable
 
 /** Serializable wrapper of ArchiveRecord, with body read in memory. */
-class WarcRecord(record: ArchiveRecord) extends Serializable {
+class WarcRecord(record: ArchiveRecord, val path: Path) extends Serializable {
   // capture headers
   private val headers = record.getHeader.getHeaderFields
   // read body of request
