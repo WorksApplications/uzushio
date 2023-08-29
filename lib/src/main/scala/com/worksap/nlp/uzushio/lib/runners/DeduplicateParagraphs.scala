@@ -441,6 +441,7 @@ class DeduplicateParagraphs(
       statistics
         .filter($"hash" =!= $"reprHash")
         .coalesce(args.partitions)
+        .persist()
         .sort($"reprHash".asc)
         .write
         .mode(SaveMode.Overwrite)

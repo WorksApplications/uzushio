@@ -1,5 +1,6 @@
 package com.worksap.nlp.uzushio.lib.utils
 
+import com.worksap.nlp.uzushio.lib.utils.WarcFileReader.MAX_RECORD_SIZE
 import com.worksap.nlp.uzushio.lib.warc.WarcRecord
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -38,9 +39,18 @@ class WarcFileReader(conf: Configuration, filePath: Path) {
     }
 
     try {
-      val record = new WarcRecord(recordIter.next())
-      recordsRead += 1
-      record
+      val rec = recordIter.next()
+      val length = rec.available()
+      if (length > MAX_RECORD_SIZE) {
+        rec.skip(length)
+        logger.info(s"from $filePath skipped ${rec.getHeader}")
+        recordsRead += 1
+        read()
+      } else {
+        val record = new WarcRecord(rec)
+        recordsRead += 1
+        record
+      }
     } catch {
       case e: java.io.EOFException =>
         logger.warn(s"error while iterating warc, try to skip: $filePath", e)
@@ -81,4 +91,8 @@ class WarcFileReader(conf: Configuration, filePath: Path) {
       result
     }
   }
+}
+
+object WarcFileReader {
+  final val MAX_RECORD_SIZE = 16 * 1024 * 1024 // 16MB
 }
