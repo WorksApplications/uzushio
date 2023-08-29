@@ -14,4 +14,7 @@ python3 cal_overlap.py --dump_direc_path $dump_direc_path --output_path $output_
 ```
 
 ## How to visualize the results
-Use `visualize.ipynb`, it will process the outputed csv into a heat map.
+Use the script to process the outputed csv into a heat map figure.
+```
+python3 visualize.py --input_path $path_to/overlap.csv --output_path $output_path
+```
