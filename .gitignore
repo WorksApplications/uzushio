@@ -7,3 +7,6 @@ target/
 # metal
 .metals/
 metals.sbt
+
+# ignore abci logs for shell scripts
+*.sh.o*

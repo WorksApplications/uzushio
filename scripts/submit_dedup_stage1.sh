@@ -24,8 +24,8 @@ echo "$(date -Iseconds) $JOB_ID ssh abci -L8080:$(hostname):8080" >> /scratch/$U
 mkdir -p /scratch/$USER/spark-exlog
 
 INPUT=$1
-OUTPUT=/dev/null
-CACHE=$2
+OUTPUT=$2
+CACHE=/dev/null
 NUM_PARTITIONS=${3:-50}
 NUM_PARTITIONS_PROPAGATION=${4:-$(($NUM_PARTITIONS * 4))}
 
@@ -38,7 +38,6 @@ NUM_PARTITIONS_PROPAGATION=${4:-$(($NUM_PARTITIONS * 4))}
     local://$UZUSHIO_JAR \
     --input="$INPUT" \
     --output="$OUTPUT" \
-    --cache="$CACHE" \
     --execution=reprHashes,stats,saveStats \
     --propagate-partitions=$NUM_PARTITIONS_PROPAGATION \
     --partitions=$NUM_PARTITIONS
