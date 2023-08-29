@@ -3,7 +3,7 @@ package com.worksap.nlp.uzushio.lib.runners
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
 import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
-import com.worksap.nlp.uzushio.lib.utils.{MathUtil, RowBuffer}
+import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
 import org.apache.commons.codec.binary.Hex
 import org.apache.spark.sql.functions._
@@ -365,10 +365,13 @@ class DeduplicateParagraphs(
 ) {
   import spark.implicits._
 
+  private val cleanParagraphs =
+    udf((x: String) => Paragraphs.extractCleanParagraphs(x))
+
   private def computeReprHashes(frame: DataFrame): DataFrame = {
     val splitDocs = frame
       .select(
-        posexplode(split(frame.col("text"), "\n\n")).as(Seq("pos", "text"))
+        posexplode(cleanParagraphs(frame.col("text"))).as(Seq("pos", "text"))
       )
 
     val basicData = prepareDataset(splitDocs)
@@ -386,7 +389,7 @@ class DeduplicateParagraphs(
 
     ds.withColumn("signature", shiftSignature(ds.col("signature")))
       // need to persist datasets otherwise mapPartitions is called two times :/
-      // to work around it it is probably required to get into spark sql internals and
+      // to fix it cleanly, it is probably required to get into spark sql internals and
       // write a custom generator (probably) which will call our logic
       .persist()
       // sort does not allow to specify number of partitions, so use this sequence of operations
@@ -447,20 +450,31 @@ class DeduplicateParagraphs(
     }
   }
 
-  private def computeStats(reprHashes: DataFrame): DataFrame = {
-    val cols = reprHashes.select("hash", "reprHash", "freq").persist()
+  private val clampLongToInt = udf((x: Long) => math.min(x, Int.MaxValue).toInt).asNonNullable()
+
+  private def computeStats(reprHashes: DataFrame, filterOnes: Boolean): DataFrame = {
+    val cols = reprHashes.select( "hash", "reprHash", "freq").persist()
 
     val totalReprHashes = cols
       .groupBy("reprHash")
       .agg(
-        sum("freq").as("freq")
+        sum("freq").as("totalFreq")
+      ).select(
+        $"reprHash",
+        clampLongToInt($"totalFreq").as("totalFreq")
       )
-      .filter($"freq" > 1)
+
+    val filtered = if (filterOnes) totalReprHashes.filter($"totalFreq" > 1) else totalReprHashes
 
     cols
-      .select("hash", "reprHash")
-      .join(totalReprHashes, "reprHash")
+      .join(filtered, "reprHash")
       .dropDuplicates("hash")
+      .select(
+        $"hash",
+        $"reprHash",
+        clampLongToInt($"freq") as "basicFreq",
+        $"totalFreq",
+      )
   }
 
   private def prepareParagraphsForFiltering(
@@ -476,24 +490,36 @@ class DeduplicateParagraphs(
 
     val exploded = raw.select(explodeCols: _*)
 
+    val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
+
     val cookedDocs = exploded
-      .withColumn("parHash", xxhash64(exploded.col("text")))
+      .withColumn("cleanText", cleanParUdf($"text"))
+      .withColumn("parHash", xxhash64($"cleanText"))
 
     val joined = cookedDocs.join(stats, $"parHash" === $"hash", "left")
 
-    // remove hash columns from dataset
-    val columns = joined.columns
-      .filter {
-        case "hash" | "reprHash" | "parHash" | "freq" => false
-        case _                                        => true
+    val basicCols = (if (args.debug) {
+      joined.columns.filter {
+        case "parHash" => false
+        case "basicFreq" | "totalFreq" => false
+        case _ => true
       }
-      .map(joined.col) ++ Seq(
-      when($"freq".isNotNull, $"freq").otherwise(lit(1L)).as("freq"),
+    } else {
+      joined.columns.filter {
+        case "hash" | "reprHash" | "parHash" | "cleanText" => false
+        case "basicFreq" | "totalFreq" => false
+        case _ => true
+      }
+    }).map(joined.col)
+
+    val computedCols = Seq( // common newly computed columns
+      when($"basicFreq".isNotNull, $"basicFreq").otherwise(lit(1)).as("basicFreq"),
+      when($"totalFreq".isNotNull, $"totalFreq").otherwise(lit(1)).as("totalFreq"),
       $"reprHash".isNull.or($"reprHash" === $"parHash").as("repr")
     )
 
     joined.select(
-      columns: _*
+      basicCols ++ computedCols: _*
     )
   }
 
@@ -544,6 +570,31 @@ class DeduplicateParagraphs(
       .filter(octet_length($"text") > 0)
   }
 
+  private def saveReassembled(ds: DataFrame) = {
+    val cols = ds.columns.flatMap {
+      case "text" | "date" | "charset" => None
+      case x => Some(ds.col(x))
+    }
+
+    val parFields = Set(
+      "text",
+      "cleanText",
+      "hash",
+      "reprHash",
+      "repr",
+      "pos",
+      "basicFreq",
+      "totalFreq"
+    )
+
+    ds.select(cols: _*)
+      .repartition(args.partitions, $"docId")
+      .sortWithinPartitions($"docId", $"url", $"pos")
+      .write
+      .mode(SaveMode.Overwrite)
+      .json(args.output)
+  }
+
   def process(): Unit = {
     val rawData = spark.read.parquet(args.inputs: _*)
 
@@ -559,7 +610,7 @@ class DeduplicateParagraphs(
     }
 
     val stats = if (args.hasStage("stats")) {
-      computeStats(reprParagraphs)
+      computeStats(reprParagraphs, filterOnes = true)
     } else {
       spark.read.parquet(args.cache.get)
     }
@@ -570,6 +621,11 @@ class DeduplicateParagraphs(
     }
 
     val paragraphsWithFreqs = prepareParagraphsForFiltering(rawData, stats)
+
+    if (args.hasStage("saveReassembled")) {
+      saveReassembled(paragraphsWithFreqs)
+      return
+    }
 
     val filtered = filterDuplicateDocs(paragraphsWithFreqs)
 
@@ -587,13 +643,16 @@ class DeduplicateParagraphs(
 
 object DeduplicateParagraphs {
 
-  /**
-   *
-   * @param idx index of document part (paragraph)
-   * @param text paragraph text
-   * @param freq how many times text or its variants were in the corpus
-   * @param repr whether this paragraph is representative (its hash is minimum over variants)
-   */
+  /** @param idx
+    *   index of document part (paragraph)
+    * @param text
+    *   paragraph text
+    * @param freq
+    *   how many times text or its variants were in the corpus
+    * @param repr
+    *   whether this paragraph is representative (its hash is minimum over
+    *   variants)
+    */
   case class DocPart(idx: Int, text: String, freq: Long, repr: Boolean)
 
   def collectDocParts(
@@ -646,6 +705,7 @@ object DeduplicateParagraphs {
     val debug = toggle(default = Some(false))
     val format = opt[String](default = Some("parquet"))
     val compression = opt[String](default = Some("zstd"))
+    val intermediate = toggle(default = Some(false))
     verify()
 
     def toArgs: Args = Args(
@@ -662,7 +722,8 @@ object DeduplicateParagraphs {
       stages = makeStages(),
       debug = debug(),
       format = format(),
-      compression = compression()
+      compression = compression(),
+      intermediate = intermediate()
     )
 
     def makeStages(): Set[String] = execution.toOption match {
@@ -684,6 +745,7 @@ object DeduplicateParagraphs {
       execution: String,
       stages: Set[String],
       debug: Boolean,
+      intermediate: Boolean,
       format: String,
       compression: String,
       numShifts: Int = -1,
