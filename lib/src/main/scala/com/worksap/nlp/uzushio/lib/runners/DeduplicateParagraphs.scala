@@ -1,7 +1,11 @@
 package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
-import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
+import com.worksap.nlp.uzushio.lib.stats.{
+  NgramBitSignatures,
+  NgramHashExtractor,
+  SimHashProcessor
+}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
@@ -450,21 +454,28 @@ class DeduplicateParagraphs(
     }
   }
 
-  private val clampLongToInt = udf((x: Long) => math.min(x, Int.MaxValue).toInt).asNonNullable()
+  private val clampLongToInt =
+    udf((x: Long) => math.min(x, Int.MaxValue).toInt).asNonNullable()
 
-  private def computeStats(reprHashes: DataFrame, filterOnes: Boolean): DataFrame = {
-    val cols = reprHashes.select( "hash", "reprHash", "freq").persist()
+  private def computeStats(
+      reprHashes: DataFrame,
+      filterOnes: Boolean
+  ): DataFrame = {
+    val cols = reprHashes.select("hash", "reprHash", "freq").persist()
 
     val totalReprHashes = cols
       .groupBy("reprHash")
       .agg(
         sum("freq").as("totalFreq")
-      ).select(
+      )
+      .select(
         $"reprHash",
         clampLongToInt($"totalFreq").as("totalFreq")
       )
 
-    val filtered = if (filterOnes) totalReprHashes.filter($"totalFreq" > 1) else totalReprHashes
+    val filtered =
+      if (filterOnes) totalReprHashes.filter($"totalFreq" > 1)
+      else totalReprHashes
 
     cols
       .join(filtered, "reprHash")
@@ -473,7 +484,7 @@ class DeduplicateParagraphs(
         $"hash",
         $"reprHash",
         clampLongToInt($"freq") as "basicFreq",
-        $"totalFreq",
+        $"totalFreq"
       )
   }
 
@@ -499,22 +510,27 @@ class DeduplicateParagraphs(
     val joined = cookedDocs.join(stats, $"parHash" === $"hash", "left")
 
     val basicCols = (if (args.debug) {
-      joined.columns.filter {
-        case "parHash" => false
-        case "basicFreq" | "totalFreq" => false
-        case _ => true
-      }
-    } else {
-      joined.columns.filter {
-        case "hash" | "reprHash" | "parHash" | "cleanText" => false
-        case "basicFreq" | "totalFreq" => false
-        case _ => true
-      }
-    }).map(joined.col)
+                       joined.columns.filter {
+                         case "parHash"                 => false
+                         case "basicFreq" | "totalFreq" => false
+                         case _                         => true
+                       }
+                     } else {
+                       joined.columns.filter {
+                         case "hash" | "reprHash" | "parHash" | "cleanText" =>
+                           false
+                         case "basicFreq" | "totalFreq" => false
+                         case _                         => true
+                       }
+                     }).map(joined.col)
 
     val computedCols = Seq( // common newly computed columns
-      when($"basicFreq".isNotNull, $"basicFreq").otherwise(lit(1)).as("basicFreq"),
-      when($"totalFreq".isNotNull, $"totalFreq").otherwise(lit(1)).as("totalFreq"),
+      when($"basicFreq".isNotNull, $"basicFreq")
+        .otherwise(lit(1))
+        .as("basicFreq"),
+      when($"totalFreq".isNotNull, $"totalFreq")
+        .otherwise(lit(1))
+        .as("totalFreq"),
       $"reprHash".isNull.or($"reprHash" === $"parHash").as("repr")
     )
 
@@ -573,7 +589,7 @@ class DeduplicateParagraphs(
   private def saveReassembled(ds: DataFrame) = {
     val cols = ds.columns.flatMap {
       case "text" | "date" | "charset" => None
-      case x => Some(ds.col(x))
+      case x                           => Some(ds.col(x))
     }
 
     val parFields = Set(
@@ -610,7 +626,10 @@ class DeduplicateParagraphs(
     }
 
     val stats = if (args.hasStage("stats")) {
-      computeStats(reprParagraphs, filterOnes = true)
+      computeStats(
+        reprParagraphs,
+        filterOnes = args.intermediate && args.hasStage("saveStats")
+      )
     } else {
       spark.read.parquet(args.cache.get)
     }
