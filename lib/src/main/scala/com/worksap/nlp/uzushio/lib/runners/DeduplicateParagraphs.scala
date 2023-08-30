@@ -369,17 +369,19 @@ class DeduplicateParagraphs(
 ) {
   import spark.implicits._
 
-  private val cleanParagraphs =
-    udf((x: String) => Paragraphs.extractCleanParagraphs(x))
+  private def prepareBasicData(rawData: DataFrame): DataFrame = {
+    val cleanParagraphs =
+      udf((x: String) => Paragraphs.extractCleanParagraphs(x))
 
-  private def computeReprHashes(frame: DataFrame): DataFrame = {
-    val splitDocs = frame
+    val splitDocs = rawData
       .select(
-        posexplode(cleanParagraphs(frame.col("text"))).as(Seq("pos", "text"))
+        posexplode(cleanParagraphs(rawData.col("text"))).as(Seq("pos", "text"))
       )
 
-    val basicData = prepareDataset(splitDocs)
+    prepareDataset(splitDocs)
+  }
 
+  private def computeReprHashes(basicData: DataFrame): DataFrame = {
     args.shiftIndices.foldLeft(basicData) { (bd, i) =>
       propagateReprHashes(bd, i)
     }
@@ -453,6 +455,29 @@ class DeduplicateParagraphs(
         .format("parquet")
         .save(args.output)
     }
+  }
+
+  private def debugStats(stats: DataFrame, preparedData: DataFrame) = {
+    val statsCols = stats.select("hash", "reprHash", "totalFreq", "basicFreq")
+    val dataCols = preparedData.select($"text", $"freq" as "rawFreq", $"hash", $"signature")
+
+    val filtered = if (args.intermediate) {
+      statsCols
+    } else {
+      statsCols.where($"totalFreq" > 1)
+    }
+
+    val joined = filtered.join(dataCols, "hash")
+
+    joined.repartitionByRange(args.partitions, $"totalFreq".desc, $"reprHash".asc)
+      .sortWithinPartitions($"totalFreq".desc, $"reprHash".asc, $"basicFreq".desc, $"hash".asc)
+      .withColumns(Map(
+        "text" -> regexp_replace($"text", "\n", "\\n"),
+        "signature" -> hex($"signature")
+      ))
+      .write
+      .mode(SaveMode.Overwrite)
+      .csv(args.output)
   }
 
   private val clampLongToInt =
@@ -615,8 +640,10 @@ class DeduplicateParagraphs(
   def process(): Unit = {
     val rawData = spark.read.parquet(args.inputs: _*)
 
+    val basicData = prepareBasicData(rawData)
+
     val reprParagraphs = if (args.hasStage("reprHashes")) {
-      computeReprHashes(rawData)
+      computeReprHashes(basicData)
     } else {
       spark.read.parquet(args.cache.get)
     }
@@ -636,7 +663,11 @@ class DeduplicateParagraphs(
     }
 
     if (args.hasStage("saveStats")) {
-      saveStats(stats)
+      if (args.debug) {
+        debugStats(stats, basicData)
+      } else {
+        saveStats(stats)
+      }
       return
     }
 
