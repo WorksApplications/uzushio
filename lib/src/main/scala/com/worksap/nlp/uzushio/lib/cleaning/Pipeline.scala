@@ -1,4 +1,4 @@
-package com.worksap.nlp.uzushio.lib.filters
+package com.worksap.nlp.uzushio.lib.cleaning
 
 import com.typesafe.config.Config
 
@@ -6,26 +6,35 @@ import java.lang.reflect.{Constructor, Parameter}
 
 case class Paragraph(
     path: String,
-    text: String
-)
-case class Document(
-    paragraphs: Seq[Paragraph]
+    text: String,
+    remove: AnyRef = null
 )
 
-trait ParagraphFilter {
-  def checkParagraph(p: Paragraph): Boolean
+case class Document(
+    paragraphs: Seq[Paragraph],
+    remove: AnyRef = null
+) {
+  def removeWhen(toRemove: Boolean, remover: AnyRef): Document = {
+    if (toRemove) copy(remove = remover) else this
+  }
 }
 
-trait DocFilter {
-  def checkDocument(doc: Document): Boolean
+trait FilterBase extends Serializable
+
+trait ParagraphFilter extends FilterBase {
+  def checkParagraph(p: Paragraph): Paragraph
+}
+
+trait DocFilter extends FilterBase {
+  def checkDocument(doc: Document): Document
 }
 
 class PerParagraphFilter(val filter: ParagraphFilter) extends DocFilter {
-  override def checkDocument(doc: Document): Boolean =
-    doc.paragraphs.exists(filter.checkParagraph)
+  override def checkDocument(doc: Document): Document =
+    doc.copy(paragraphs = doc.paragraphs.map(filter.checkParagraph))
 }
 
-class Pipeline {}
+class Pipeline extends Serializable {}
 
 object Pipeline {
 

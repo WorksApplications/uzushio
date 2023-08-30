@@ -3,7 +3,6 @@ package com.worksap.nlp.uzushio.lib.warc
 import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor, ParseAbortException}
 import com.worksap.nlp.uzushio.lib.lang.{EstimationFailure, LangEstimation, LangTagSniffer, ProbableLanguage}
 import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.{logger, resolveEarliestDate}
-import org.apache.hadoop.fs.Path
 import org.apache.hc.core5.http.impl.nio.{DefaultHttpResponseFactory, DefaultHttpResponseParser, SessionBufferAccess}
 import org.apache.hc.core5.http.{HttpException, HttpMessage, MessageHeaders}
 import org.apache.tika.detect.EncodingDetector
@@ -171,7 +170,7 @@ class WarcEntryParser(
   private val metadata = new Metadata()
 
   /** Extracts paragraphs from HTML document
-    * @param data
+    * @param record
     *   bytes of html file
     * @param bodyOffset
     *   offset from the start of data array
