@@ -124,8 +124,9 @@ class WarcEntryParser(
       content: Array[Byte],
       offset: Int
   ): Charset = {
+    val length = math.min(content.length - offset, 8 * 1024)
     val charset =
-      detectCharsetFromBytes(content, offset, content.length - offset)
+      detectCharsetFromBytes(content, offset, length)
     if (charset == null) {
       return StandardCharsets.UTF_8
     }
