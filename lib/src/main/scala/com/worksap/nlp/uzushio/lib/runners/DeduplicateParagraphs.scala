@@ -1,11 +1,7 @@
 package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
-import com.worksap.nlp.uzushio.lib.stats.{
-  NgramBitSignatures,
-  NgramHashExtractor,
-  SimHashProcessor
-}
+import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
@@ -459,7 +455,8 @@ class DeduplicateParagraphs(
 
   private def debugStats(stats: DataFrame, preparedData: DataFrame) = {
     val statsCols = stats.select("hash", "reprHash", "totalFreq", "basicFreq")
-    val dataCols = preparedData.select($"text", $"freq" as "rawFreq", $"hash", $"signature")
+    val dataCols =
+      preparedData.select($"text", $"freq" as "rawFreq", $"hash", $"signature")
 
     val filtered = if (args.intermediate) {
       statsCols
@@ -469,12 +466,20 @@ class DeduplicateParagraphs(
 
     val joined = filtered.join(dataCols, "hash")
 
-    joined.repartitionByRange(args.partitions, $"totalFreq".desc, $"reprHash".asc)
-      .sortWithinPartitions($"totalFreq".desc, $"reprHash".asc, $"basicFreq".desc, $"hash".asc)
-      .withColumns(Map(
-        "text" -> regexp_replace($"text", "\n", "\\n"),
-        "signature" -> hex($"signature")
-      ))
+    joined
+      .repartitionByRange(args.partitions, $"totalFreq".desc, $"reprHash".asc)
+      .sortWithinPartitions(
+        $"totalFreq".desc,
+        $"reprHash".asc,
+        $"basicFreq".desc,
+        $"hash".asc
+      )
+      .withColumns(
+        Map(
+          "text" -> regexp_replace($"text", "\n", "\\n"),
+          "signature" -> hex($"signature")
+        )
+      )
       .write
       .mode(SaveMode.Overwrite)
       .csv(args.output)
