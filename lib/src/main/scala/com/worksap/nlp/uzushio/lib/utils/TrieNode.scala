@@ -2,7 +2,7 @@ package com.worksap.nlp.uzushio.lib.utils
 
 import it.unimi.dsi.fastutil.chars.Char2ObjectOpenHashMap
 
-final class TrieNode[T] extends Char2ObjectOpenHashMap[TrieNode[T]] {
+final class TrieNode[T] extends Char2ObjectOpenHashMap[TrieNode[T]](4) {
   private var innerValue: T = _
 
   def findLongest(str: CharSequence, offset: Int): Int = {

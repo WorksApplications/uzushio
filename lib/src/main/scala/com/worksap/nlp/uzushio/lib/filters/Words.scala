@@ -8,7 +8,7 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 
-class Words(list: String, minimum: Int) extends DocFilter {
+class Words(list: String, minimum: Int = 3) extends DocFilter {
   private val trie = Words.readToTrie(list)
   override def checkDocument(doc: Document): Document = {
     val total = doc.paragraphs.foldLeft(0) { case (cnt, p) =>
@@ -57,13 +57,15 @@ object Words {
     throw new IllegalArgumentException(s"could not find word list $name")
   }
 
-
   private def readToTrie(classRes: URL): TrieNode[Boolean] = {
-    val reader = new InputStreamReader(classRes.openStream(), StandardCharsets.UTF_8)
+    val reader =
+      new InputStreamReader(classRes.openStream(), StandardCharsets.UTF_8)
     readToTrie(new BufferedReader(reader).lines())
   }
 
-  private def readToTrie(s: java.util.stream.Stream[String]): TrieNode[Boolean] = {
+  private def readToTrie(
+                          s: java.util.stream.Stream[String]
+                        ): TrieNode[Boolean] = {
     try {
       TrieNode.make(s.iterator().asScala)
     } finally {

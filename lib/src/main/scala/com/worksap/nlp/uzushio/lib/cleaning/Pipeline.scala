@@ -42,25 +42,51 @@ object Pipeline {
     getClass.getClassLoader.loadClass(clzName)
   }
 
-  private def getParam(cfg: Config, par: Parameter): AnyRef = {
+  private def getParam(
+                        clz: Class[_],
+                        cfg: Config,
+                        par: Parameter,
+                        index: Int
+                      ): AnyRef = {
+    if (!cfg.hasPath(par.getName)) {
+      val defFnName = "$lessinit$greater$default$" + index
+      try {
+        val defMethod = clz.getMethod(defFnName) // should be static
+        return defMethod.invoke(null)
+      } catch {
+        case _: NoSuchMethodException =>
+          throw new IllegalArgumentException(
+            s"could not instantiate $clz, ${par.getName} did not configured or have default value"
+          )
+      }
+    }
+
     val tpe = par.getType
     if (tpe == classOf[String]) {
       cfg.getString(par.getName)
-    } else if (tpe == classOf[Int] || tpe == classOf[Integer]) {
+    } else if (tpe == classOf[Int] || tpe == classOf[java.lang.Integer]) {
       cfg.getInt(par.getName).asInstanceOf[AnyRef]
+    } else if (tpe == classOf[Float] || tpe == classOf[java.lang.Float]) {
+      cfg.getDouble(par.getName).toFloat.asInstanceOf[AnyRef]
+    } else if (tpe == classOf[Double] || tpe == classOf[java.lang.Double]) {
+      cfg.getDouble(par.getName).asInstanceOf[AnyRef]
     } else {
-      throw new IllegalArgumentException("not supported yet")
+      throw new IllegalArgumentException(s"type $tpe is not supported yet")
     }
   }
 
-  def tryInstantiate(ctor: Constructor[_], cfg: Config): DocFilter = {
+  def tryInstantiate(
+                      clz: Class[_],
+                      ctor: Constructor[_],
+                      cfg: Config
+                    ): DocFilter = {
     val partypes = ctor.getParameters
     val args = new Array[AnyRef](partypes.length)
 
     var i = 0
     while (i < partypes.length) {
       val par = partypes(i)
-      val arg = getParam(cfg, par)
+      val arg = getParam(clz, cfg, par, i + 1)
       args(i) = arg
       i += 1
     }
@@ -79,7 +105,7 @@ object Pipeline {
     val iter = ctors.iterator
     while (iter.hasNext) {
       val ctor = iter.next()
-      val instance = tryInstantiate(ctor, cfg)
+      val instance = tryInstantiate(clz, ctor, cfg)
       if (instance != null) {
         return instance
       }
