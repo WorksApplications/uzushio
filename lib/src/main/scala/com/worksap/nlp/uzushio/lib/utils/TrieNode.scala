@@ -3,23 +3,25 @@ package com.worksap.nlp.uzushio.lib.utils
 import it.unimi.dsi.fastutil.chars.Char2ObjectOpenHashMap
 
 final class TrieNode[T] extends Char2ObjectOpenHashMap[TrieNode[T]](4) {
-  private var innerValue: T = _
+  private var position: Int = -1
 
-  def findLongest(str: CharSequence, offset: Int): Int = {
+  def findLongest(str: CharSequence, offset: Int): SearchResult = {
     var idx = offset
     val len = str.length()
-    var last = -1
+    var end = -1
+    var value = -1
     var node = this
     while (idx < len && node != null) {
       val ch = str.charAt(idx)
       val next = node.get(ch)
-      if (next != null && next.innerValue != null) {
-        last = idx + 1
+      if (next != null && next.position != -1) {
+        end = idx + 1
+        value = next.position
       }
       node = next
       idx += 1
     }
-    last
+    SearchResult(end, value)
   }
 }
 
@@ -30,6 +32,7 @@ object TrieNode {
 
   def make(data: Iterator[CharSequence]): TrieNode[Boolean] = {
     val root = new TrieNode[Boolean]()
+    var index = 0
     while (data.hasNext) {
       val str = data.next()
       var node = root
@@ -45,8 +48,36 @@ object TrieNode {
         node = subnode
         i += 1
       }
-      node.innerValue = true
+      node.position = index
+      index += 1
     }
     root
   }
+}
+
+final class SearchResult(val carrier: Long) extends AnyVal {
+  def end: Int = (carrier & 0xffffffff).toInt
+
+  def index: Int = (carrier >>> 32).toInt
+
+  def ==(o: SearchResult): Boolean = {
+    o.carrier == carrier
+  }
+
+  def !=(o: SearchResult): Boolean = !(this == o)
+
+  def found: Boolean = end > 0
+
+  def failure: Boolean = !found
+
+  override def toString: String = s"SearchResult($end, $index)"
+}
+
+object SearchResult {
+  def apply(end: Int, index: Int): SearchResult = {
+    val repr = ((index & 0xffffffffL) << 32) | (end & 0xffffffffL)
+    new SearchResult(repr)
+  }
+
+  def empty(): SearchResult = apply(-1, -1)
 }

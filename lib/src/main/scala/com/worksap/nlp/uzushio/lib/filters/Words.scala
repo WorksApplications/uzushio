@@ -2,6 +2,7 @@ package com.worksap.nlp.uzushio.lib.filters
 
 import com.worksap.nlp.uzushio.lib.cleaning.{DocFilter, Document}
 import com.worksap.nlp.uzushio.lib.utils.TrieNode
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.net.URL
@@ -12,25 +13,25 @@ class Words(list: String, minimum: Int = 3) extends DocFilter {
   private val trie = Words.readToTrie(list)
   override def checkDocument(doc: Document): Document = {
     val total = doc.paragraphs.foldLeft(0) { case (cnt, p) =>
-      cnt + countWords(p.text)
+      cnt + coundWordInstances(p.text)
     }
     doc.removeWhen(total > minimum, this)
   }
 
-  def countWords(data: CharSequence): Int = {
+  def coundWordInstances(data: CharSequence): Int = {
     var index = 0
     val len = data.length()
-    var count = 0
+    val found = new IntOpenHashSet()
     while (index < len) {
-      val end = trie.findLongest(data, index)
-      if (end < 0) {
+      val res = trie.findLongest(data, index)
+      if (res.found) {
         index += 1
       } else {
-        index = end
-        count += 1
+        index = res.end
+        found.add(res.index)
       }
     }
-    count
+    found.size()
   }
 
   override def toString = s"Words($list, min=$minimum)"
