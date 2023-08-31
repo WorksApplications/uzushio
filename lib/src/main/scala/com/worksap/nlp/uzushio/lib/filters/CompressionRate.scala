@@ -8,7 +8,7 @@ import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.StandardCharsets
 
 /**
- * Filter out documents which have too low or too high compression rate
+ * Filter out documents which have too low or too high compression rate (using LZ4 algorithm)
  *
  * @param low  low compression rate threshold
  * @param high high compression rate threshold
