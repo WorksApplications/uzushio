@@ -27,8 +27,6 @@ object FilterStatistics {
     val textOnly = limited.select("text")
     val extractor = extractFilteredMetrix(spark, args.filter())
 
-    val withValues = textOnly.withColumn("value", extractor(textOnly.col("text")))
-
     val sample = args.examples()
     val cleanPars = udf { (s: String, rng: Double) =>
       val pars = Paragraphs.extractCleanParagraphs(s)
@@ -39,13 +37,15 @@ object FilterStatistics {
       }
     }
 
-
-    withValues.repartitionByRange(args.partitions(), withValues.col("value"))
-      .sortWithinPartitions("value")
+    val withValues = textOnly
+      .withColumn("value", extractor(textOnly.col("text")))
       .select(
         $"value",
         cleanPars($"text", rand()) as "text"
       )
+
+    withValues.persist().repartitionByRange(args.partitions(), withValues.col("value"))
+      .sortWithinPartitions("value")
       .write
       .mode(SaveMode.Overwrite)
       .csv(args.output())
