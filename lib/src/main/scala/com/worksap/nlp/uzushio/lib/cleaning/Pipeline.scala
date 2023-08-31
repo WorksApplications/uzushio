@@ -1,6 +1,8 @@
 package com.worksap.nlp.uzushio.lib.cleaning
 
 import com.typesafe.config.Config
+import com.worksap.nlp.uzushio.lib.utils.Paragraphs
+import org.apache.commons.lang3.StringUtils
 
 import java.lang.reflect.{Constructor, Parameter}
 
@@ -16,6 +18,17 @@ case class Document(
 ) {
   def removeWhen(toRemove: Boolean, remover: AnyRef): Document = {
     if (toRemove) copy(remove = remover) else this
+  }
+}
+
+object Document {
+  def parse(s: String): Document = {
+    val paragraphs = StringUtils.split(s, "\n\n")
+    val parObjects = paragraphs.map { text =>
+      val (path, content) = Paragraphs.splitPath(text)
+      Paragraph(path, content)
+    }
+    Document(parObjects)
   }
 }
 
