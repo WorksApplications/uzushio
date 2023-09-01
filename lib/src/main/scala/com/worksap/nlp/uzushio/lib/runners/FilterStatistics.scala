@@ -6,7 +6,7 @@ import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.functions.{rand, regexp_replace, udf}
+import org.apache.spark.sql.functions.{octet_length, rand, regexp_replace, udf}
 import org.rogach.scallop.ScallopConf
 
 object FilterStatistics {
@@ -24,14 +24,15 @@ object FilterStatistics {
         rawData.sample(withReplacement = false, ratio, 0xdeadbeefL)
     }
 
-    val textOnly = limited.select("text")
+
+    val textOnly = limited.select("text").filter(octet_length($"text") > 2)
     val extractor = extractFilteredMetrix(spark, args.filter())
 
-    val sample = args.examples()
+    val exampleProb = args.examples()
     val cleanPars = udf { (s: String, rng: Double) =>
       val pars = Paragraphs.extractCleanParagraphs(s)
-      if (rng <= sample) {
-        pars.map(p => p.replaceAll("\n", "\\n")).mkString("<p>")
+      if (rng <= exampleProb) {
+        pars.map(p => p.replaceAll("\n", "<br>")).mkString("<p>")
       } else {
         ""
       }
@@ -47,6 +48,7 @@ object FilterStatistics {
     withValues.persist().repartitionByRange(args.partitions(), withValues.col("value"))
       .sortWithinPartitions("value")
       .write
+      .option("escape", "\"")
       .mode(SaveMode.Overwrite)
       .csv(args.output())
   }
