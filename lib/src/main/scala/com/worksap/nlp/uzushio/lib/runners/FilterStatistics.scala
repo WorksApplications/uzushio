@@ -1,7 +1,7 @@
 package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
-import com.worksap.nlp.uzushio.lib.filters.CompressionRate
+import com.worksap.nlp.uzushio.lib.filters.{CompressionRate, HiraganaRatio}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -59,6 +59,9 @@ object FilterStatistics {
       case "compression" =>
         val filter = new CompressionRate(0, 100)
         udf { (s: String) => filter.compressionRatio(Document.parse(s)) }
+      case "hiragana" =>
+        val filter = new HiraganaRatio()
+        udf { (s: String) => filter.computeHiraganaRatio(Document.parse(s)) }
     }
   }
 

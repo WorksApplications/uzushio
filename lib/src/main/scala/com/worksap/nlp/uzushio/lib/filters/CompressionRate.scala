@@ -1,11 +1,14 @@
 package com.worksap.nlp.uzushio.lib.filters
 
-import com.worksap.nlp.uzushio.lib.cleaning.{DocFilter, Document}
+import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.filters.CompressionRate.{INPUT_SIZE, OUTPUT_SIZE}
+import com.worksap.nlp.uzushio.lib.filters.base.HighLowDocFilter
 import net.jpountz.lz4.{LZ4Exception, LZ4Factory}
 
-import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.StandardCharsets
+import java.nio.{ByteBuffer, CharBuffer}
+
+
 
 /**
  * Filter out documents which have too low or too high compression rate (using LZ4 algorithm)
@@ -13,7 +16,7 @@ import java.nio.charset.StandardCharsets
  * @param low  low compression rate threshold
  * @param high high compression rate threshold
  */
-class CompressionRate(low: Float, high: Float) extends DocFilter {
+class CompressionRate(override val low: Float, override val high: Float) extends HighLowDocFilter {
   @transient private lazy val lz4 = LZ4Factory.fastestInstance()
   @transient private lazy val utf8Buffer = ByteBuffer.allocateDirect(INPUT_SIZE)
   @transient private lazy val compressBuffer = ByteBuffer.allocateDirect(OUTPUT_SIZE)
@@ -39,11 +42,7 @@ class CompressionRate(low: Float, high: Float) extends DocFilter {
 
   override def checkDocument(doc: Document): Document = {
     val ratio: Float = compressionRatio(doc)
-    if (ratio < low) {
-      doc.copy(remove = Low)
-    } else if (ratio > high) {
-      doc.copy(remove = High)
-    } else doc
+    maybeFilter(doc, ratio)
   }
 
   def compressionRatio(doc: Document): Float = {
@@ -61,16 +60,6 @@ class CompressionRate(low: Float, high: Float) extends DocFilter {
     val ratio = compressedSize.toFloat / uncompressedSize.toFloat
     ratio
   }
-
-  object Low {
-    override val toString: String = s"CompressionRate.Low($low)"
-  }
-
-  object High {
-    override val toString: String = s"CompressionRate.High($high)"
-  }
-
-  override def toString: String = s"CompressionRate($low, $high)"
 }
 
 object CompressionRate {
