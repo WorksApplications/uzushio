@@ -6,18 +6,53 @@ import org.apache.commons.lang3.StringUtils
 
 import java.lang.reflect.{Constructor, Parameter}
 
+/**
+ *
+ * @param path      html path of the paragraph, separated by >, with . for classes and # for ids
+ * @param text      text content of the paragraph with link content possibly inside STX/ETX character pairs
+ * @param index     index of the paragraph in the document, starting from 0
+ * @param exactFreq number of occurrences of the paragraph with the same hash value in the corpus
+ * @param nearFreq  number of occurrences of the near-duplicate paragraphs
+ * @param remove    set this field to not-null value to remove this document
+ */
 case class Paragraph(
     path: String,
     text: String,
+    index: Int = 0,
+    exactFreq: Int = 1,
+    nearFreq: Int = 1,
     remove: AnyRef = null
-)
+                    ) {
+  def renderInto[T <: Appendable](bldr: T): T = {
+    if (path != null && path.nonEmpty) {
+      bldr.append(path)
+      bldr.append(Paragraphs.HTML_PATH_SEPARATOR)
+    }
+    bldr.append(text)
+    bldr
+  }
+}
 
 case class Document(
-    paragraphs: Seq[Paragraph],
+                     paragraphs: IndexedSeq[Paragraph],
     remove: AnyRef = null
 ) {
   def removeWhen(toRemove: Boolean, remover: AnyRef): Document = {
     if (toRemove) copy(remove = remover) else this
+  }
+
+  def render(): String = {
+    val bldr = new java.lang.StringBuilder()
+    val iter = paragraphs.iterator
+    var first = true
+    while (iter.hasNext) {
+      if (!first) {
+        bldr.append("\n\n")
+      }
+      iter.next().renderInto(bldr)
+      first = false
+    }
+    bldr.toString
   }
 }
 

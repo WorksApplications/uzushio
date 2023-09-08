@@ -22,7 +22,7 @@ package object filters {
     Document(
       data.map { text =>
         Paragraph("", text)
-      }
+      }.toIndexedSeq
     )
   }
 }

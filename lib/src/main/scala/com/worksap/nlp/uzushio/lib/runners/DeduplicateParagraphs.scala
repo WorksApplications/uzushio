@@ -1,5 +1,6 @@
 package com.worksap.nlp.uzushio.lib.runners
 
+import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
 import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
@@ -454,24 +455,24 @@ class DeduplicateParagraphs(
   }
 
   private def debugStats(stats: DataFrame, preparedData: DataFrame) = {
-    val statsCols = stats.select("hash", "reprHash", "totalFreq", "basicFreq")
+    val statsCols = stats.select("hash", "reprHash", "nearFreq", "exactFreq")
     val dataCols =
       preparedData.select($"text", $"freq" as "rawFreq", $"hash", $"signature")
 
     val filtered = if (args.intermediate) {
       statsCols
     } else {
-      statsCols.where($"totalFreq" > 1)
+      statsCols.where($"nearFreq" > 1)
     }
 
     val joined = filtered.join(dataCols, "hash")
 
     joined
-      .repartitionByRange(args.partitions, $"totalFreq".desc, $"reprHash".asc)
+      .repartitionByRange(args.partitions, $"nearFreq".desc, $"reprHash".asc)
       .sortWithinPartitions(
-        $"totalFreq".desc,
+        $"nearFreq".desc,
         $"reprHash".asc,
-        $"basicFreq".desc,
+        $"exactFreq".desc,
         $"hash".asc
       )
       .withColumns(
@@ -497,15 +498,15 @@ class DeduplicateParagraphs(
     val totalReprHashes = cols
       .groupBy("reprHash")
       .agg(
-        sum("freq").as("totalFreq")
+        sum("freq").as("nearFreq")
       )
       .select(
         $"reprHash",
-        clampLongToInt($"totalFreq").as("totalFreq")
+        clampLongToInt($"nearFreq").as("nearFreq")
       )
 
     val filtered =
-      if (filterOnes) totalReprHashes.filter($"totalFreq" > 1)
+      if (filterOnes) totalReprHashes.filter($"nearFreq" > 1)
       else totalReprHashes
 
     cols
@@ -514,8 +515,8 @@ class DeduplicateParagraphs(
       .select(
         $"hash",
         $"reprHash",
-        clampLongToInt($"freq") as "basicFreq",
-        $"totalFreq"
+        clampLongToInt($"freq") as "exactFreq",
+        $"nearFreq"
       )
   }
 
@@ -543,26 +544,25 @@ class DeduplicateParagraphs(
     val basicCols = (if (args.debug) {
                        joined.columns.filter {
                          case "parHash"                 => false
-                         case "basicFreq" | "totalFreq" => false
+                         case "exactFreq" | "nearFreq" => false
                          case _                         => true
                        }
                      } else {
                        joined.columns.filter {
                          case "hash" | "reprHash" | "parHash" | "cleanText" =>
                            false
-                         case "basicFreq" | "totalFreq" => false
+                         case "exactFreq" | "nearFreq" => false
                          case _                         => true
                        }
                      }).map(joined.col)
 
     val computedCols = Seq( // common newly computed columns
-      when($"basicFreq".isNotNull, $"basicFreq")
+      when($"exactFreq".isNotNull, $"exactFreq")
         .otherwise(lit(1))
-        .as("basicFreq"),
-      when($"totalFreq".isNotNull, $"totalFreq")
+        .as("exactFreq"),
+      when($"nearFreq".isNotNull, $"nearFreq")
         .otherwise(lit(1))
-        .as("totalFreq"),
-      $"reprHash".isNull.or($"reprHash" === $"parHash").as("repr")
+        .as("nearFreq")
     )
 
     joined.select(
@@ -574,7 +574,7 @@ class DeduplicateParagraphs(
   // paragraphs are shuffled because of join with freqs,
   // groupBy op merges them back together, and we use an udf to perform the actual filtering
   private def filterDuplicateDocs(ds: DataFrame): DataFrame = {
-    val docParts = Seq("text", "pos", "freq", "repr")
+    val docParts = Seq("text", "pos", "exactFreq", "nearFreq")
 
     val allColumns = ds.columns
 
@@ -596,11 +596,11 @@ class DeduplicateParagraphs(
         (
             text: Array[String],
             pos: Array[Int],
-            freq: Array[Long],
-            repr: Array[Boolean]
+            exactFreq: Array[Int],
+            nearFreq: Array[Int]
         ) => {
           val sorted =
-            DeduplicateParagraphs.collectDocParts(text, pos, freq, repr)
+            DeduplicateParagraphs.collectDocParts(text, pos, exactFreq, nearFreq)
           DeduplicateParagraphs.processDocumentParts(args, sorted)
         }
       ).asNonNullable()
@@ -630,8 +630,8 @@ class DeduplicateParagraphs(
       "reprHash",
       "repr",
       "pos",
-      "basicFreq",
-      "totalFreq"
+      "exactFreq",
+      "nearFreq"
     )
 
     ds.select(cols: _*)
@@ -699,46 +699,44 @@ class DeduplicateParagraphs(
 
 object DeduplicateParagraphs {
 
-  /** @param idx
-    *   index of document part (paragraph)
-    * @param text
-    *   paragraph text
-    * @param freq
-    *   how many times text or its variants were in the corpus
-    * @param repr
-    *   whether this paragraph is representative (its hash is minimum over
-    *   variants)
-    */
-  case class DocPart(idx: Int, text: String, freq: Long, repr: Boolean)
-
   def collectDocParts(
       text: Array[String],
       pos: Array[Int],
-      freq: Array[Long],
-      repr: Array[Boolean]
-  ): Array[DocPart] = {
+      exactFreq: Array[Int],
+      nearFreq: Array[Int]
+                     ): Array[Paragraph] = {
     val len = text.length
-    val result = new Array[DocPart](len)
+    val result = new Array[Paragraph](len)
     var i = 0
     while (i < len) {
-      result.update(i, DocPart(pos(i), text(i), freq(i), repr(i)))
+      val (path, par) = Paragraphs.splitPath(text(i))
+      result.update(
+        i,
+        Paragraph(
+          path = path,
+          text = par,
+          index = pos(i),
+          exactFreq = exactFreq(i),
+          nearFreq = nearFreq(i)
+        )
+      )
       i += 1
     }
-    java.util.Arrays.sort(result, TupleComparator)
+    java.util.Arrays.sort(result, ParagraphIndexCompare)
     result
   }
 
-  object TupleComparator extends Comparator[DocPart] {
-    override def compare(o1: DocPart, o2: DocPart): Int =
-      java.lang.Integer.compare(o1.idx, o2.idx)
+  private object ParagraphIndexCompare extends Comparator[Paragraph] {
+    override def compare(o1: Paragraph, o2: Paragraph): Int =
+      java.lang.Integer.compare(o1.index, o2.index)
   }
 
   private def processDocumentParts(
       args: Args,
-      parts: Seq[DocPart]
+      parts: IndexedSeq[Paragraph]
   ): String = { // do something smarter than this
-    val result = parts.filter(_.freq <= 1).map(_.text).mkString("\n\n")
-    result
+    val result = parts.filter(_.nearFreq <= 1)
+    Document(result).render()
   }
 
   // noinspection TypeAnnotation,ScalaWeakerAccess
