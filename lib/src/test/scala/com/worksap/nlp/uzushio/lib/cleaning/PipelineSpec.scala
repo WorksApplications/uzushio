@@ -23,6 +23,11 @@ class PipelineSpec extends AnyFreeSpec {
       assert(filter != null)
       assert(filter.isInstanceOf[Words])
     }
+
+    "can instantiate pipeline from classpath" - {
+      val pipeline = Pipeline.make("doc_len.conf")
+      assert(pipeline != null)
+    }
   }
 
 }

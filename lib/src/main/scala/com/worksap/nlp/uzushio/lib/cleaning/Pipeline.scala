@@ -1,10 +1,13 @@
 package com.worksap.nlp.uzushio.lib.cleaning
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import org.apache.commons.lang3.StringUtils
 
 import java.lang.reflect.{Constructor, Parameter}
+import java.net.URL
+import java.nio.file.{Files, Path, Paths}
+import scala.jdk.CollectionConverters.iterableAsScalaIterableConverter
 
 /**
  *
@@ -84,12 +87,32 @@ class PerParagraphFilter(val filter: ParagraphFilter) extends DocFilter {
     doc.copy(paragraphs = doc.paragraphs.map(filter.checkParagraph))
 }
 
-class Pipeline extends Serializable {}
+final class Pipeline(filers: Array[DocFilter]) extends Serializable {
+  def applyFilters(doc: Document): Document = {
+    var i = 0
+    val len = filers.length
+    var state = doc
+    while (i < len && state.remove != null) {
+      val f = filers(i)
+      state = f.checkDocument(state)
+      i += 1
+    }
+    state
+  }
+}
 
 object Pipeline {
 
   def findFilterClass(clzName: String): Class[_] = {
-    getClass.getClassLoader.loadClass(clzName)
+    try {
+      return getClass.getClassLoader.loadClass(clzName)
+    } catch {
+      case _: ClassNotFoundException => // ignore
+    }
+
+    // try to use default package
+    val name = s"com.worksap.nlp.uzushio.lib.filters.$clzName"
+    getClass.getClassLoader.loadClass(name)
   }
 
   private def getParam(
@@ -163,5 +186,37 @@ object Pipeline {
     throw new Exception(
       "could not find a suitable constructor to create filter " + cfg
     )
+  }
+
+  def make(cfg: Config): Pipeline = {
+    val filterCfgs = cfg.getConfigList("filters")
+    val filters = filterCfgs.asScala.map(cfg => instantiateFilter(cfg)).toArray
+    new Pipeline(filters)
+  }
+
+  def make(path: Path): Pipeline = {
+    val cfg = ConfigFactory.parseFile(path.toFile)
+    make(cfg)
+  }
+
+  def make(url: URL): Pipeline = {
+    val cfg = ConfigFactory.parseURL(url)
+    make(cfg)
+  }
+
+  def make(name: String): Pipeline = {
+    val p = Paths.get(name)
+    if (Files.exists(p)) {
+      return make(p)
+    }
+    val basicUri = getClass.getClassLoader.getResource(name)
+    if (basicUri != null) {
+      return make(basicUri)
+    }
+    val pipelinesUri = getClass.getClassLoader.getResource(s"pipeline/$name")
+    if (pipelinesUri != null) {
+      return make(pipelinesUri)
+    }
+    throw new IllegalArgumentException(s"failed to find pipeline description: $name")
   }
 }

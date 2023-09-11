@@ -1,6 +1,6 @@
 package com.worksap.nlp.uzushio.lib.runners
 
-import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
+import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph, Pipeline}
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
 import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
@@ -734,9 +734,10 @@ object DeduplicateParagraphs {
   private def processDocumentParts(
       args: Args,
       parts: IndexedSeq[Paragraph]
-  ): String = { // do something smarter than this
-    val result = parts.filter(_.nearFreq <= 1)
-    Document(result).render()
+                                  ): String = {
+    val doc = Document(parts)
+    val filtered = args.pipeline.applyFilters(doc)
+    filtered.copy(paragraphs = doc.paragraphs.filter(_.remove != null)).render()
   }
 
   // noinspection TypeAnnotation,ScalaWeakerAccess
@@ -760,6 +761,7 @@ object DeduplicateParagraphs {
     val format = opt[String](default = Some("parquet"))
     val compression = opt[String](default = Some("zstd"))
     val intermediate = toggle(default = Some(false))
+    val filters = opt[String](descr = "filter pipeline configuration", default = Some("all_duplicate_paragraphs.conf"))
     verify()
 
     def toArgs: Args = Args(
@@ -777,7 +779,8 @@ object DeduplicateParagraphs {
       debug = debug(),
       format = format(),
       compression = compression(),
-      intermediate = intermediate()
+      intermediate = intermediate(),
+      pipeline = Pipeline.make(filters())
     )
 
     def makeStages(): Set[String] = execution.toOption match {
@@ -805,7 +808,8 @@ object DeduplicateParagraphs {
       numShifts: Int = -1,
       bufferSizeInBytes: Int = 10000000,
       preFilterRatio: Double = 0.6,
-      propagatePartitions: Int = 64
+      propagatePartitions: Int = 64,
+      pipeline: Pipeline
   ) {
     def minBitsToMatch: Int = (simHashSize * preFilterRatio).toInt
 
