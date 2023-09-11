@@ -27,11 +27,22 @@ object Build {
   }
   val lintSettings = Def.settings {
     scalacOptions ++= (
-      if (scalaVersion.value.startsWith("2.")) {
-        Seq(
-          "-Xlint"
-        )
-      } else { Seq.empty }
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((2, 12)) =>
+          Seq(
+            "-Xlint"
+          )
+        case Some((2, 13)) =>
+          Seq(
+            "-Xlint",
+            "-Wdead-code",
+            "-Wextra-implicit",
+            "-Wnumeric-widen",
+            "-Wunused",
+            "-Wvalue-discard"
+          )
+        case _ => Seq.empty
+      }
     )
   }
 
@@ -65,7 +76,9 @@ object Build {
     ("com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.15.2" % Optional)
       .cross(CrossVersion.for3Use2_13),
     "org.scalatest" %% "scalatest" % "3.2.16" % Test,
-    ("org.scala-lang.modules" %% "scala-xml" % "2.2.0").cross(CrossVersion.for3Use2_13),
+    ("org.scala-lang.modules" %% "scala-xml" % "2.2.0").cross(
+      CrossVersion.for3Use2_13
+    )
   )
   lazy val scalaCompatSettings = Def.settings(
     libraryDependencies ++= (
