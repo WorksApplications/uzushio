@@ -41,6 +41,8 @@ case class Document(
     if (toRemove) copy(remove = remover) else this
   }
 
+  def aliveParagraphs: Iterator[Paragraph] = paragraphs.iterator.filter(_.remove ne null)
+
   def render(): String = {
     val bldr = new java.lang.StringBuilder()
     val iter = paragraphs.iterator

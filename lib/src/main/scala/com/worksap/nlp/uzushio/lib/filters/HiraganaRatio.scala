@@ -13,7 +13,7 @@ final class HiraganaRatio(override val low: Float = 0.0f, override val high: Flo
   def computeHiraganaRatio(document: Document): Float = {
     var nchars = 0
     var nhiragana = 0
-    val iter = document.paragraphs.iterator
+    val iter = document.aliveParagraphs
     while (iter.hasNext) {
       val par = iter.next()
       val text = par.text
