@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigObject
 import com.worksap.nlp.sudachi.Tokenizer
 import com.worksap.nlp.uzushio.Sudachi
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 import org.apache.spark.sql.Dataset

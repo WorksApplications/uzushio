@@ -1,6 +1,6 @@
 package com.worksap.nlp.uzushio.warc
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import java.io.Serializable
 import org.apache.commons.io.IOUtils
 import org.archive.io.ArchiveRecord

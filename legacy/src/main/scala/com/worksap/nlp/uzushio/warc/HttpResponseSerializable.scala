@@ -28,6 +28,9 @@ class HttpResponseSerializable(
   }
 
   def getHeaders(): Seq[(String, String)] = {
-    resp.getHeaders().map(header => (header.getName(), header.getValue()))
+    resp
+      .getHeaders()
+      .toIndexedSeq
+      .map(header => (header.getName(), header.getValue()))
   }
 }

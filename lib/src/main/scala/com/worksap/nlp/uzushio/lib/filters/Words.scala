@@ -39,7 +39,7 @@ class Words(list: String, minimum: Int = 3) extends DocFilter {
 }
 
 object Words {
-  import scala.collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
   def readToTrie(name: String): TrieNode[Boolean] = {
     val p = Paths.get(name)
     if (Files.exists(p)) {
@@ -66,8 +66,8 @@ object Words {
   }
 
   private def readToTrie(
-                          s: java.util.stream.Stream[String]
-                        ): TrieNode[Boolean] = {
+      s: java.util.stream.Stream[String]
+  ): TrieNode[Boolean] = {
     try {
       TrieNode.make(s.iterator().asScala)
     } finally {

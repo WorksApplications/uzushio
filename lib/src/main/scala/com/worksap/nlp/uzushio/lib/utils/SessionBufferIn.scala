@@ -10,16 +10,17 @@ trait ResettableBuffer extends SessionInputBuffer {
 }
 
 object SessionBufferAccess {
-  def instance(size: Int, lineSize: Int): ResettableBuffer = new SessionInputBufferImpl(size, lineSize) with ResettableBuffer {
-    override def putBytes(bytes: Array[Byte]): Unit = {
-      val b = buffer()
-      val totalSize = size.min(bytes.length)
-      b.clear()
-      b.put( bytes, 0, totalSize)
+  def instance(size: Int, lineSize: Int): ResettableBuffer =
+    new SessionInputBufferImpl(size, lineSize) with ResettableBuffer {
+      override def putBytes(bytes: Array[Byte]): Unit = {
+        val b = buffer()
+        val totalSize = size.min(bytes.length)
+        b.clear()
+        b.put(bytes, 0, totalSize)
+      }
+
+      override def clear(): Unit = super.clear()
+
+      override def position(): Int = buffer().position()
     }
-
-    override def clear(): Unit = super.clear()
-
-    override def position(): Int = buffer().position()
-  }
 }

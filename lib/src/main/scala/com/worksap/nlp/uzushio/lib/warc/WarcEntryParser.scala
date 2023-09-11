@@ -1,9 +1,25 @@
 package com.worksap.nlp.uzushio.lib.warc
 
-import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor, ParseAbortException}
-import com.worksap.nlp.uzushio.lib.lang.{EstimationFailure, LangEstimation, LangTagSniffer, ProbableLanguage}
-import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.{logger, resolveEarliestDate}
-import org.apache.hc.core5.http.impl.nio.{DefaultHttpResponseFactory, DefaultHttpResponseParser, SessionBufferAccess}
+import com.worksap.nlp.uzushio.lib.html.{
+  AllTagMapper,
+  ParagraphExtractor,
+  ParseAbortException
+}
+import com.worksap.nlp.uzushio.lib.lang.{
+  EstimationFailure,
+  LangEstimation,
+  LangTagSniffer,
+  ProbableLanguage
+}
+import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.{
+  logger,
+  resolveEarliestDate
+}
+import org.apache.hc.core5.http.impl.nio.{
+  DefaultHttpResponseFactory,
+  DefaultHttpResponseParser,
+  SessionBufferAccess
+}
 import org.apache.hc.core5.http.{HttpException, HttpMessage, MessageHeaders}
 import org.apache.tika.detect.EncodingDetector
 import org.apache.tika.exception.TikaException
@@ -15,7 +31,12 @@ import org.mozilla.universalchardet.UniversalDetector
 import org.slf4j.LoggerFactory
 
 import java.io.{ByteArrayInputStream, IOException, InputStream}
-import java.nio.charset.{Charset, IllegalCharsetNameException, StandardCharsets, UnsupportedCharsetException}
+import java.nio.charset.{
+  Charset,
+  IllegalCharsetNameException,
+  StandardCharsets,
+  UnsupportedCharsetException
+}
 import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.util.{Locale, UUID}
@@ -31,8 +52,8 @@ case class CrawlContent(
     date: String
 )
 class WarcEntryParser(
-                       acceptedLanguage: String => Boolean = _ => true,
-                       failedCount: Int => Unit = _ => ()
+    acceptedLanguage: String => Boolean = _ => true,
+    failedCount: Int => Unit = _ => ()
 ) {
 
   private val charsetDetector = new UniversalDetector()
@@ -204,18 +225,25 @@ class WarcEntryParser(
     try {
       parser.parse(inputStream, handler, metadata, parseContext)
     } catch {
-      case e: SAXException                    => reportSkippedDoc(result, record, e)
-      case e: TikaException                   => reportSkippedDoc(result, record, e)
-      case e: StringIndexOutOfBoundsException => reportSkippedDoc(result, record, e)
-      case e: NullPointerException            => reportSkippedDoc(result, record, e)
-      case e: ParseAbortException             => reportSkippedDoc(result, record, e)
+      case e: SAXException  => reportSkippedDoc(result, record, e)
+      case e: TikaException => reportSkippedDoc(result, record, e)
+      case e: StringIndexOutOfBoundsException =>
+        reportSkippedDoc(result, record, e)
+      case e: NullPointerException => reportSkippedDoc(result, record, e)
+      case e: ParseAbortException  => reportSkippedDoc(result, record, e)
     }
-    result
+    result.toSeq
   }
 
-  private def reportSkippedDoc(data: ArrayBuffer[String], record: WarcRecord, e: Throwable): Unit = {
+  private def reportSkippedDoc(
+      data: ArrayBuffer[String],
+      record: WarcRecord,
+      e: Throwable
+  ): Unit = {
     data.clear()
-    logger.warn(s"parse failed ${record.docId} from ${record.url} in ${record.path}, cause: ${e.toString}")
+    logger.warn(
+      s"parse failed ${record.docId} from ${record.url} in ${record.path}, cause: ${e.toString}"
+    )
     failedCount(1)
   }
 

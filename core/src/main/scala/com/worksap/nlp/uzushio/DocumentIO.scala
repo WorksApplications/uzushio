@@ -25,7 +25,7 @@ object DocumentIO {
   }
 
   def main(args: Array[String]): Unit = {
-    val conf = new Conf(args)
+    val conf = new Conf(args.toIndexedSeq)
     val spark = SparkSession.builder().appName("DocumentIO").getOrCreate()
 
     try { run(spark, conf) }
@@ -37,7 +37,7 @@ object DocumentIO {
       idxColName: String = idxCol
   ): DataFrame = {
     // add index column
-    dataframe.withColumn(idxColName, monotonically_increasing_id)
+    dataframe.withColumn(idxColName, monotonically_increasing_id())
   }
 
   def formatPathList(paths: Seq[Path]): Seq[Path] = {

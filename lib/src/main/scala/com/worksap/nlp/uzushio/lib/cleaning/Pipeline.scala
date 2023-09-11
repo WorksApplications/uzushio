@@ -8,24 +8,24 @@ import org.apache.commons.lang3.StringUtils
 import java.lang.reflect.{Constructor, Parameter}
 import java.net.URL
 import java.nio.file.{Files, Path, Paths}
-import scala.jdk.CollectionConverters.iterableAsScalaIterableConverter
+import scala.jdk.CollectionConverters._
 
 /** @param path
- * html path of the paragraph, separated by >, with . for classes and # for
- * ids
- * @param text
- * text content of the paragraph with link content possibly inside STX/ETX
- * character pairs
- * @param index
- * index of the paragraph in the document, starting from 0
- * @param exactFreq
- * number of occurrences of the paragraph with the same hash value in the
- * corpus
- * @param nearFreq
- * number of occurrences of the near-duplicate paragraphs
- * @param remove
- * set this field to not-null value to remove this document
- */
+  *   html path of the paragraph, separated by >, with . for classes and # for
+  *   ids
+  * @param text
+  *   text content of the paragraph with link content possibly inside STX/ETX
+  *   character pairs
+  * @param index
+  *   index of the paragraph in the document, starting from 0
+  * @param exactFreq
+  *   number of occurrences of the paragraph with the same hash value in the
+  *   corpus
+  * @param nearFreq
+  *   number of occurrences of the near-duplicate paragraphs
+  * @param remove
+  *   set this field to not-null value to remove this document
+  */
 case class Paragraph(
     path: String,
     text: String,
@@ -33,7 +33,7 @@ case class Paragraph(
     exactFreq: Int = 1,
     nearFreq: Int = 1,
     remove: AnyRef = null
-                    ) {
+) {
   def renderInto[T <: Appendable](bldr: T): T = {
     if (path != null && path.nonEmpty) {
       bldr.append(path)
@@ -45,7 +45,7 @@ case class Paragraph(
 }
 
 case class Document(
-                     paragraphs: IndexedSeq[Paragraph],
+    paragraphs: IndexedSeq[Paragraph],
     remove: AnyRef = null
 ) {
   def removeWhen(toRemove: Boolean, remover: AnyRef): Document = {
@@ -77,10 +77,9 @@ object Document {
       val (path, content) = Paragraphs.splitPath(text)
       Paragraph(path, content)
     }
-    Document(parObjects)
+    Document(parObjects.toIndexedSeq)
   }
 }
-
 
 class PerParagraphFilter(val filter: ParagraphFilter) extends DocFilter {
   override def checkDocument(doc: Document): Document =
@@ -116,11 +115,11 @@ object Pipeline {
   }
 
   private def getParam(
-                        clz: Class[_],
-                        cfg: Config,
-                        par: Parameter,
-                        index: Int
-                      ): AnyRef = {
+      clz: Class[_],
+      cfg: Config,
+      par: Parameter,
+      index: Int
+  ): AnyRef = {
     if (!cfg.hasPath(par.getName)) {
       val defFnName = "$lessinit$greater$default$" + index
       try {
@@ -149,10 +148,10 @@ object Pipeline {
   }
 
   def tryInstantiate(
-                      clz: Class[_],
-                      ctor: Constructor[_],
-                      cfg: Config
-                    ): DocFilter = {
+      clz: Class[_],
+      ctor: Constructor[_],
+      cfg: Config
+  ): DocFilter = {
     val partypes = ctor.getParameters
     val args = new Array[AnyRef](partypes.length)
 

@@ -3,8 +3,6 @@ package com.worksap.nlp.uzushio.lib.warc
 import com.worksap.nlp.uzushio.lib.utils.ClasspathAccess
 import org.scalatest.freespec.AnyFreeSpec
 
-import java.util.UUID
-
 class WarcEntryParserSpec extends AnyFreeSpec with ClasspathAccess {
   "WarcEntryParser" - {
     val parser = new WarcEntryParser()
@@ -12,7 +10,7 @@ class WarcEntryParserSpec extends AnyFreeSpec with ClasspathAccess {
       val data = classpathBytes("lang/shift_jis.txt")
       val parsed = parser.parseHttpHeader(data)
       assert(parsed.isDefined)
-      val Some((message, offset)) = parsed
+      val Some((message, offset)) = parsed: @unchecked
       assertResult(206)(offset)
       assertResult("text/html")(message.getHeader("Content-Type").getValue)
       val date = WarcEntryParser.resolveEarliestDate("", message)
@@ -21,7 +19,9 @@ class WarcEntryParserSpec extends AnyFreeSpec with ClasspathAccess {
 
     "parses UUID" - {
       "<urn:uuid:f1a9564a-ae00-40ef-838e-a4486a83fd1d>" in {
-        val uuid = WarcEntryParser.parseWarcUuid("<urn:uuid:f1a9564a-ae00-40ef-838e-a4486a83fd1d>")
+        val uuid = WarcEntryParser.parseWarcUuid(
+          "<urn:uuid:f1a9564a-ae00-40ef-838e-a4486a83fd1d>"
+        )
         assert(uuid == "f1a9564a-ae00-40ef-838e-a4486a83fd1d")
       }
     }

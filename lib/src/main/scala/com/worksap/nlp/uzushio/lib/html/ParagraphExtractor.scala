@@ -1,6 +1,10 @@
 package com.worksap.nlp.uzushio.lib.html
 
-import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{MAX_PATH_SIZE, blockTags, ignoreTags}
+import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{
+  MAX_PATH_SIZE,
+  blockTags,
+  ignoreTags
+}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
@@ -19,7 +23,7 @@ class ParagraphExtractor(
 ) extends DefaultHandler {
   private var ignoreLevel = 0
   private val writer = new StringBuilder()
-  private val tag_path = mutable.ArrayStack[String]()
+  private val tag_path = mutable.Stack[String]()
   private var per_tag_path_str = ""
 
   private def ignoreText: Boolean = ignoreLevel > 0
@@ -179,5 +183,3 @@ object ParagraphExtractor {
     "xmp" // deprecated in HTML5, instead use "pre"
   )
 }
-
-

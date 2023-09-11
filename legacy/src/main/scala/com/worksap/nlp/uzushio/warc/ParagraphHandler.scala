@@ -1,7 +1,6 @@
 package com.worksap.nlp.uzushio.warc
 
 import java.io.IOException
-import java.io.OutputStream
 import java.io.StringWriter
 import java.io.Writer
 import org.xml.sax.{Attributes, SAXException}

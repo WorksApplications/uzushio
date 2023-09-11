@@ -2,7 +2,11 @@ package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph, Pipeline}
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
-import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
+import com.worksap.nlp.uzushio.lib.stats.{
+  NgramBitSignatures,
+  NgramHashExtractor,
+  SimHashProcessor
+}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
@@ -531,7 +535,7 @@ class DeduplicateParagraphs(
       case col => raw.col(col)
     }
 
-    val exploded = raw.select(explodeCols: _*)
+    val exploded = raw.select(explodeCols.toIndexedSeq: _*)
 
     val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
 
@@ -543,16 +547,16 @@ class DeduplicateParagraphs(
 
     val basicCols = (if (args.debug) {
                        joined.columns.filter {
-                         case "parHash"                 => false
+                         case "parHash"                => false
                          case "exactFreq" | "nearFreq" => false
-                         case _                         => true
+                         case _                        => true
                        }
                      } else {
                        joined.columns.filter {
                          case "hash" | "reprHash" | "parHash" | "cleanText" =>
                            false
                          case "exactFreq" | "nearFreq" => false
-                         case _                         => true
+                         case _                        => true
                        }
                      }).map(joined.col)
 
@@ -566,7 +570,7 @@ class DeduplicateParagraphs(
     )
 
     joined.select(
-      basicCols ++ computedCols: _*
+      basicCols.toIndexedSeq ++ computedCols: _*
     )
   }
 
@@ -586,7 +590,8 @@ class DeduplicateParagraphs(
       .map(colName => first(colName).as(colName))
     val aggColumns = docParts.map(x => collect_list(x).as(x))
 
-    val aggOpFirst :: aggOpRest = (aggColumns ++ aggQueryBasicColumns).toList
+    val aggOpFirst :: aggOpRest =
+      (aggColumns ++ aggQueryBasicColumns).toList: @unchecked
 
     val aggOpResult = ds.groupBy("docId").agg(aggOpFirst, aggOpRest: _*)
 
@@ -600,8 +605,13 @@ class DeduplicateParagraphs(
             nearFreq: Array[Int]
         ) => {
           val sorted =
-            DeduplicateParagraphs.collectDocParts(text, pos, exactFreq, nearFreq)
-          DeduplicateParagraphs.processDocumentParts(args, sorted)
+            DeduplicateParagraphs.collectDocParts(
+              text,
+              pos,
+              exactFreq,
+              nearFreq
+            )
+          DeduplicateParagraphs.processDocumentParts(args, sorted.toIndexedSeq)
         }
       ).asNonNullable()
 
@@ -623,18 +633,7 @@ class DeduplicateParagraphs(
       case x                           => Some(ds.col(x))
     }
 
-    val parFields = Set(
-      "text",
-      "cleanText",
-      "hash",
-      "reprHash",
-      "repr",
-      "pos",
-      "exactFreq",
-      "nearFreq"
-    )
-
-    ds.select(cols: _*)
+    ds.select(cols.toIndexedSeq: _*)
       .repartition(args.partitions, $"docId")
       .sortWithinPartitions($"docId", $"url", $"pos")
       .write
@@ -704,7 +703,7 @@ object DeduplicateParagraphs {
       pos: Array[Int],
       exactFreq: Array[Int],
       nearFreq: Array[Int]
-                     ): Array[Paragraph] = {
+  ): Array[Paragraph] = {
     val len = text.length
     val result = new Array[Paragraph](len)
     var i = 0
@@ -734,7 +733,7 @@ object DeduplicateParagraphs {
   private def processDocumentParts(
       args: Args,
       parts: IndexedSeq[Paragraph]
-                                  ): String = {
+  ): String = {
     val doc = Document(parts)
     val filtered = args.pipeline.applyFilters(doc)
     filtered.copy(paragraphs = doc.paragraphs.filter(_.remove != null)).render()
@@ -761,7 +760,10 @@ object DeduplicateParagraphs {
     val format = opt[String](default = Some("parquet"))
     val compression = opt[String](default = Some("zstd"))
     val intermediate = toggle(default = Some(false))
-    val filters = opt[String](descr = "filter pipeline configuration", default = Some("all_duplicate_paragraphs.conf"))
+    val filters = opt[String](
+      descr = "filter pipeline configuration",
+      default = Some("all_duplicate_paragraphs.conf")
+    )
     verify()
 
     def toArgs: Args = Args(
@@ -834,7 +836,7 @@ object DeduplicateParagraphs {
   }
 
   def main(args: Array[String]): Unit = {
-    val argParser = new ArgParser(args)
+    val argParser = new ArgParser(args.toIndexedSeq)
     val argObj = argParser.toArgs
 
     SparkSession.builder().master("local[*]").getOrCreate().use { spark =>

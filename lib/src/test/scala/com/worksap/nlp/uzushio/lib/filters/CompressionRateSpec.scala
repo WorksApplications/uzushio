@@ -6,7 +6,7 @@ import org.scalatest.freespec.AnyFreeSpec
 class CompressionRateSpec extends AnyFreeSpec {
   "CompressionRate" - {
     "correctly survives serialization" in {
-      val doc = Document(Array(Paragraph("", "test1 test2")))
+      val doc = Document(Array(Paragraph("", "test1 test2")).toIndexedSeq)
       val f1 = new CompressionRate(0.1f, 1.2f)
       val b1 = f1.encodeDocContent(doc)
       val f2 = cloneViaSerialization(f1)

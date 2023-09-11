@@ -8,11 +8,11 @@ import org.apache.log4j.LogManager
 import org.archive.io.warc.WARCReaderFactory
 
 import java.io.{FilterInputStream, InputStream}
-import scala.collection.JavaConverters._
 
 /** Reads [[WarcRecord]]s from a WARC file using Hadoop filesystem APIs. */
 class WarcFileReader(conf: Configuration, filePath: Path) {
-  @transient private lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
+  @transient private lazy val logger =
+    LogManager.getLogger(this.getClass.getSimpleName)
 
   /** Opens a warc file and setup an iterator of records. */
   private val fs = filePath.getFileSystem(conf)

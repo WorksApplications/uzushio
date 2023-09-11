@@ -3,8 +3,12 @@ package com.worksap.nlp.uzushio.lib
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
 import com.worksap.nlp.uzushio.lib.filters.base.FilterBase
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
-import scala.annotation.varargs
+import java.io.{
+  ByteArrayInputStream,
+  ByteArrayOutputStream,
+  ObjectInputStream,
+  ObjectOutputStream
+}
 
 package object filters {
   def cloneViaSerialization[T <: FilterBase](f: T): T = {

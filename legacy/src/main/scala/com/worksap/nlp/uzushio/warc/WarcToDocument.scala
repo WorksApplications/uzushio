@@ -6,12 +6,15 @@ import java.io.ByteArrayInputStream
 import java.nio.file.{Path, Paths}
 import org.rogach.scallop.ScallopConf
 import org.apache.log4j.LogManager
-import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.tika.detect.EncodingDetector
 import org.apache.tika.metadata.{HttpHeaders, Metadata}
-import org.apache.tika.parser.html.{HtmlEncodingDetector, HtmlMapper, HtmlParser}
+import org.apache.tika.parser.html.{
+  HtmlEncodingDetector,
+  HtmlMapper,
+  HtmlParser
+}
 import org.apache.tika.parser.ParseContext
 import org.apache.tika.sax.BodyContentHandler
 
@@ -92,9 +95,9 @@ object WarcToDocument {
       // use http response record only
       .filter(arc => {
         val contentType = arc.headers.getOrElse(HttpHeaders.CONTENT_TYPE, "")
-        arc.isResponse && contentType.startsWith(
+        arc.isResponse() && contentType.startsWith(
           "application/http"
-        ) && !arc.isTruncated
+        ) && !arc.isTruncated()
       })
 
     // repartition
@@ -102,7 +105,7 @@ object WarcToDocument {
       case None    => warcRecords
       case Some(n) => warcRecords.coalesce(n, shuffle = true)
     }).persist()
-    logger.info(s"warc http responce record count: ${repartitioned.count}")
+    logger.info(s"warc http responce record count: ${repartitioned.count()}")
 
     val htmlResponces = repartitioned
       // parse body as http response
@@ -122,7 +125,7 @@ object WarcToDocument {
         }
       }
       .persist()
-    logger.info(s"html responce count: ${htmlResponces.count}")
+    logger.info(s"html responce count: ${htmlResponces.count()}")
     repartitioned.unpersist()
 
     val pDelim = conf.paragraphDelim() // conf is not serializable
@@ -144,9 +147,9 @@ object WarcToDocument {
         })
       })
       .toDF("warcHeaders", "httpHeaders", "tikaMetadata", "html", "document")
-      .persist
+      .persist()
     logger.info(
-      s"persed document count: ${textParsed.filter(_.getAs[String](4) != "").count}"
+      s"persed document count: ${textParsed.filter(_.getAs[String](4) != "").count()}"
     )
     htmlResponces.unpersist()
 
@@ -177,7 +180,7 @@ object WarcToDocument {
   }
 
   def main(args: Array[String]): Unit = {
-    val conf = new Conf(args)
+    val conf = new Conf(args.toIndexedSeq)
     val spark =
       SparkSession.builder().appName(this.getClass.getSimpleName).getOrCreate()
 

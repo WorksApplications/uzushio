@@ -1,12 +1,8 @@
 package com.worksap.nlp.uzushio
 
-import collection.JavaConverters._
-
-import org.apache.spark.sql.{SparkSession, DataFrame, Dataset, Row}
 import org.apache.spark.sql.types._
 import org.apache.spark.ml.{UnaryTransformer}
 import org.apache.spark.ml.util.{Identifiable}
-import org.apache.spark.ml.linalg.{Vectors, VectorUDT}
 
 /**/
 class TokenHasher(override val uid: String)

@@ -3,8 +3,6 @@ package com.worksap.nlp.uzushio.lib.lang
 import com.worksap.nlp.uzushio.lib.utils.ClasspathAccess
 import org.scalatest.freespec.AnyFreeSpec
 
-
-
 class LangEstimationSpec extends AnyFreeSpec with ClasspathAccess {
   "LangEstimation" - {
     val sniffer = new LangTagSniffer()

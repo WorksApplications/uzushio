@@ -1,8 +1,8 @@
 package com.worksap.nlp.uzushio
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
-import org.apache.spark.sql.{SparkSession, DataFrame, Dataset, Row}
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.types._
 import org.apache.spark.ml.{Transformer}
 import org.apache.spark.ml.param.{Param, ParamMap}
@@ -62,7 +62,9 @@ class SudachiTokenizer(override val uid: String)
     val outputSchema = transformSchema(dataset.schema)
 
     val mode = Sudachi.parseSplitMode($(splitMode))
-    val tokenized = dataset.toDF.rdd
+    val tokenized = dataset
+      .toDF()
+      .rdd
       .mapPartitions(iter => {
         val tok = Sudachi.setupSudachiTokenizer()
 

@@ -5,8 +5,7 @@ import org.rogach.scallop.ScallopConf
 import com.typesafe.config.{Config, ConfigFactory}
 import com.worksap.nlp.uzushio.cleaning.Pipeline
 import org.apache.log4j.LogManager
-import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{Dataset, SparkSession}
 
 object CorpusCleaner {
   @transient lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
@@ -134,7 +133,6 @@ object CorpusCleaner {
   }
 
   def run(spark: SparkSession, conf: Conf): Unit = {
-    import spark.implicits._
 
     // Dataset[Seq[String (paragraph)]]
     val data = loadInput(spark, conf)
@@ -150,7 +148,7 @@ object CorpusCleaner {
   }
 
   def main(args: Array[String]): Unit = {
-    val conf = new Conf(new CLIConf(args))
+    val conf = new Conf(new CLIConf(args.toIndexedSeq))
     val spark =
       SparkSession.builder().appName(this.getClass.getSimpleName).getOrCreate()
 

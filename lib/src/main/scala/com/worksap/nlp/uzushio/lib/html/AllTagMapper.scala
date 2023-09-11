@@ -11,7 +11,8 @@ import java.util.Locale
   * https://stackoverflow.com/questions/19368018/parsing-html-elements-in-apache-tika
   */
 class AllTagMapper extends HtmlMapper {
-  override def mapSafeElement(name: String): String = name.toLowerCase(Locale.ROOT)
+  override def mapSafeElement(name: String): String =
+    name.toLowerCase(Locale.ROOT)
 
   override def isDiscardElement(name: String): Boolean = false
 

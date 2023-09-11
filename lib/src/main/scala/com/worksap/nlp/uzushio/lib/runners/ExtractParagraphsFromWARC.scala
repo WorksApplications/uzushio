@@ -97,7 +97,7 @@ object WarcTextExtractionRaw {
   def main(args: Array[String]): Unit = {
     import com.worksap.nlp.uzushio.lib.utils.Resources._
 
-    val cfg = new ConfigParser(args)
+    val cfg = new ConfigParser(args.toIndexedSeq)
     SparkSession
       .builder()
       .master("local[*]")

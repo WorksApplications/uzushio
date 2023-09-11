@@ -5,10 +5,9 @@ import org.rogach.scallop.ScallopConf
 import org.apache.log4j.{LogManager}
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.spark.sql.{SparkSession, Row}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.feature.{NGram}
 import org.apache.spark.graphx.{Graph, Edge}
 
@@ -242,7 +241,7 @@ object MinHashDeduplicator {
     logger.info("save result")
     val docsWithCC = documents.join(cc, Seq(didCol), "left")
     val dupDocs =
-      docsWithCC.filter((!isnull(col(ccCol))) && (col(ccCol) !== col(didCol)))
+      docsWithCC.filter((!isnull(col(ccCol))) && (col(ccCol) =!= col(didCol)))
     val dedupDocs =
       docsWithCC.filter((isnull(col(ccCol))) || (col(ccCol) === col(didCol)))
 
@@ -269,7 +268,7 @@ object MinHashDeduplicator {
     if (l1 == 0) return l2
     if (l2 == 0) return l1
 
-    var p = ArrayBuffer.range(0, l1 + 1)
+    val p = ArrayBuffer.range(0, l1 + 1)
     var lastDiag: Int = 0
     for (i2 <- 1 to l2) {
       p(0) = i2
@@ -296,7 +295,7 @@ object MinHashDeduplicator {
   }
 
   def main(args: Array[String]): Unit = {
-    val conf = new Conf(args)
+    val conf = new Conf(args.toIndexedSeq)
     val spark =
       SparkSession.builder().appName("MinHashDeduplicator").getOrCreate()
 

@@ -1,10 +1,8 @@
 package com.worksap.nlp.uzushio.cleaning
 
-import collection.JavaConverters._
-import java.nio.file.{Path, Paths, Files}
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import scala.jdk.CollectionConverters._
+import com.typesafe.config.{Config, ConfigObject}
 import org.apache.spark.sql.Dataset
-import java.nio.channels.Pipe
 
 /** Sequencially apply multiple transformers.
   *
@@ -29,7 +27,11 @@ class Pipeline(private var stages: Seq[Transformer] = Seq())
 object Pipeline {
   def fromConfig(conf: Config): Pipeline = {
     val stageConfs =
-      conf.getObjectList("stages").asScala.map(_.asInstanceOf[ConfigObject])
+      conf
+        .getObjectList("stages")
+        .asScala
+        .map(_.asInstanceOf[ConfigObject])
+        .toSeq
     val stages = getStagesFromCompanion(stageConfs)
     new Pipeline(stages)
   }

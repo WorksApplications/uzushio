@@ -11,14 +11,12 @@ case class CountMinSketchState(
     cols: Int,
     counts: Array[Long]
 ) {
-  def update(hasher: Hasher, value: Long): Unit = {
-
-  }
+  def update(hasher: Hasher, value: Long): Unit = {}
 }
 
 case class Hasher(
     coeffs: Array[Long]
-                 ) {
+) {
   def hash(c1: Long, c2: Long, value: Long): Long = {
     val x = (value * c1) + c2 // mod 2^64
     java.lang.Long.rotateRight(x, 23)
@@ -36,18 +34,20 @@ class CountMinSketch(
     private val rows: Int,
     private val cols: Int,
     private val ngrams: NgramHashExtractor,
-    private val hasher: Hasher,
-                    )
-    extends Aggregator[String, CountMinSketchState, CountMinSketchState] {
-  override def zero: CountMinSketchState = CountMinSketchState(rows, cols, new Array[Long](rows * cols))
+    private val hasher: Hasher
+) extends Aggregator[String, CountMinSketchState, CountMinSketchState] {
+  override def zero: CountMinSketchState =
+    CountMinSketchState(rows, cols, new Array[Long](rows * cols))
 
-  override def reduce(b: CountMinSketchState, a: String): CountMinSketchState = {
+  override def reduce(
+      b: CountMinSketchState,
+      a: String
+  ): CountMinSketchState = {
     ngrams.compute(a) { hash =>
       b.update(hasher, hash)
     }
     b
   }
-
 
   override def merge(
       b1: CountMinSketchState,

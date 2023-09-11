@@ -12,7 +12,7 @@ object Paragraphs {
 
   def extractCleanParagraphs(text: String): Seq[String] = {
     val paragraphs = StringUtils.split(text, PARAGRAPH_SEP)
-    paragraphs.flatMap { x =>
+    paragraphs.toIndexedSeq.flatMap { x =>
       val par = extractCleanParagraph(x)
       if (hasContent(par)) Some(par) else None
     }

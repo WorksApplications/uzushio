@@ -1,6 +1,6 @@
 package com.worksap.nlp.uzushio.warc
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import java.io.{InputStream, FilterInputStream}
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;

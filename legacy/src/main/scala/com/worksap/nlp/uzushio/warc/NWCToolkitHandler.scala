@@ -4,7 +4,7 @@ import java.io.IOException
 import java.io.StringWriter
 import java.io.Writer
 
-import org.xml.sax.{ContentHandler, Attributes, SAXException}
+import org.xml.sax.{Attributes, SAXException}
 import org.xml.sax.helpers.DefaultHandler
 
 /** Handler that mimics the behaviour of nwc-toolkit text-extractor.

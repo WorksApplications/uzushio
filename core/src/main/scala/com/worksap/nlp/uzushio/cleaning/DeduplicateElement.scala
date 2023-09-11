@@ -11,7 +11,7 @@ class DeduplicateElement extends Transformer {
 
     // add indices: (doc_id, elem_id, txt)
     val indexed = ds
-      .withColumn("did", monotonically_increasing_id)
+      .withColumn("did", monotonically_increasing_id())
       .flatMap(r =>
         r.getSeq[String](0).zipWithIndex.map(z => (r.getLong(1), z._2, z._1))
       )
