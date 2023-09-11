@@ -40,14 +40,16 @@ object Build {
   )
   val sparkDependencies = Seq(
     ("org.apache.spark" %% "spark-sql" % V.spark)
-      .cross(CrossVersion.for3Use2_13),
-    ("org.apache.spark" %% "spark-mllib" % V.spark).cross(
-      CrossVersion.for3Use2_13
-    )
+      .cross(CrossVersion.for3Use2_13)
+      .exclude("org.scala-lang.modules", "scala-xml_2.13"),
+    ("org.apache.spark" %% "spark-mllib" % V.spark)
+      .cross(
+        CrossVersion.for3Use2_13
+      )
+      .exclude("org.scala-lang.modules", "scala-xml_2.13")
   )
   val libdependencies = Seq(
-    "org.scala-lang.modules" %% "scala-collection-compat" % "2.11.0",
-    "org.rogach" %% "scallop" % "4.1.0",
+    ("org.rogach" %% "scallop" % "4.1.0"),
     "org.netpreserve.commons" % "webarchive-commons" % "1.1.9" // org.archive.io
       exclude ("org.apache.hadoop", "hadoop-core")
       exclude ("com.googlecode.juniversalchardet", "juniversalchardet"),
@@ -60,8 +62,21 @@ object Build {
     "org.apache.logging.log4j" % "log4j-core" % "2.20.0" % Optional,
     "org.apache.logging.log4j" % "log4j-slf4j-impl" % "2.20.0" % Optional,
     "org.apache.logging.log4j" % "log4j-slf4j2-impl" % "2.20.0" % Optional,
-    "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.14.2" % Optional,
-    "org.scalatest" %% "scalatest" % "3.2.16" % Test
+    ("com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.15.2" % Optional)
+      .cross(CrossVersion.for3Use2_13),
+    "org.scalatest" %% "scalatest" % "3.2.16" % Test,
+    ("org.scala-lang.modules" %% "scala-xml" % "2.2.0").cross(CrossVersion.for3Use2_13),
+  )
+  lazy val scalaCompatSettings = Def.settings(
+    libraryDependencies ++= (
+      if (scalaVersion.value.startsWith("2.")) {
+        Seq(
+          "org.scala-lang.modules" %% "scala-collection-compat" % "2.11.0"
+        ),
+      } else {
+        Seq.empty
+      }
+    )
   )
 
   lazy val assemblySettings = Def.settings(

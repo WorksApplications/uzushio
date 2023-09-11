@@ -8,6 +8,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{octet_length, rand, udf}
 import org.rogach.scallop.ScallopConf
+import org.rogach.scallop._
 
 object FilterStatistics {
 

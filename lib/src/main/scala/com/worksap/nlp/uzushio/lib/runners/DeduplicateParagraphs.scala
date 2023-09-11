@@ -14,6 +14,7 @@ import org.apache.commons.codec.binary.Hex
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.rogach.scallop.ScallopConf
+import org.rogach.scallop._
 import spire.std.LevenshteinDistance
 
 import java.util

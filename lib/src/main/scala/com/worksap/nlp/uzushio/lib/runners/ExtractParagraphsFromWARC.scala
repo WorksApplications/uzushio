@@ -27,7 +27,7 @@ object ExtractParagraphsFromWARC {
   }
 
   def run(args: Args)(spark: SparkSession): Unit = {
-    import spark.implicits._
+
     logger.info(
       s"filtering out documents in following languages: ${args.languages.mkString(",")}"
     )
@@ -56,7 +56,7 @@ object ExtractParagraphsFromWARC {
       },
       preservesPartitioning = true
     )
-
+    import spark.implicits._
     val frame = items.coalesce(args.maxPartitions).toDF()
     frame.write
       .mode(SaveMode.Overwrite)
@@ -77,6 +77,7 @@ object WarcTextExtractionRaw {
 
   // noinspection TypeAnnotation
   class ConfigParser(args: Seq[String]) extends ScallopConf(args) {
+    import org.rogach.scallop._
     val input = opt[List[String]](required = true)
     val output = opt[String](required = true)
     val language = opt[List[String]](default = Some(Nil))

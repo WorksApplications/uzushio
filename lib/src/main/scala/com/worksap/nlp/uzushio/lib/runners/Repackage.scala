@@ -2,7 +2,7 @@ package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import org.apache.spark.sql.{SaveMode, SparkSession}
-import org.rogach.scallop.ScallopConf
+import org.rogach.scallop._
 
 object Repackage {
 

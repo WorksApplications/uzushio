@@ -74,8 +74,16 @@ lazy val lib = (project in file("lib"))
     name := "uzushio-lib",
     libraryDependencies ++= sparkDependencies.map(_ % Optional),
     libraryDependencies ++= libdependencies,
-    scalacOptions ++= Seq("-opt:l:inline", "-opt-inline-from:classpath"),
+    scalacOptions ++= (
+      if (scalaVersion.value.startsWith("2.")) {
+        Seq("-opt:l:inline", "-opt-inline-from:classpath")
+      } else {
+        Seq.empty
+      }
+    ),
     javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
   )
   .settings(commonSettings)
   .settings(lintSettings)
+  .settings(scalaCompatSettings)
+
