@@ -1,6 +1,7 @@
 package com.worksap.nlp.uzushio.lib.filters
 
-import com.worksap.nlp.uzushio.lib.cleaning.{DocFilter, Document}
+import com.worksap.nlp.uzushio.lib.cleaning.Document
+import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
 import com.worksap.nlp.uzushio.lib.utils.TrieNode
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet
 

@@ -1,6 +1,7 @@
 package com.worksap.nlp.uzushio.lib
 
-import com.worksap.nlp.uzushio.lib.cleaning.{Document, FilterBase, Paragraph}
+import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
+import com.worksap.nlp.uzushio.lib.filters.base.FilterBase
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 import scala.annotation.varargs

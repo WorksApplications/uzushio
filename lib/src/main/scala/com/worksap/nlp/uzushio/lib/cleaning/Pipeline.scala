@@ -1,6 +1,7 @@
 package com.worksap.nlp.uzushio.lib.cleaning
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.worksap.nlp.uzushio.lib.filters.base.{DocFilter, ParagraphFilter}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import org.apache.commons.lang3.StringUtils
 
@@ -9,14 +10,21 @@ import java.net.URL
 import java.nio.file.{Files, Path, Paths}
 import scala.jdk.CollectionConverters.iterableAsScalaIterableConverter
 
-/**
- *
- * @param path      html path of the paragraph, separated by >, with . for classes and # for ids
- * @param text      text content of the paragraph with link content possibly inside STX/ETX character pairs
- * @param index     index of the paragraph in the document, starting from 0
- * @param exactFreq number of occurrences of the paragraph with the same hash value in the corpus
- * @param nearFreq  number of occurrences of the near-duplicate paragraphs
- * @param remove    set this field to not-null value to remove this document
+/** @param path
+ * html path of the paragraph, separated by >, with . for classes and # for
+ * ids
+ * @param text
+ * text content of the paragraph with link content possibly inside STX/ETX
+ * character pairs
+ * @param index
+ * index of the paragraph in the document, starting from 0
+ * @param exactFreq
+ * number of occurrences of the paragraph with the same hash value in the
+ * corpus
+ * @param nearFreq
+ * number of occurrences of the near-duplicate paragraphs
+ * @param remove
+ * set this field to not-null value to remove this document
  */
 case class Paragraph(
     path: String,
@@ -44,7 +52,8 @@ case class Document(
     if (toRemove) copy(remove = remover) else this
   }
 
-  def aliveParagraphs: Iterator[Paragraph] = paragraphs.iterator.filter(_.remove ne null)
+  def aliveParagraphs: Iterator[Paragraph] =
+    paragraphs.iterator.filter(_.remove ne null)
 
   def render(): String = {
     val bldr = new java.lang.StringBuilder()
@@ -72,15 +81,6 @@ object Document {
   }
 }
 
-trait FilterBase extends Serializable
-
-trait ParagraphFilter extends FilterBase {
-  def checkParagraph(p: Paragraph): Paragraph
-}
-
-trait DocFilter extends FilterBase {
-  def checkDocument(doc: Document): Document
-}
 
 class PerParagraphFilter(val filter: ParagraphFilter) extends DocFilter {
   override def checkDocument(doc: Document): Document =
@@ -217,6 +217,8 @@ object Pipeline {
     if (pipelinesUri != null) {
       return make(pipelinesUri)
     }
-    throw new IllegalArgumentException(s"failed to find pipeline description: $name")
+    throw new IllegalArgumentException(
+      s"failed to find pipeline description: $name"
+    )
   }
 }

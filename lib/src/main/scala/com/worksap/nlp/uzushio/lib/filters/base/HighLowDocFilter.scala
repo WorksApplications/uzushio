@@ -1,6 +1,6 @@
 package com.worksap.nlp.uzushio.lib.filters.base
 
-import com.worksap.nlp.uzushio.lib.cleaning.{DocFilter, Document}
+import com.worksap.nlp.uzushio.lib.cleaning.Document
 
 trait HighLowDocFilter extends DocFilter {
   def high: Float
