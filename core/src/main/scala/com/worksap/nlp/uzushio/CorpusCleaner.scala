@@ -40,7 +40,7 @@ object CorpusCleaner {
   /* Config that cliconf and configfile merged.
    *
    * Prefers cli > config file > default value.
-   * See `src/main/resources/reference.conf` for the default values.
+   * See `core/src/main/resources/reference.conf` for the default values.
    */
   private class Conf(val cliconf: CLIConf) {
     // args only from cli

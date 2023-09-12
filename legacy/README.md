@@ -102,7 +102,7 @@ spark-submit --class org.sample.corpus.CorpusCleaner \
   - By default, each files are treated as "\n\n" splitted documents that consists of "\n" splitted sentences.
 - `--output`: Spark output dir (default `./out`). Need to be empty if exists.
 - `--config`: Name or path of config file (default: `chitra`).
-  - See `src/main/resources/reference.conf` for reference.
+  - See `core/src/main/resources/reference.conf` for reference.
   - See next section for existing config name.
 - You can override config values by cli arg (check with `-h` option).
 
@@ -191,7 +191,7 @@ We use following two metrics:
 
 Extract text and meta data from WARC file.
 
-See [[./src/main/scala/org/sample/corpus/warc/README.md]] for detail.
+See [[./core/src/main/scala/org/sample/corpus/warc/README.md]] for detail.
 
 ```bash
 spark-submit --class org.sample.corpus.warc.WarcToDocument \
