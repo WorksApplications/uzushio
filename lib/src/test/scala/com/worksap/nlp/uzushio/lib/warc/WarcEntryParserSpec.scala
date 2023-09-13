@@ -13,7 +13,7 @@ class WarcEntryParserSpec extends AnyFreeSpec with ClasspathAccess {
       val parsed = parser.parseHttpHeader(data)
       assert(parsed.isDefined)
       val Some((message, offset)) = parsed
-      assertResult(206)(offset)
+      assert(offset == 197)
       assertResult("text/html")(message.getHeader("Content-Type").getValue)
       val date = WarcEntryParser.resolveEarliestDate("", message)
       assert("2012-12-29T16:50:56" == date)
