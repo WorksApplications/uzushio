@@ -2,7 +2,7 @@ package com.worksap.nlp.uzushio.lib.filters
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.filters.base.HighLowDocFilter
-import com.worksap.nlp.uzushio.lib.utils.Paragraphs
+import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs}
 
 class LinkCharRatio(
     override val low: Float = 0.0f,
@@ -16,8 +16,8 @@ class LinkCharRatio(
     while (iter.hasNext) {
       val par = iter.next()
       var i = 0
-      val len = 0
       val txt = par.text
+      val len = txt.length
       var inside = 0
       while (i < len) {
         val ch = txt.charAt(i)
@@ -32,7 +32,7 @@ class LinkCharRatio(
         i += 1
       }
     }
-    inLink.toFloat / total.toFloat
+    MathUtil.ratio(inLink, total)
   }
 
   override def checkDocument(doc: Document): Document = {

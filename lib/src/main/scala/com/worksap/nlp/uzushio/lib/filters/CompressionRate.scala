@@ -24,7 +24,7 @@ class CompressionRate(override val low: Float, override val high: Float) extends
     val enc = StandardCharsets.UTF_8.newEncoder()
     val buf = utf8Buffer
     buf.clear()
-    val iter = doc.paragraphs.iterator
+    val iter = doc.aliveParagraphs
     while (iter.hasNext) {
       val p = iter.next()
       val cbuf = CharBuffer.wrap(p.text)

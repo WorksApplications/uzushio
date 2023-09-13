@@ -95,4 +95,11 @@ public class MathUtil {
         return Long.bitCount(~(x ^ y));
     }
 
+    public static float ratio(int count, int total) {
+        if (count == 0 || total == 0) {
+            return 0.0f;
+        }
+        return (float) count / (float) total;
+    }
+
  }

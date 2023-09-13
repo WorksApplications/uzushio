@@ -3,6 +3,7 @@ package com.worksap.nlp.uzushio.lib.filters
 import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.filters.HiraganaRatio.isHiragana
 import com.worksap.nlp.uzushio.lib.filters.base.HighLowDocFilter
+import com.worksap.nlp.uzushio.lib.utils.MathUtil
 
 final class HiraganaRatio(
     override val low: Float = 0.0f,
@@ -23,7 +24,7 @@ final class HiraganaRatio(
       nchars += text.length
       nhiragana += countHiraganaChars(text)
     }
-    nhiragana.toFloat / nchars.toFloat
+    MathUtil.ratio(nhiragana, nchars)
   }
 
   def countHiraganaChars(str: String): Int = {
