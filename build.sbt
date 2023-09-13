@@ -38,6 +38,8 @@ lazy val commonSettings = Seq(
   )
 )
 
+disablePlugins(sbtassembly.AssemblyPlugin)
+
 lazy val root = (project in file("."))
   .aggregate(
     lib,
@@ -48,12 +50,14 @@ lazy val root = (project in file("."))
   .settings(commonSettings)
 
 lazy val legacy = (project in file("legacy"))
+  .disablePlugins(sbtassembly.AssemblyPlugin)
   .dependsOn(lib)
   .settings(
     libraryDependencies ++= sparkDependencies.map(_ % Provided)
   )
 
 lazy val core = (project in file("core"))
+  .enablePlugins(sbtassembly.AssemblyPlugin)
   .settings(
     name := "uzushio",
     libraryDependencies ++= coreDependencies ++ sparkDependencies.map(
@@ -65,8 +69,8 @@ lazy val core = (project in file("core"))
   .settings(assemblySettings)
   .dependsOn(lib)
 
-
 lazy val lib = (project in file("lib"))
+  .disablePlugins(sbtassembly.AssemblyPlugin)
   .settings(
     name := "uzushio-lib",
     libraryDependencies ++= sparkDependencies.map(_ % Optional),
