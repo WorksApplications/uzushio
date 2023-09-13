@@ -11,7 +11,8 @@ class MathUtilTest extends AnyFreeSpec {
 
     "longFromBytes" - {
       "produces correct long from 0-based 8-length sequence" in {
-        val bytes = Array[Byte](0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88.toByte)
+        val bytes =
+          Array[Byte](0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88.toByte)
         val long = MathUtil.longFromBytes(bytes, 0)
         assert(0x8877665544332211L == long)
       }
@@ -23,13 +24,35 @@ class MathUtilTest extends AnyFreeSpec {
       }
 
       "produces correct long from 2-based 8-length sequence" in {
-        val bytes = Array[Byte](0x00, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88.toByte)
+        val bytes = Array[Byte](
+          0x00,
+          0x00,
+          0x11,
+          0x22,
+          0x33,
+          0x44,
+          0x55,
+          0x66,
+          0x77,
+          0x88.toByte
+        )
         val long = MathUtil.longFromBytes(bytes, 2)
         assert(0x8877665544332211L == long)
       }
 
       "produces correct long from 1-based 8-length sequence" in {
-        val bytes = Array[Byte](0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88.toByte, 0x00)
+        val bytes = Array[Byte](
+          0x00,
+          0x11,
+          0x22,
+          0x33,
+          0x44,
+          0x55,
+          0x66,
+          0x77,
+          0x88.toByte,
+          0x00
+        )
         val long = MathUtil.longFromBytes(bytes, 1)
         assert(0x8877665544332211L == long)
       }

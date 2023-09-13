@@ -21,8 +21,10 @@ class LangEstimation(private val minBytes: Int = 1024) {
   private def langDetector = LangEstimation.cachedDetector
 
   /** Copy non-ASCII characters into detection buffer
-    * @param input input buffer
-    * @param output output buffer
+    * @param input
+    *   input buffer
+    * @param output
+    *   output buffer
     */
   private def copyNonAscii(input: CharBuffer, output: CharBuffer): Unit = {
     var prevWhitespace = false
@@ -109,10 +111,13 @@ class LangEstimation(private val minBytes: Int = 1024) {
 object LangEstimation {
 
   private lazy val cachedDetector = {
-    val builtinLangs = com.optimaize.langdetect.profiles.BuiltInLanguages.getLanguages
-    val profileReader = new com.optimaize.langdetect.profiles.LanguageProfileReader
+    val builtinLangs =
+      com.optimaize.langdetect.profiles.BuiltInLanguages.getLanguages
+    val profileReader =
+      new com.optimaize.langdetect.profiles.LanguageProfileReader
     val profiles = profileReader.readBuiltIn(builtinLangs)
-    LanguageDetectorBuilder.create(NgramExtractor.gramLengths(1, 2))
+    LanguageDetectorBuilder
+      .create(NgramExtractor.gramLengths(1, 2))
       .withProfiles(profiles)
       .build()
   }

@@ -11,7 +11,8 @@ object Repackage {
 
     val repart = data.coalesce(args.maxParitions)
 
-    repart.write.format(args.format)
+    repart.write
+      .format(args.format)
       .option("compression", args.compression)
       .mode(SaveMode.Overwrite)
       .save(args.output)
@@ -34,7 +35,13 @@ object Repackage {
     )
   }
 
-  case class Args(input: String, output: String, format: String, compression: String, maxParitions: Int)
+  case class Args(
+      input: String,
+      output: String,
+      format: String,
+      compression: String,
+      maxParitions: Int
+  )
 
   def main(args: Array[String]): Unit = {
     val argObj = new ArgParser(args).toArgs

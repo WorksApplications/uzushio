@@ -66,8 +66,8 @@ object Words {
   }
 
   private def readToTrie(
-                          s: java.util.stream.Stream[String]
-                        ): TrieNode[Boolean] = {
+      s: java.util.stream.Stream[String]
+  ): TrieNode[Boolean] = {
     try {
       TrieNode.make(s.iterator().asScala)
     } finally {

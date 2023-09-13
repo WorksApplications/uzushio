@@ -1,25 +1,30 @@
 package com.worksap.nlp.uzushio.lib.filters
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
-import com.worksap.nlp.uzushio.lib.filters.CompressionRate.{INPUT_SIZE, OUTPUT_SIZE}
+import com.worksap.nlp.uzushio.lib.filters.CompressionRate.{
+  INPUT_SIZE,
+  OUTPUT_SIZE
+}
 import com.worksap.nlp.uzushio.lib.filters.base.HighLowDocFilter
 import net.jpountz.lz4.{LZ4Exception, LZ4Factory}
 
 import java.nio.charset.StandardCharsets
 import java.nio.{ByteBuffer, CharBuffer}
 
-
-
-/**
- * Filter out documents which have too low or too high compression rate (using LZ4 algorithm)
- *
- * @param low  low compression rate threshold
- * @param high high compression rate threshold
- */
-class CompressionRate(override val low: Float, override val high: Float) extends HighLowDocFilter {
+/** Filter out documents which have too low or too high compression rate (using
+  * LZ4 algorithm)
+  *
+  * @param low
+  *   low compression rate threshold
+  * @param high
+  *   high compression rate threshold
+  */
+class CompressionRate(override val low: Float, override val high: Float)
+    extends HighLowDocFilter {
   @transient private lazy val lz4 = LZ4Factory.fastestInstance()
   @transient private lazy val utf8Buffer = ByteBuffer.allocateDirect(INPUT_SIZE)
-  @transient private lazy val compressBuffer = ByteBuffer.allocateDirect(OUTPUT_SIZE)
+  @transient private lazy val compressBuffer =
+    ByteBuffer.allocateDirect(OUTPUT_SIZE)
 
   def encodeDocContent(doc: Document): ByteBuffer = {
     val enc = StandardCharsets.UTF_8.newEncoder()
@@ -51,12 +56,13 @@ class CompressionRate(override val low: Float, override val high: Float) extends
     val uncompressedSize = buf.limit()
     val outBuf = compressBuffer
     outBuf.clear()
-    val compressedSize = try {
-      compressor.compress(buf, outBuf)
-      outBuf.position()
-    } catch {
-      case _: LZ4Exception => OUTPUT_SIZE
-    }
+    val compressedSize =
+      try {
+        compressor.compress(buf, outBuf)
+        outBuf.position()
+      } catch {
+        case _: LZ4Exception => OUTPUT_SIZE
+      }
     val ratio = compressedSize.toFloat / uncompressedSize.toFloat
     ratio
   }

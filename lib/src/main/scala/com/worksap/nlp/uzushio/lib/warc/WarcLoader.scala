@@ -13,6 +13,7 @@ object WarcLoader {
     spark
       .newAPIHadoopFile[LongWritable, WarcWritable, WarcInputFormat](
         name
-      ).map { case (_, v) => v.getRecord }
+      )
+      .map { case (_, v) => v.getRecord }
   }
 }
