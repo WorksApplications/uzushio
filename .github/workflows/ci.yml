@@ -1,6 +1,8 @@
 name: CI
 on:
   push:
+    paths:
+      - main
   pull_request:
 jobs:
   build:
