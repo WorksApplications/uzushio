@@ -21,7 +21,7 @@ object Build {
   val V = new {
     val scala212 = "2.12.18"
     val scala3 = "3.3.1"
-    val spark = "3.3.2"
+    val spark = "3.4.1"
     val sudachi = "0.7.3"
   }
   val lintSettings = Def.settings {
