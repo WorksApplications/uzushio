@@ -14,4 +14,4 @@ jobs:
           distribution: temurin
           java-version: 8
           cache: sbt
-      - run: sbt test
+      - run: sbt "scalafmtCheck;test"
