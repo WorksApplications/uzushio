@@ -4,7 +4,10 @@ import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.filters.HiraganaRatio.isHiragana
 import com.worksap.nlp.uzushio.lib.filters.base.HighLowDocFilter
 
-final class HiraganaRatio(override val low: Float = 0.0f, override val high: Float = 1.0f) extends HighLowDocFilter {
+final class HiraganaRatio(
+    override val low: Float = 0.0f,
+    override val high: Float = 1.0f
+) extends HighLowDocFilter {
   override def checkDocument(doc: Document): Document = {
     val ratio = computeHiraganaRatio(doc)
     maybeFilter(doc, ratio)

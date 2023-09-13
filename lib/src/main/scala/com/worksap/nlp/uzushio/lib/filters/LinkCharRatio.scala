@@ -5,9 +5,9 @@ import com.worksap.nlp.uzushio.lib.filters.base.HighLowDocFilter
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 
 class LinkCharRatio(
-                     override val low: Float = 0.0f,
-                     override val high: Float = 1.0f
-                   ) extends HighLowDocFilter {
+    override val low: Float = 0.0f,
+    override val high: Float = 1.0f
+) extends HighLowDocFilter {
 
   def calcLinkCharRatio(doc: Document): Float = {
     val iter = doc.aliveParagraphs

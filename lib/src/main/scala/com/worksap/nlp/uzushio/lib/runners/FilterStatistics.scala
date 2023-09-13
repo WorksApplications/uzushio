@@ -1,7 +1,11 @@
 package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
-import com.worksap.nlp.uzushio.lib.filters.{CompressionRate, HiraganaRatio, LinkCharRatio}
+import com.worksap.nlp.uzushio.lib.filters.{
+  CompressionRate,
+  HiraganaRatio,
+  LinkCharRatio
+}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -24,7 +28,6 @@ object FilterStatistics {
         rawData.sample(withReplacement = false, ratio, 0xdeadbeefL)
     }
 
-
     val textOnly = limited.select("text").filter(octet_length($"text") > 2)
     val extractor = extractFilteredMetrix(spark, args.filter())
 
@@ -45,7 +48,9 @@ object FilterStatistics {
         cleanPars($"text", rand()) as "text"
       )
 
-    withValues.persist().repartitionByRange(args.partitions(), withValues.col("value"))
+    withValues
+      .persist()
+      .repartitionByRange(args.partitions(), withValues.col("value"))
       .sortWithinPartitions("value")
       .write
       .option("escape", "\"")
@@ -53,7 +58,10 @@ object FilterStatistics {
       .csv(args.output())
   }
 
-  def extractFilteredMetrix(sparkSession: SparkSession, fiter: String): UserDefinedFunction = {
+  def extractFilteredMetrix(
+      sparkSession: SparkSession,
+      fiter: String
+  ): UserDefinedFunction = {
     import sparkSession.implicits._
     fiter match {
       case "compression" =>

@@ -1,6 +1,12 @@
 package com.worksap.nlp.uzushio.lib.warc
 
-import com.worksap.nlp.uzushio.lib.warc.WarcRecord.{RECORD_ACCESS_DATE, RECORD_ID, RECORD_TRUNCATED, RECORD_TYPE, RECORD_URL}
+import com.worksap.nlp.uzushio.lib.warc.WarcRecord.{
+  RECORD_ACCESS_DATE,
+  RECORD_ID,
+  RECORD_TRUNCATED,
+  RECORD_TYPE,
+  RECORD_URL
+}
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.Path
 import org.archive.format.warc.WARCConstants
@@ -23,9 +29,9 @@ class WarcRecord(record: ArchiveRecord, val path: Path) extends Serializable {
 
   def isTruncated: Boolean = {
     headers.get(RECORD_TRUNCATED) match {
-      case null => false
+      case null            => false
       case s: CharSequence => s.length() > 0
-      case _ => true
+      case _               => true
     }
   }
 

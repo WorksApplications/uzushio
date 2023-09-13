@@ -21,7 +21,9 @@ class WarcEntryParserSpec extends AnyFreeSpec with ClasspathAccess {
 
     "parses UUID" - {
       "<urn:uuid:f1a9564a-ae00-40ef-838e-a4486a83fd1d>" in {
-        val uuid = WarcEntryParser.parseWarcUuid("<urn:uuid:f1a9564a-ae00-40ef-838e-a4486a83fd1d>")
+        val uuid = WarcEntryParser.parseWarcUuid(
+          "<urn:uuid:f1a9564a-ae00-40ef-838e-a4486a83fd1d>"
+        )
         assert(uuid == "f1a9564a-ae00-40ef-838e-a4486a83fd1d")
       }
     }

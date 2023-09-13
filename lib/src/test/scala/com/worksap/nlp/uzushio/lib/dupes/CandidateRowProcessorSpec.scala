@@ -1,6 +1,9 @@
 package com.worksap.nlp.uzushio.lib.dupes
 
-import com.worksap.nlp.uzushio.lib.runners.{CandidateRowProcessor, DuplicateCandidateRow}
+import com.worksap.nlp.uzushio.lib.runners.{
+  CandidateRowProcessor,
+  DuplicateCandidateRow
+}
 import com.worksap.nlp.uzushio.lib.stats.{NgramHashExtractor, SimHashProcessor}
 import org.apache.spark.sql.catalyst.expressions.XXH64
 import org.apache.spark.unsafe.types.UTF8String
@@ -31,7 +34,7 @@ class CandidateRowProcessorSpec extends AnyFreeSpec {
       RowCandidate("docomo STYLE series N-01C"),
       RowCandidate("docomo STYLE series SH-03E"),
       RowCandidate("4位docomo STYLE series N-01E"),
-      RowCandidate("5位docomo STYLE series N-03D"),
+      RowCandidate("5位docomo STYLE series N-03D")
     )
     val proc = new CandidateRowProcessor(1024 * 1024, 70, pars.iterator)
     val result = proc.toArray
@@ -46,7 +49,7 @@ class CandidateRowProcessorSpec extends AnyFreeSpec {
       RowCandidate("らくらくホン ベーシック3 [ピンク]"),
       RowCandidate("> らくらくホン ベーシック3 [ホワイト]"),
       RowCandidate("らくらくホン ベーシック3 [ホワイト]"),
-      RowCandidate("らくらくホン ベーシック3 [ホワイト] のクチコミ掲示板"),
+      RowCandidate("らくらくホン ベーシック3 [ホワイト] のクチコミ掲示板")
     )
     val proc = new CandidateRowProcessor(1024 * 1024, 70, pars.iterator)
     val result = proc.toArray

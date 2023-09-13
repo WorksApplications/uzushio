@@ -1,6 +1,10 @@
 package com.worksap.nlp.uzushio.lib.html
 
-import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{MAX_PATH_SIZE, blockTags, ignoreTags}
+import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{
+  MAX_PATH_SIZE,
+  blockTags,
+  ignoreTags
+}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
@@ -179,5 +183,3 @@ object ParagraphExtractor {
     "xmp" // deprecated in HTML5, instead use "pre"
   )
 }
-
-
