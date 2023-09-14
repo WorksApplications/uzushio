@@ -8,7 +8,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.ml.param.shared.{HasInputCol, HasOutputCol, HasSeed}
 import org.apache.spark.ml.param.{IntParam, Params, ParamMap, ParamValidators}
-import org.apache.spark.ml.util.{Identifiable}
+import org.apache.spark.ml.util.Identifiable
 
 /* Reimplementation of spark.ml.feature.MinHashLSH, but in/out types are Array[Long].
  *
@@ -16,21 +16,18 @@ import org.apache.spark.ml.util.{Identifiable}
  */
 
 trait MinHashParams extends Params with HasInputCol with HasOutputCol {
-  val b: IntParam =
-    new IntParam(this, "b", "num and-amplification", ParamValidators.gt(0))
+  val b: IntParam = new IntParam(this, "b", "num and-amplification", ParamValidators.gt(0))
   def getB: Int = $(b)
 
-  val r: IntParam =
-    new IntParam(this, "r", "num or-amplification", ParamValidators.gt(0))
+  val r: IntParam = new IntParam(this, "r", "num or-amplification", ParamValidators.gt(0))
   def getR: Int = $(r)
 
   setDefault(b -> 1, r -> 1)
 
-  protected[this] final def validateAndTransformSchema(
+  final protected[this] def validateAndTransformSchema(
       schema: StructType
   ): StructType = {
-    val typeCandidates =
-      Set(new ArrayType(LongType, true), new ArrayType(LongType, false))
+    val typeCandidates = Set(new ArrayType(LongType, true), new ArrayType(LongType, false))
     val inputType = schema($(inputCol)).dataType
     require(
       typeCandidates.exists(inputType.equals),

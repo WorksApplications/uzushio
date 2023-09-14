@@ -1,20 +1,13 @@
 package com.worksap.nlp.uzushio.lib.warc
 
-import com.worksap.nlp.uzushio.lib.html.{
-  AllTagMapper,
-  ParagraphExtractor,
-  ParseAbortException
-}
+import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor, ParseAbortException}
 import com.worksap.nlp.uzushio.lib.lang.{
   EstimationFailure,
   LangEstimation,
   LangTagSniffer,
   ProbableLanguage
 }
-import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.{
-  logger,
-  resolveEarliestDate
-}
+import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.{logger, resolveEarliestDate}
 import org.apache.hc.core5.http.impl.nio.{
   DefaultHttpResponseFactory,
   DefaultHttpResponseParser,
@@ -90,8 +83,8 @@ class WarcEntryParser(
       }
       Some((resp, sessionInputBuffer.position()))
     } catch {
-      case _: HttpException            => None
-      case _: IOException              => None
+      case _: HttpException => None
+      case _: IOException => None
       case _: IllegalArgumentException => None
     }
   }
@@ -118,10 +111,10 @@ class WarcEntryParser(
   private def lookupNormalizedCharset(name: String) = {
     val charsetName = name.toLowerCase(Locale.ROOT)
     charsetName match {
-      case ""               => None
+      case "" => None
       case "utf-8" | "utf8" => Some(StandardCharsets.UTF_8)
       case "shiftjis" | "shift_jis" | "shift-jis" => Some(win31j)
-      case x                                      => lookupCharset(x)
+      case x => lookupCharset(x)
     }
   }
 
@@ -145,8 +138,7 @@ class WarcEntryParser(
       offset: Int
   ): Charset = {
     val length = math.min(content.length - offset, 8 * 1024)
-    val charset =
-      detectCharsetFromBytes(content, offset, length)
+    val charset = detectCharsetFromBytes(content, offset, length)
     if (charset == null) {
       return StandardCharsets.UTF_8
     }
@@ -168,22 +160,22 @@ class WarcEntryParser(
     if (c1.isDefined) {
       langEstimation.estimateLang(data, offset, c1.get) match {
         case ProbableLanguage(lang) => return Some((c1.get, lang))
-        case EstimationFailure      => return None
-        case _                      => // do nothing
+        case EstimationFailure => return None
+        case _ => // do nothing
       }
     }
     val c2 = guessCharsetFromHeader(headers)
     if (c2.isDefined) {
       langEstimation.estimateLang(data, offset, c2.get) match {
         case ProbableLanguage(lang) => return Some((c2.get, lang))
-        case EstimationFailure      => return None
-        case _                      => // do nothing
+        case EstimationFailure => return None
+        case _ => // do nothing
       }
     }
     val c3 = guessCharsetFromBytes(data, offset)
     langEstimation.estimateLang(data, offset, c3) match {
       case ProbableLanguage(lang) => Some((c3, lang))
-      case _                      => None
+      case _ => None
     }
   }
 
@@ -210,14 +202,12 @@ class WarcEntryParser(
       new ParagraphExtractor(result)
     )
     val data = record.content
-    val inputStream =
-      new ByteArrayInputStream(data, bodyOffset, data.length - bodyOffset)
+    val inputStream = new ByteArrayInputStream(data, bodyOffset, data.length - bodyOffset)
     val parseContext = new ParseContext()
     parseContext.set(
       classOf[EncodingDetector],
       new EncodingDetector {
-        override def detect(input: InputStream, metadata: Metadata): Charset =
-          cs
+        override def detect(input: InputStream, metadata: Metadata): Charset = cs
       }
     )
     parseContext.set(classOf[HtmlMapper], new AllTagMapper)
@@ -225,12 +215,11 @@ class WarcEntryParser(
     try {
       parser.parse(inputStream, handler, metadata, parseContext)
     } catch {
-      case e: SAXException  => reportSkippedDoc(result, record, e)
+      case e: SAXException => reportSkippedDoc(result, record, e)
       case e: TikaException => reportSkippedDoc(result, record, e)
-      case e: StringIndexOutOfBoundsException =>
-        reportSkippedDoc(result, record, e)
+      case e: StringIndexOutOfBoundsException => reportSkippedDoc(result, record, e)
       case e: NullPointerException => reportSkippedDoc(result, record, e)
-      case e: ParseAbortException  => reportSkippedDoc(result, record, e)
+      case e: ParseAbortException => reportSkippedDoc(result, record, e)
     }
     result
   }
@@ -315,10 +304,7 @@ object WarcEntryParser {
       return base
     }
     try {
-      val parsed = ZonedDateTime
-        .from(parser.parse(value))
-        .withZoneSameInstant(UTC)
-        .toLocalDateTime
+      val parsed = ZonedDateTime.from(parser.parse(value)).withZoneSameInstant(UTC).toLocalDateTime
       if (parsed.isBefore(dateCutoff)) {
         return base
       }

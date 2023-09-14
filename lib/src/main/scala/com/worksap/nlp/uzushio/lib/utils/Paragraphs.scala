@@ -52,21 +52,21 @@ object Paragraphs {
     cleanParagraph(noLinkMarkers)
   }
 
-  private final val spacesRegex = "[\u0000-\u0001\u0004-\u0020\u00a0]+".r
-  private final val emptyLinks =
-    "\u0002[\u0000-\u0001\u0004-\u0020\u00a0]*\u0003".r
-  private final val linkChars = "[\u0002\u0003]".r
+  final private val spacesRegex = "[\u0000-\u0001\u0004-\u0020\u00a0]+".r
+  final private val emptyLinks = "\u0002[\u0000-\u0001\u0004-\u0020\u00a0]*\u0003".r
+  final private val linkChars = "[\u0002\u0003]".r
 
   final val HTML_LINK_START: Char = 0x02 // ASCII TEXT START
   final val HTML_LINK_END: Char = 0x03 // ASCII TEXT END
 
   private def cleanInsideLinks(x: String): String = {
     val idx = x.indexOf('\u0002')
-    val noBreaks = if (idx < 0) {
-      x
-    } else {
-      cleanLinksImpl(new lang.StringBuilder(x), idx)
-    }
+    val noBreaks =
+      if (idx < 0) {
+        x
+      } else {
+        cleanLinksImpl(new lang.StringBuilder(x), idx)
+      }
     emptyLinks.replaceAllIn(noBreaks, "")
   }
 
@@ -82,9 +82,9 @@ object Paragraphs {
       val c = builder.charAt(idx)
       if (inside) {
         c match {
-          case HTML_LINK_END              => inside = false
+          case HTML_LINK_END => inside = false
           case _ if c < 0x20 || c == 0xa0 => builder.setCharAt(idx, ' ')
-          case _                          => // do nothing
+          case _ => // do nothing
         }
 
       } else if (c == HTML_LINK_START) {
@@ -97,14 +97,10 @@ object Paragraphs {
   }
 
   def cleanParagraph(str: String): String = {
-    StringUtils
-      .split(cleanInsideLinks(str), '\n')
-      .map { s =>
-        val collapsedSpaces = spacesRegex.replaceAllIn(s, " ")
-        StringUtils.strip(collapsedSpaces)
-      }
-      .filter(Paragraphs.hasContent)
-      .mkString("\n")
+    StringUtils.split(cleanInsideLinks(str), '\n').map { s =>
+      val collapsedSpaces = spacesRegex.replaceAllIn(s, " ")
+      StringUtils.strip(collapsedSpaces)
+    }.filter(Paragraphs.hasContent).mkString("\n")
   }
 
 }

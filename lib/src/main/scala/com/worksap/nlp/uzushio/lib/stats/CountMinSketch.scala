@@ -58,8 +58,7 @@ class CountMinSketch(
     result
   }
 
-  override def finish(reduction: CountMinSketchState): CountMinSketchState =
-    reduction
+  override def finish(reduction: CountMinSketchState): CountMinSketchState = reduction
 
   override def bufferEncoder: Encoder[CountMinSketchState] = Encoders.product
 

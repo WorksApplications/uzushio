@@ -21,16 +21,12 @@ object CorpusCleaner {
     )
 
     val inputFormat = opt[String](descr = "Input file format (text/parquet).")
-    val inputDelimiter =
-      opt[String](descr = "Delimiter of documents (text)")
-    val inputColumn =
-      opt[String](descr = "Name of the document column (parquet).")
+    val inputDelimiter = opt[String](descr = "Delimiter of documents (text)")
+    val inputColumn = opt[String](descr = "Name of the document column (parquet).")
 
     val outputFormat = opt[String](descr = "Output file format (text/parquet).")
-    val outputDelimiter =
-      opt[String](descr = "Delimiter of documents (text).")
-    val outputColumn =
-      opt[String](descr = "Name of the document column (parquet).")
+    val outputDelimiter = opt[String](descr = "Delimiter of documents (text).")
+    val outputColumn = opt[String](descr = "Name of the document column (parquet).")
     val outputElementDelimiter =
       opt[String](descr = "Delimiter of elements e.g. paragraph, sentence.")
 
@@ -70,15 +66,13 @@ object CorpusCleaner {
     val outputDelimiter: String = cliconf.outputDelimiter.toOption.getOrElse(
       Option(fileconf.getString("output.delimiter")).get
     )
-    val outputElementDelimiter: String =
-      cliconf.outputElementDelimiter.toOption.getOrElse(
-        Option(fileconf.getString("output.elementDelimiter")).get
-      )
+    val outputElementDelimiter: String = cliconf.outputElementDelimiter.toOption.getOrElse(
+      Option(fileconf.getString("output.elementDelimiter")).get
+    )
   }
 
   // todo: check if there is a way to get this list
-  private val providedSettings =
-    Set("chitra", "sudachiDictCorpus", "rmTemplate", "warc")
+  private val providedSettings = Set("chitra", "sudachiDictCorpus", "rmTemplate", "warc")
 
   private def loadConfig(nameOrPath: String): Config = {
     if (providedSettings.contains(nameOrPath)) {
@@ -101,14 +95,10 @@ object CorpusCleaner {
 
     val rawdf = conf.inputFormat match {
       case "parquet" => {
-        spark.read
-          .load(inputPaths: _*)
-          .select(docCol) // TODO: keep other columns
+        spark.read.load(inputPaths: _*).select(docCol) // TODO: keep other columns
       }
       case "text" | "txt" => {
-        spark.read
-          .option("lineSep", conf.inputDelimiter)
-          .text(inputPaths: _*)
+        spark.read.option("lineSep", conf.inputDelimiter).text(inputPaths: _*)
           .withColumnRenamed("value", docCol)
       }
     }
@@ -126,9 +116,7 @@ object CorpusCleaner {
         dfout.toDF(conf.outputColumn).write.save(conf.output.toString)
       }
       case "text" | "txt" => {
-        dfout.write
-          .option("lineSep", conf.outputDelimiter)
-          .text(conf.output.toString)
+        dfout.write.option("lineSep", conf.outputDelimiter).text(conf.output.toString)
       }
     }
   }
@@ -142,7 +130,7 @@ object CorpusCleaner {
     // setup pipeline and apply
     // TODO: keep original non-document column
     val pipeline = Pipeline.fromConfig(conf.fileconf)
-    logger.info(s"pipeline: ${pipeline}")
+    logger.info(s"pipeline: $pipeline")
     val processed = pipeline.transform(data)
 
     // write
@@ -151,8 +139,7 @@ object CorpusCleaner {
 
   def main(args: Array[String]): Unit = {
     val conf = new Conf(new CLIConf(args))
-    val spark =
-      SparkSession.builder().appName(this.getClass.getSimpleName).getOrCreate()
+    val spark = SparkSession.builder().appName(this.getClass.getSimpleName).getOrCreate()
 
     try { run(spark, conf) }
     finally { spark.stop() }

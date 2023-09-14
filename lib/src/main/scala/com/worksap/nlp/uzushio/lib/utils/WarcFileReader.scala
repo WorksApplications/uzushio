@@ -12,8 +12,7 @@ import scala.collection.JavaConverters._
 
 /** Reads [[WarcRecord]]s from a WARC file using Hadoop filesystem APIs. */
 class WarcFileReader(conf: Configuration, filePath: Path) {
-  @transient private lazy val logger =
-    LogManager.getLogger(this.getClass.getSimpleName)
+  @transient private lazy val logger = LogManager.getLogger(this.getClass.getSimpleName)
 
   /** Opens a warc file and setup an iterator of records. */
   private val fs = filePath.getFileSystem(conf)
@@ -72,8 +71,7 @@ class WarcFileReader(conf: Configuration, filePath: Path) {
   }
 
   /** InputStream that records the number of bytes read. */
-  private class CountingInputStream(in: InputStream)
-      extends FilterInputStream(in) {
+  private class CountingInputStream(in: InputStream) extends FilterInputStream(in) {
     override def read(): Int = {
       val result = in.read()
       if (result != -1) bytesRead += 1

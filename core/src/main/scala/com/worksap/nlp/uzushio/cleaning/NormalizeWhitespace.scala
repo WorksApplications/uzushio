@@ -12,6 +12,5 @@ class NormalizeWhitespace extends SentenceNormalizer {
 }
 
 object NormalizeWhitespace extends FromConfig {
-  override def fromConfig(conf: ConfigObject): NormalizeWhitespace =
-    new NormalizeWhitespace
+  override def fromConfig(conf: ConfigObject): NormalizeWhitespace = new NormalizeWhitespace
 }

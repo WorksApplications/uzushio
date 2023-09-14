@@ -4,12 +4,10 @@ import org.apache.hadoop.io.Writable
 
 import java.io.{DataInput, DataOutput, Serializable};
 
-/** A mutable wrapper around a [[WarcRecord]] implementing the Hadoop Writable
-  * and Serializable (for Spark) interfaces.
+/** A mutable wrapper around a [[WarcRecord]] implementing the Hadoop Writable and Serializable (for
+  * Spark) interfaces.
   */
-class WarcWritable(private var record: WarcRecord = null)
-    extends Writable
-    with Serializable {
+class WarcWritable(private var record: WarcRecord = null) extends Writable with Serializable {
 
   /** Returns the record currently wrapped by this writable. */
   def getRecord: WarcRecord = record
@@ -25,8 +23,7 @@ class WarcWritable(private var record: WarcRecord = null)
     // if (record != null) record.write(out);
   }
 
-  /** Parses a [[WarcRecord]] out of a [[DataInput]] stream, and make it the
-    * current record.
+  /** Parses a [[WarcRecord]] out of a [[DataInput]] stream, and make it the current record.
     */
   override def readFields(in: DataInput): Unit = {
     // TODO: impl (not neccessary for current use case)

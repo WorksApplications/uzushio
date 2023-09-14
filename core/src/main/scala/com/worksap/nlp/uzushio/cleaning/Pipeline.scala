@@ -11,8 +11,7 @@ import java.nio.channels.Pipe
   * @param stages
   *   list of transformers to apply
   */
-class Pipeline(private var stages: Seq[Transformer] = Seq())
-    extends Transformer {
+class Pipeline(private var stages: Seq[Transformer] = Seq()) extends Transformer {
 
   def setStages(value: Seq[Transformer]): Pipeline = {
     stages = value
@@ -23,13 +22,14 @@ class Pipeline(private var stages: Seq[Transformer] = Seq())
     stages.foldLeft(ds)((ds, tr) => tr.transform(ds))
   }
 
-  override def toString(): String = { s"Pipeline(${stages})" }
+  override def toString(): String = {
+    s"Pipeline($stages)"
+  }
 }
 
 object Pipeline {
   def fromConfig(conf: Config): Pipeline = {
-    val stageConfs =
-      conf.getObjectList("stages").asScala.map(_.asInstanceOf[ConfigObject])
+    val stageConfs = conf.getObjectList("stages").asScala.map(_.asInstanceOf[ConfigObject])
     val stages = getStagesFromCompanion(stageConfs)
     new Pipeline(stages)
   }
@@ -46,9 +46,7 @@ object Pipeline {
   private def getStagesFromCompanion(confObjs: Seq[ConfigObject]) = {
     confObjs.map(co => {
       val name = co.get("class").unwrapped.asInstanceOf[String]
-      getCompanionOf(name)
-        .asInstanceOf[FromConfig]
-        .fromConfig(co)
+      getCompanionOf(name).asInstanceOf[FromConfig].fromConfig(co)
     })
   }
 
@@ -61,10 +59,7 @@ object Pipeline {
   /** Get a companion object of a class from the given name. */
   private def getCompanionOf(name: String) = {
     val clz = Class.forName(withClassPrefix(name))
-    clz.getClassLoader
-      .loadClass(clz.getName + "$")
-      .getField("MODULE$")
-      .get(null)
+    clz.getClassLoader.loadClass(clz.getName + "$").getField("MODULE$").get(null)
   }
 
   private val classname = this.getClass.getName()
@@ -72,12 +67,13 @@ object Pipeline {
 
   /** Append class name prefix if not exists.
     *
-    * Note: This assume each transformer classes belong to the same package to
-    * this class.
+    * Note: This assume each transformer classes belong to the same package to this class.
     */
   private def withClassPrefix(name: String): String = {
     if (name.startsWith(classPrefix)) { name }
-    else { s"${classPrefix}.${name}" }
+    else {
+      s"$classPrefix.$name"
+    }
   }
 
 }

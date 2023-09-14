@@ -8,8 +8,7 @@ import scala.io.Source
 /** Removes given substrings from documents.
   *
   * @param matchSentence
-  *   If true, match string with only full sentence, i.e. substr have to
-  *   start/end at newline.
+  *   If true, match string with only full sentence, i.e. substr have to start/end at newline.
   */
 class RemoveSubstring(
     substrs: Set[String],
@@ -17,7 +16,9 @@ class RemoveSubstring(
 ) extends DocumentNormalizer {
   val substrPattern = matchSentence match {
     case false => { s"""(${substrs.mkString("|")})""".r }
-    case true  => { s"""(?m)(^${substrs.mkString("$|^")}$$)""".r }
+    case true => {
+      s"""(?m)(^${substrs.mkString("$|^")}$$)""".r
+    }
   }
 
   override def normalizeDocument(doc: Seq[String]): Seq[String] = {
@@ -26,8 +27,7 @@ class RemoveSubstring(
     removed.split("\n").filter(_.length > 0).toSeq
   }
 
-  override def toString(): String =
-    s"${this.getClass.getSimpleName}(#substr=${substrs.size})"
+  override def toString(): String = s"${this.getClass.getSimpleName}(#substr=${substrs.size})"
 }
 
 object RemoveSubstring extends FromConfig {
@@ -40,8 +40,7 @@ object RemoveSubstring extends FromConfig {
       delim: String = defaultDelim,
       matchSentence: Boolean = defaultMatchSentence
   ): RemoveSubstring = {
-    val fullstr =
-      new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8)
+    val fullstr = new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8)
     new RemoveSubstring(
       fullstr.split(delim).map(_.trim).filter(_.nonEmpty).toSet,
       matchSentence
@@ -51,8 +50,7 @@ object RemoveSubstring extends FromConfig {
   override def fromConfig(conf: ConfigObject): RemoveSubstring = {
     val pathStr = conf.getOrElseAs[String]("path", defaultPath)
     val delim = conf.getOrElseAs[String]("delim", defaultDelim)
-    val matchSentence =
-      conf.getOrElseAs[Boolean]("matchSentence", defaultMatchSentence)
+    val matchSentence = conf.getOrElseAs[Boolean]("matchSentence", defaultMatchSentence)
 
     val filepath = Paths.get(pathStr)
     if (filepath.toFile.exists) {

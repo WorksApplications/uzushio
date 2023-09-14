@@ -10,10 +10,8 @@ object WarcLoader {
       spark: SparkContext,
       name: String
   ): RDD[WarcRecord] = {
-    spark
-      .newAPIHadoopFile[LongWritable, WarcWritable, WarcInputFormat](
-        name
-      )
-      .map { case (_, v) => v.getRecord }
+    spark.newAPIHadoopFile[LongWritable, WarcWritable, WarcInputFormat](
+      name
+    ).map { case (_, v) => v.getRecord }
   }
 }

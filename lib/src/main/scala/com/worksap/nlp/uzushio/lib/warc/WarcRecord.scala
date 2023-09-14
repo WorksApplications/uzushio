@@ -27,25 +27,17 @@ class WarcRecord(record: ArchiveRecord, val path: Path) extends Serializable {
     "response" == warcType
   }
 
-  def isTruncated: Boolean = {
-    headers.get(RECORD_TRUNCATED) match {
-      case null            => false
-      case s: CharSequence => s.length() > 0
-      case _               => true
-    }
+  def isTruncated: Boolean = headers.get(RECORD_TRUNCATED) match {
+    case null => false
+    case s: CharSequence => s.length() > 0
+    case _ => true
   }
 
-  def url: String = {
-    headers.getOrDefault(RECORD_URL, "").toString
-  }
+  def url: String = headers.getOrDefault(RECORD_URL, "").toString
 
-  def accessDate: String = {
-    headers.get(RECORD_ACCESS_DATE).toString
-  }
+  def accessDate: String = headers.get(RECORD_ACCESS_DATE).toString
 
-  def docId: String = {
-    headers.get(RECORD_ID).toString
-  }
+  def docId: String = headers.get(RECORD_ID).toString
 }
 
 object WarcRecord {

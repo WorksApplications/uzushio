@@ -16,6 +16,5 @@ class RemoveScriptDocument extends DocumentFilter {
 }
 
 object RemoveScriptDocument extends FromConfig {
-  override def fromConfig(conf: ConfigObject): RemoveScriptDocument =
-    new RemoveScriptDocument
+  override def fromConfig(conf: ConfigObject): RemoveScriptDocument = new RemoveScriptDocument
 }

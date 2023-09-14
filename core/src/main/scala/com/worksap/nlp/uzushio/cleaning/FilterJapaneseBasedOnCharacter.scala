@@ -17,8 +17,7 @@ class FilterJapaneseBasedOnCharacter(
 ) extends SentenceFilter
     with FieldSettable[FilterJapaneseBasedOnCharacter] {
   val kanaPattern = """\p{InHiragana}|\p{InKatakana}""".r
-  val jpCharPattern =
-    """\p{InHiragana}|\p{InKatakana}|\p{InCJKUnifiedIdeographs}""".r
+  val jpCharPattern = """\p{InHiragana}|\p{InKatakana}|\p{InCJKUnifiedIdeographs}""".r
 
   override def isFiltered(sent: String): Boolean = {
     val kanaCount = kanaPattern.findAllIn(sent).length.toDouble
@@ -28,8 +27,7 @@ class FilterJapaneseBasedOnCharacter(
     (kanaCount / charCount) > kanaRate && (jpCount / charCount) > jpRate
   }
 
-  override def toString(): String =
-    s"${this.getClass.getSimpleName}(${kanaRate}, ${jpRate})"
+  override def toString(): String = s"${this.getClass.getSimpleName}($kanaRate, $jpRate)"
 }
 
 object FilterJapaneseBasedOnCharacter extends FromConfig {

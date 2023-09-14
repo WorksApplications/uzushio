@@ -9,7 +9,7 @@ object Sudachi {
     mode.capitalize match {
       case "A" => Tokenizer.SplitMode.A
       case "B" => Tokenizer.SplitMode.B
-      case _   => Tokenizer.SplitMode.C
+      case _ => Tokenizer.SplitMode.C
     }
   }
 

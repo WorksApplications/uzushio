@@ -19,11 +19,9 @@ trait FromConfig {
 
   /** Wrapper class for easy config value access. */
   implicit class ConfigObjectWrapper(val conf: ConfigObject) {
-    def getAs[T](key: String): Option[T] =
-      Option(conf.get(key)).map(_.unwrapped.asInstanceOf[T])
+    def getAs[T](key: String): Option[T] = Option(conf.get(key)).map(_.unwrapped.asInstanceOf[T])
 
-    def getOrElseAs[T](key: String, default: T): T =
-      conf.getAs[T](key).getOrElse(default)
+    def getOrElseAs[T](key: String, default: T): T = conf.getAs[T](key).getOrElse(default)
   }
 }
 

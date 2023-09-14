@@ -16,7 +16,7 @@ class RemoveShortDocument(min: Int = 5)
     min <= doc.map(_.split("\n").length).reduce(_ + _)
   }
 
-  override def toString(): String = s"${this.getClass.getSimpleName}(${min})"
+  override def toString(): String = s"${this.getClass.getSimpleName}($min)"
 }
 
 object RemoveShortDocument extends FromConfig {

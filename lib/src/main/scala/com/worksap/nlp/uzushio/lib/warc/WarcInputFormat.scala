@@ -4,12 +4,7 @@ import com.worksap.nlp.uzushio.lib.utils.WarcFileReader
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.LongWritable
 import org.apache.hadoop.mapreduce.lib.input.{FileInputFormat, FileSplit}
-import org.apache.hadoop.mapreduce.{
-  InputSplit,
-  JobContext,
-  RecordReader,
-  TaskAttemptContext
-}
+import org.apache.hadoop.mapreduce.{InputSplit, JobContext, RecordReader, TaskAttemptContext}
 
 /** Hadoop InputFormat for WARC files.
   *
@@ -17,8 +12,7 @@ import org.apache.hadoop.mapreduce.{
   */
 class WarcInputFormat extends FileInputFormat[LongWritable, WarcWritable] {
 
-  /** Opens a WARC file (possibly compressed), and returns a RecordReader for
-    * accessing it.
+  /** Opens a WARC file (possibly compressed), and returns a RecordReader for accessing it.
     */
   override def createRecordReader(
       split: InputSplit,

@@ -4,13 +4,12 @@ import com.typesafe.config.ConfigObject
 
 /** Removes non-printable characters.
   *
-  * Following python's str.isprintable, remove unicode general-category "Other"
-  * or "Separator" except space. We also keep surrogate code points (that are
-  * not in python).
+  * Following python's str.isprintable, remove unicode general-category "Other" or "Separator"
+  * except space. We also keep surrogate code points (that are not in python).
   *
   * @param keepWS
-  *   If true, keep whitespaces other than space (" "), including \u3000. This
-  *   is not python compatible behaviour.
+  *   If true, keep whitespaces other than space (" "), including \u3000. This is not python
+  *   compatible behaviour.
   */
 class NormalizeCharacter(keepWS: Boolean = NormalizeCharacter.defaultKeepWS)
     extends SentenceNormalizer {
@@ -22,8 +21,7 @@ class NormalizeCharacter(keepWS: Boolean = NormalizeCharacter.defaultKeepWS)
     nonPrintablePattern.replaceAllIn(sent, "")
   }
 
-  override def toString(): String =
-    s"${this.getClass.getSimpleName}(keepWS=${keepWS})"
+  override def toString(): String = s"${this.getClass.getSimpleName}(keepWS=$keepWS)"
 }
 
 object NormalizeCharacter extends FromConfig {
