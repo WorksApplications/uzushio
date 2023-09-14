@@ -1,7 +1,7 @@
 package com.worksap.nlp.uzushio.lib.cleaning
 
 import com.typesafe.config.ConfigFactory
-import com.worksap.nlp.uzushio.lib.filters.Words
+import com.worksap.nlp.uzushio.lib.filters.WordInstances
 import org.scalatest.freespec.AnyFreeSpec
 
 class PipelineSpec extends AnyFreeSpec {
@@ -12,7 +12,7 @@ class PipelineSpec extends AnyFreeSpec {
       )
       val filter = Pipeline.instantiateFilter(cfg)
       assert(filter != null)
-      assert(filter.isInstanceOf[Words])
+      assert(filter.isInstanceOf[WordInstances])
     }
 
     "can instantiate class with default value" in {
@@ -21,7 +21,7 @@ class PipelineSpec extends AnyFreeSpec {
       )
       val filter = Pipeline.instantiateFilter(cfg)
       assert(filter != null)
-      assert(filter.isInstanceOf[Words])
+      assert(filter.isInstanceOf[WordInstances])
     }
 
     "can instantiate pipeline from classpath" - {
