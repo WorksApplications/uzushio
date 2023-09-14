@@ -12,6 +12,5 @@ class RemoveEmail extends SentenceFilter {
 }
 
 object RemoveEmail extends FromConfig {
-  override def fromConfig(conf: ConfigObject): RemoveEmail =
-    new RemoveEmail
+  override def fromConfig(conf: ConfigObject): RemoveEmail = new RemoveEmail
 }

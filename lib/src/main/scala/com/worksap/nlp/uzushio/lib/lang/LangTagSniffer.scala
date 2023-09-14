@@ -1,9 +1,6 @@
 package com.worksap.nlp.uzushio.lib.lang
 
-import com.worksap.nlp.uzushio.lib.lang.LangTagSniffer.{
-  extractCharset,
-  metaRegex
-}
+import com.worksap.nlp.uzushio.lib.lang.LangTagSniffer.{extractCharset, metaRegex}
 
 import java.nio.charset.{CodingErrorAction, StandardCharsets}
 import java.nio.{ByteBuffer, CharBuffer}
@@ -11,8 +8,8 @@ import java.util.regex.Pattern
 
 case class LangTagSniff(charset: String, language: String)
 
-/** Try to sniff language and encoding by decoding first 10k bytes as ASCII and
-  * using regexes to find `<meta>` tags.
+/** Try to sniff language and encoding by decoding first 10k bytes as ASCII and using regexes to
+  * find `<meta>` tags.
   */
 class LangTagSniffer() {
   private val decoder = {
@@ -59,8 +56,7 @@ class LangTagSniffer() {
 
 object LangTagSniffer {
   private val metaRegex = "<meta[^>]*>".r
-  private val charsetRegex =
-    Pattern.compile("charset=([^\"' >]+)", Pattern.CASE_INSENSITIVE)
+  private val charsetRegex = Pattern.compile("charset=([^\"' >]+)", Pattern.CASE_INSENSITIVE)
 
   def extractCharset(tag: String): String = {
     val matcher = charsetRegex.matcher(tag)

@@ -11,16 +11,13 @@ import java.nio.file.{Files, Path, Paths}
 import scala.jdk.CollectionConverters.iterableAsScalaIterableConverter
 
 /** @param path
-  *   html path of the paragraph, separated by >, with . for classes and # for
-  *   ids
+  *   html path of the paragraph, separated by >, with . for classes and # for ids
   * @param text
-  *   text content of the paragraph with link content possibly inside STX/ETX
-  *   character pairs
+  *   text content of the paragraph with link content possibly inside STX/ETX character pairs
   * @param index
   *   index of the paragraph in the document, starting from 0
   * @param exactFreq
-  *   number of occurrences of the paragraph with the same hash value in the
-  *   corpus
+  *   number of occurrences of the paragraph with the same hash value in the corpus
   * @param nearFreq
   *   number of occurrences of the near-duplicate paragraphs
   * @param remove
@@ -52,8 +49,7 @@ case class Document(
     if (toRemove) copy(remove = remover) else this
   }
 
-  def aliveParagraphs: Iterator[Paragraph] =
-    paragraphs.iterator.filter(_.remove ne null)
+  def aliveParagraphs: Iterator[Paragraph] = paragraphs.iterator.filter(_.remove ne null)
 
   def render(): String = {
     val bldr = new java.lang.StringBuilder()
@@ -82,8 +78,8 @@ object Document {
 }
 
 class PerParagraphFilter(val filter: ParagraphFilter) extends DocFilter {
-  override def checkDocument(doc: Document): Document =
-    doc.copy(paragraphs = doc.paragraphs.map(filter.checkParagraph))
+  override def checkDocument(doc: Document): Document = doc
+    .copy(paragraphs = doc.paragraphs.map(filter.checkParagraph))
 }
 
 final class Pipeline(filers: Array[DocFilter]) extends Serializable {
@@ -126,8 +122,7 @@ object Pipeline {
         val defMethod = clz.getMethod(defFnName) // should be static
         return defMethod.invoke(null)
       } catch {
-        case _: NoSuchMethodException =>
-          throw new IllegalArgumentException(
+        case _: NoSuchMethodException => throw new IllegalArgumentException(
             s"could not instantiate $clz, ${par.getName} did not configured or have default value"
           )
       }
@@ -164,9 +159,9 @@ object Pipeline {
     }
 
     ctor.newInstance(args: _*) match {
-      case f: DocFilter       => f
+      case f: DocFilter => f
       case f: ParagraphFilter => new PerParagraphFilter(f)
-      case _                  => throw new Exception("")
+      case _ => throw new Exception("")
     }
   }
 

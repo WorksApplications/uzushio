@@ -2,14 +2,14 @@ package com.worksap.nlp.uzushio
 
 import java.nio.file.{Path, Paths, Files}
 import org.rogach.scallop.ScallopConf
-import org.apache.log4j.{LogManager}
+import org.apache.log4j.LogManager
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.{SparkSession, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.linalg.{Vector, Vectors}
-import org.apache.spark.ml.feature.{NGram}
+import org.apache.spark.ml.feature.NGram
 import org.apache.spark.graphx.{Graph, Edge}
 
 object MinHashDeduplicator {
@@ -19,18 +19,16 @@ object MinHashDeduplicator {
 
     val mode = opt[String](
       default = Some("C"),
-      validate = (m => m.length == 1 && "aAbBcC".contains(m))
+      validate = m => m.length == 1 && "aAbBcC".contains(m)
     )
     val ngram = opt[Int](default = Some(5), validate = (_ > 0))
     val minhashB = opt[Int](default = Some(15), validate = (_ > 0))
     val minhashR = opt[Int](default = Some(150), validate = (_ > 0))
 
-    val jaccardThr =
-      opt[Double](default = Some(0.8), validate = { v => (0 <= v) && (v <= 1) })
+    val jaccardThr = opt[Double](default = Some(0.8), validate = { v => (0 <= v) && (v <= 1) })
 
     val skipEditsim = opt[Boolean]()
-    val editsimThr =
-      opt[Double](default = Some(0.8), validate = { v => (0 <= v) && (v <= 1) })
+    val editsimThr = opt[Double](default = Some(0.8), validate = { v => (0 <= v) && (v <= 1) })
 
     verify()
   }
@@ -53,8 +51,7 @@ object MinHashDeduplicator {
 
     val docPath = outRoot.resolve("doc").toString
     if (!Files.exists(Paths.get(docPath))) {
-      val documents =
-        DocumentIO.addIndex(DocumentIO.loadRawDocuments(spark, conf.input()))
+      val documents = DocumentIO.addIndex(DocumentIO.loadRawDocuments(spark, conf.input()))
 
       logger.info("save indexed documents")
       documents.write.save(docPath)
@@ -64,27 +61,17 @@ object MinHashDeduplicator {
     /* preprocess documents into a set of n-gram hashes */
     val prepPath = outRoot.resolve("prep").toString
     if (!Files.exists(Paths.get(prepPath))) {
-      val pipeline = new Pipeline()
-        .setStages(
-          Array(
-            new SudachiTokenizer()
-              .setInputCol(docCol)
-              .setOutputCol(tokCol)
-              .setSplitMode(conf.mode()),
-            new NGram()
-              .setInputCol(tokCol)
-              .setOutputCol(ngramCol)
-              .setN(conf.ngram()),
-            new TokenHasher().setInputCol(ngramCol).setOutputCol(featureCol)
-          )
+      val pipeline = new Pipeline().setStages(
+        Array(
+          new SudachiTokenizer().setInputCol(docCol).setOutputCol(tokCol).setSplitMode(conf.mode()),
+          new NGram().setInputCol(tokCol).setOutputCol(ngramCol).setN(conf.ngram()),
+          new TokenHasher().setInputCol(ngramCol).setOutputCol(featureCol)
         )
+      )
         // those transformers does not require actual data to fit
         .fit(documents.limit(1))
 
-      val preprocessed = pipeline
-        .transform(documents)
-        .select(didCol, tokCol, featureCol)
-        .cache()
+      val preprocessed = pipeline.transform(documents).select(didCol, tokCol, featureCol).cache()
 
       logger.info("save preprocessed data")
       preprocessed.write.save(prepPath)
@@ -99,35 +86,24 @@ object MinHashDeduplicator {
      *
      * we omit token and hash column during this due to the space limitation.
      */
-    val candPath = outRoot.resolve(s"${minhashCol}").toString
+    val candPath = outRoot.resolve(s"$minhashCol").toString
     if (!Files.exists(Paths.get(candPath))) {
       val b = conf.minhashB()
       val r = conf.minhashR()
-      val minhashModel = new MinHash()
-        .setInputCol(featureCol)
-        .setOutputCol(minhashCol)
-        .setB(b)
-        .setR(r)
-        .fit(preprocessed.limit(1))
+      val minhashModel = new MinHash().setInputCol(featureCol).setOutputCol(minhashCol).setB(b)
+        .setR(r).fit(preprocessed.limit(1))
 
       val matchRdds = Range(0, r).map(i => {
-        minhashModel
-          .transformBucket(i, preprocessed.select(didCol, featureCol))
-          .select(didCol, minhashCol)
-          .groupByKey(row => { row.getAs[Seq[Long]](minhashCol) })
-          .flatMapGroups((k, iter) => {
-            iter.toSeq
-              .sortBy(r => r.getAs[Long](didCol))
+        minhashModel.transformBucket(i, preprocessed.select(didCol, featureCol))
+          .select(didCol, minhashCol).groupByKey(row => {
+            row.getAs[Seq[Long]](minhashCol)
+          }).flatMapGroups((k, iter) => {
+            iter.toSeq.sortBy(r => r.getAs[Long](didCol))
               .combinations(2) // combinations keeps order if items are unique
-              .map(arr =>
-                Tuple2(arr(0).getAs[Long](didCol), arr(1).getAs[Long](didCol))
-              )
-          })
-          .rdd
+              .map(arr => Tuple2(arr(0).getAs[Long](didCol), arr(1).getAs[Long](didCol)))
+          }).rdd
       })
-      val candidates = spark.sparkContext
-        .union(matchRdds)
-        .toDF(s"${didCol}1", s"${didCol}2")
+      val candidates = spark.sparkContext.union(matchRdds).toDF(s"${didCol}1", s"${didCol}2")
         .dropDuplicates(s"${didCol}1", s"${didCol}2")
 
       /* save and load to balance partition size */
@@ -139,29 +115,21 @@ object MinHashDeduplicator {
     val jaccardPath = outRoot.resolve(jaccardCol).toString
     if (!Files.exists(Paths.get(jaccardPath))) {
       val candidates = spark.read.load(candPath)
-      val candWithFeature = candidates
-        .join(
-          preprocessed.select(didCol, featureCol),
-          candidates.col(s"${didCol}1").equalTo(preprocessed.col(didCol))
-        )
-        .drop(didCol)
-        .withColumnRenamed(featureCol, s"${featureCol}1")
-        .join(
-          preprocessed.select(didCol, featureCol),
-          candidates.col(s"${didCol}2").equalTo(preprocessed.col(didCol))
-        )
-        .drop(didCol)
-        .withColumnRenamed(featureCol, s"${featureCol}2")
+      val candWithFeature = candidates.join(
+        preprocessed.select(didCol, featureCol),
+        candidates.col(s"${didCol}1").equalTo(preprocessed.col(didCol))
+      ).drop(didCol).withColumnRenamed(featureCol, s"${featureCol}1").join(
+        preprocessed.select(didCol, featureCol),
+        candidates.col(s"${didCol}2").equalTo(preprocessed.col(didCol))
+      ).drop(didCol).withColumnRenamed(featureCol, s"${featureCol}2")
 
       val clcJaccardIndex = udf { (seq1: Seq[Long], seq2: Seq[Long]) =>
         jaccardIndex(seq1, seq2)
       }
-      val jaccard = candWithFeature
-        .withColumn(
-          jaccardCol,
-          clcJaccardIndex(col(s"${featureCol}1"), col(s"${featureCol}2"))
-        )
-        .select(s"${didCol}1", s"${didCol}2", jaccardCol)
+      val jaccard = candWithFeature.withColumn(
+        jaccardCol,
+        clcJaccardIndex(col(s"${featureCol}1"), col(s"${featureCol}2"))
+      ).select(s"${didCol}1", s"${didCol}2", jaccardCol)
 
       logger.info("save jaccard index")
       jaccard.write.save(jaccardPath)
@@ -171,37 +139,25 @@ object MinHashDeduplicator {
     val editSimPath = outRoot.resolve(editSimCol).toString
     if (!conf.skipEditsim() && !Files.exists(Paths.get(editSimPath))) {
       /* save and load to balance partition size */
-      val tmpPath = outRoot.resolve(s"tmp_${editSimCol}").toString
-      spark.read
-        .load(jaccardPath)
-        .filter(col(jaccardCol) >= conf.jaccardThr())
-        .write
-        .save(tmpPath)
+      val tmpPath = outRoot.resolve(s"tmp_$editSimCol").toString
+      spark.read.load(jaccardPath).filter(col(jaccardCol) >= conf.jaccardThr()).write.save(tmpPath)
       val candidates = spark.read.load(tmpPath)
 
-      val candWithFeature = candidates
-        .join(
-          preprocessed.select(didCol, tokCol),
-          candidates.col(s"${didCol}1").equalTo(preprocessed.col(didCol))
-        )
-        .drop(didCol)
-        .withColumnRenamed(tokCol, s"${tokCol}1")
-        .join(
-          preprocessed.select(didCol, tokCol),
-          candidates.col(s"${didCol}2").equalTo(preprocessed.col(didCol))
-        )
-        .drop(didCol)
-        .withColumnRenamed(tokCol, s"${tokCol}2")
+      val candWithFeature = candidates.join(
+        preprocessed.select(didCol, tokCol),
+        candidates.col(s"${didCol}1").equalTo(preprocessed.col(didCol))
+      ).drop(didCol).withColumnRenamed(tokCol, s"${tokCol}1").join(
+        preprocessed.select(didCol, tokCol),
+        candidates.col(s"${didCol}2").equalTo(preprocessed.col(didCol))
+      ).drop(didCol).withColumnRenamed(tokCol, s"${tokCol}2")
 
       val clcEditSim = udf { (seq1: Seq[String], seq2: Seq[String]) =>
         editSimilarity(seq1, seq2)
       }
-      val editSim = candWithFeature
-        .withColumn(
-          editSimCol,
-          clcEditSim(col(s"${tokCol}1"), col(s"${tokCol}2"))
-        )
-        .select(s"${didCol}1", s"${didCol}2", editSimCol)
+      val editSim = candWithFeature.withColumn(
+        editSimCol,
+        clcEditSim(col(s"${tokCol}1"), col(s"${tokCol}2"))
+      ).select(s"${didCol}1", s"${didCol}2", editSimCol)
 
       logger.info("save edit similarity")
       editSim.write.save(editSimPath)
@@ -213,23 +169,16 @@ object MinHashDeduplicator {
     val ccPath = outRoot.resolve(ccCol).toString
     if (!Files.exists(Paths.get(ccPath))) {
       val (matchPath, thrCol, thrVal) =
-        if (conf.skipEditsim())
-          (jaccardPath, jaccardCol, conf.jaccardThr())
-        else
-          (editSimPath, editSimCol, conf.editsimThr())
+        if (conf.skipEditsim()) (jaccardPath, jaccardCol, conf.jaccardThr())
+        else (editSimPath, editSimCol, conf.editsimThr())
 
       /* save and load to balance partition size */
-      val tmpPath = outRoot.resolve(s"tmp_${ccCol}").toString
-      spark.read
-        .load(matchPath)
-        .filter(col(thrCol) >= thrVal)
-        .write
-        .save(tmpPath)
+      val tmpPath = outRoot.resolve(s"tmp_$ccCol").toString
+      spark.read.load(matchPath).filter(col(thrCol) >= thrVal).write.save(tmpPath)
       val matches = spark.read.load(tmpPath)
 
-      val edgeRdd = matches.rdd.map(row =>
-        Edge(row.getAs[Long](s"${didCol}1"), row.getAs[Long](s"${didCol}2"), "")
-      )
+      val edgeRdd = matches.rdd
+        .map(row => Edge(row.getAs[Long](s"${didCol}1"), row.getAs[Long](s"${didCol}2"), ""))
       val graph = Graph.fromEdges(edgeRdd, "")
       val cc = graph.connectedComponents().vertices.toDF(didCol, ccCol)
 
@@ -241,10 +190,8 @@ object MinHashDeduplicator {
     /* rm duplicated documents */
     logger.info("save result")
     val docsWithCC = documents.join(cc, Seq(didCol), "left")
-    val dupDocs =
-      docsWithCC.filter((!isnull(col(ccCol))) && (col(ccCol) !== col(didCol)))
-    val dedupDocs =
-      docsWithCC.filter((isnull(col(ccCol))) || (col(ccCol) === col(didCol)))
+    val dupDocs = docsWithCC.filter((!isnull(col(ccCol))) && (col(ccCol) !== col(didCol)))
+    val dedupDocs = docsWithCC.filter((isnull(col(ccCol))) || (col(ccCol) === col(didCol)))
 
     DocumentIO.saveRawDocuments(dedupDocs, outRoot.resolve("dedup"))
     DocumentIO.saveRawDocuments(dupDocs, outRoot.resolve("dup"))
@@ -297,8 +244,7 @@ object MinHashDeduplicator {
 
   def main(args: Array[String]): Unit = {
     val conf = new Conf(args)
-    val spark =
-      SparkSession.builder().appName("MinHashDeduplicator").getOrCreate()
+    val spark = SparkSession.builder().appName("MinHashDeduplicator").getOrCreate()
 
     try { run(spark, conf) }
     finally { spark.stop() }

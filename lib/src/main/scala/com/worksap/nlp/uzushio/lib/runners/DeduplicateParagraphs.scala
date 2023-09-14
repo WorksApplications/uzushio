@@ -2,11 +2,7 @@ package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph, Pipeline}
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
-import com.worksap.nlp.uzushio.lib.stats.{
-  NgramBitSignatures,
-  NgramHashExtractor,
-  SimHashProcessor
-}
+import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
@@ -57,19 +53,17 @@ final case class DuplicateCandidateRow(
   def registerInsteadOf(other: DuplicateCandidateRow): Unit =
     registerInBuffer(other.collection, other.indexInCollection)
 
-  def wasIn(group: RowBuffer[DuplicateCandidateRow]): Boolean =
-    collection eq group
+  def wasIn(group: RowBuffer[DuplicateCandidateRow]): Boolean = collection eq group
 
   // estimate object size
   // this some fields are lazy and can not be instantiated at all, but we compute their sizes
   // based on heuristics
   def sizeInBytes: Int = {
     val textLen = text.length
-    var objectSize =
-      HEADER_SIZE + // header
-        HEADER_SIZE + signature.length + // suppose that arrays also have 12-byte header
-        36 + textLen * 2 + // String fields, header + string content header + content data
-        8 * 8 // fields
+    var objectSize = HEADER_SIZE + // header
+      HEADER_SIZE + signature.length + // suppose that arrays also have 12-byte header
+      36 + textLen * 2 + // String fields, header + string content header + content data
+      8 * 8 // fields
 
     if (textLen >= TEXT_NGRAM_MATCHING_THRESHOLD) {
       objectSize += (HEADER_SIZE + NGRAM_SIG_LEN * 8)
@@ -81,7 +75,8 @@ final case class DuplicateCandidateRow(
         case _ if textLen <= 16 =>
           NgramBitSignatures.UnigramUpTo16Chars.SIG_LEN * 8 // unigrams only
         case _ =>
-          (NgramBitSignatures.UnigramBigramMoreThan16Chars.SIG_LEN1 + NgramBitSignatures.UnigramBigramMoreThan16Chars.SIG_LEN2) * 8
+          (NgramBitSignatures.UnigramBigramMoreThan16Chars.SIG_LEN1 + NgramBitSignatures
+            .UnigramBigramMoreThan16Chars.SIG_LEN2) * 8
       }
     }
 
@@ -141,9 +136,8 @@ final case class DuplicateCandidateRow(
     math.abs(itemLength - myLength) <= MAX_MATCHING_LENGTH
   }
 
-  override def toString: String = {
+  override def toString: String =
     s"[${Hex.encodeHexString(signature)}, $freq, ${hash.toHexString}, ${reprHash.toHexString}, $text]"
-  }
 }
 
 object DuplicateCandidateRow {
@@ -167,10 +161,8 @@ class CandidateRowProcessor(
 ) extends Iterator[RowResult] {
 
   private val queue = new util.ArrayDeque[DuplicateCandidateRow]()
-  private val lengthBuckets =
-    new Int2ObjectOpenHashMap[RowBuffer[DuplicateCandidateRow]]()
-  private val groups =
-    new RowBuffer[RowBuffer[DuplicateCandidateRow]]()
+  private val lengthBuckets = new Int2ObjectOpenHashMap[RowBuffer[DuplicateCandidateRow]]()
+  private val groups = new RowBuffer[RowBuffer[DuplicateCandidateRow]]()
   private var currentBytes = 0
 
   // keep queue size small by not growing it when the prefixes of the signature are distant enough
@@ -371,13 +363,11 @@ class DeduplicateParagraphs(
   import spark.implicits._
 
   private def prepareBasicData(rawData: DataFrame): DataFrame = {
-    val cleanParagraphs =
-      udf((x: String) => Paragraphs.extractCleanParagraphs(x))
+    val cleanParagraphs = udf((x: String) => Paragraphs.extractCleanParagraphs(x))
 
-    val splitDocs = rawData
-      .select(
-        posexplode(cleanParagraphs(rawData.col("text"))).as(Seq("pos", "text"))
-      )
+    val splitDocs = rawData.select(
+      posexplode(cleanParagraphs(rawData.col("text"))).as(Seq("pos", "text"))
+    )
 
     prepareDataset(splitDocs)
   }
@@ -391,8 +381,7 @@ class DeduplicateParagraphs(
   // propagate repr hashes between documents (paragraphs) which are similar
   def propagateReprHashes(ds: DataFrame, shift: Int): DataFrame = {
     val args = this.args // do not capture outer object
-    val shiftSignature =
-      udf((x: Array[Byte]) => MathUtil.rotateBitsRight(x, shift))
+    val shiftSignature = udf((x: Array[Byte]) => MathUtil.rotateBitsRight(x, shift))
 
     ds.withColumn("signature", shiftSignature(ds.col("signature")))
       // need to persist datasets otherwise mapPartitions is called two times :/
@@ -401,16 +390,14 @@ class DeduplicateParagraphs(
       .persist()
       // sort does not allow to specify number of partitions, so use this sequence of operations
       .repartitionByRange(args.propagatePartitions, $"signature".asc)
-      .sortWithinPartitions($"signature".asc)
-      .as[DuplicateCandidateRow]
+      .sortWithinPartitions($"signature".asc).as[DuplicateCandidateRow]
       .mapPartitions(iter => // all logic is in the CandidateRowProcessor class
         new CandidateRowProcessor(
           args.bufferSizeInBytes,
           args.minBitsToMatch,
           iter
         )
-      )
-      .toDF()
+      ).toDF()
   }
 
   def prepareDataset(ds: DataFrame): DataFrame = {
@@ -423,75 +410,56 @@ class DeduplicateParagraphs(
       simHasher.result(x)
     })
 
-    val basicData = ds
-      .groupBy("text")
-      .agg(
-        count("pos").name("freq")
+    val basicData = ds.groupBy("text").agg(
+      count("pos").name("freq")
+    ).withColumns(
+      Map(
+        "signature" -> simHash($"text"),
+        "hash" -> xxhash64($"text")
       )
-      .withColumns(
-        Map(
-          "signature" -> simHash($"text"),
-          "hash" -> xxhash64($"text")
-        )
-      )
-      .withColumn("reprHash", $"hash")
+    ).withColumn("reprHash", $"hash")
 
     basicData
   }
 
   private def saveStats(statistics: DataFrame) = {
     if (args.debug) {
-      statistics
-        .filter($"hash" =!= $"reprHash")
-        .coalesce(args.partitions)
-        .persist()
-        .sort($"reprHash".asc)
-        .write
-        .mode(SaveMode.Overwrite)
-        .json(args.output)
+      statistics.filter($"hash" =!= $"reprHash").coalesce(args.partitions).persist()
+        .sort($"reprHash".asc).write.mode(SaveMode.Overwrite).json(args.output)
     } else {
-      statistics.write
-        .mode(SaveMode.Overwrite)
-        .option("compression", "zstd")
-        .format("parquet")
+      statistics.write.mode(SaveMode.Overwrite).option("compression", "zstd").format("parquet")
         .save(args.output)
     }
   }
 
   private def debugStats(stats: DataFrame, preparedData: DataFrame) = {
     val statsCols = stats.select("hash", "reprHash", "nearFreq", "exactFreq")
-    val dataCols =
-      preparedData.select($"text", $"freq" as "rawFreq", $"hash", $"signature")
+    val dataCols = preparedData.select($"text", $"freq" as "rawFreq", $"hash", $"signature")
 
-    val filtered = if (args.intermediate) {
-      statsCols
-    } else {
-      statsCols.where($"nearFreq" > 1)
-    }
+    val filtered =
+      if (args.intermediate) {
+        statsCols
+      } else {
+        statsCols.where($"nearFreq" > 1)
+      }
 
     val joined = filtered.join(dataCols, "hash")
 
-    joined
-      .repartitionByRange(args.partitions, $"nearFreq".desc, $"reprHash".asc)
+    joined.repartitionByRange(args.partitions, $"nearFreq".desc, $"reprHash".asc)
       .sortWithinPartitions(
         $"nearFreq".desc,
         $"reprHash".asc,
         $"exactFreq".desc,
         $"hash".asc
-      )
-      .withColumns(
+      ).withColumns(
         Map(
           "text" -> regexp_replace($"text", "\n", "\\n"),
           "signature" -> hex($"signature")
         )
-      )
-      .write
-      .mode(SaveMode.Overwrite)
-      .csv(args.output)
+      ).write.mode(SaveMode.Overwrite).csv(args.output)
   }
 
-  private val clampLongToInt =
-    udf((x: Long) => math.min(x, Int.MaxValue).toInt).asNonNullable()
+  private val clampLongToInt = udf((x: Long) => math.min(x, Int.MaxValue).toInt).asNonNullable()
 
   private def computeStats(
       reprHashes: DataFrame,
@@ -499,29 +467,23 @@ class DeduplicateParagraphs(
   ): DataFrame = {
     val cols = reprHashes.select("hash", "reprHash", "freq").persist()
 
-    val totalReprHashes = cols
-      .groupBy("reprHash")
-      .agg(
-        sum("freq").as("nearFreq")
-      )
-      .select(
-        $"reprHash",
-        clampLongToInt($"nearFreq").as("nearFreq")
-      )
+    val totalReprHashes = cols.groupBy("reprHash").agg(
+      sum("freq").as("nearFreq")
+    ).select(
+      $"reprHash",
+      clampLongToInt($"nearFreq").as("nearFreq")
+    )
 
     val filtered =
       if (filterOnes) totalReprHashes.filter($"nearFreq" > 1)
       else totalReprHashes
 
-    cols
-      .join(filtered, "reprHash")
-      .dropDuplicates("hash")
-      .select(
-        $"hash",
-        $"reprHash",
-        clampLongToInt($"freq") as "exactFreq",
-        $"nearFreq"
-      )
+    cols.join(filtered, "reprHash").dropDuplicates("hash").select(
+      $"hash",
+      $"reprHash",
+      clampLongToInt($"freq") as "exactFreq",
+      $"nearFreq"
+    )
   }
 
   private def prepareParagraphsForFiltering(
@@ -530,8 +492,7 @@ class DeduplicateParagraphs(
   ): DataFrame = {
 
     val explodeCols = raw.columns.map {
-      case "text" =>
-        posexplode(split(raw.col("text"), "\n\n")).as(Seq("pos", "text"))
+      case "text" => posexplode(split(raw.col("text"), "\n\n")).as(Seq("pos", "text"))
       case col => raw.col(col)
     }
 
@@ -539,34 +500,28 @@ class DeduplicateParagraphs(
 
     val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
 
-    val cookedDocs = exploded
-      .withColumn("cleanText", cleanParUdf($"text"))
+    val cookedDocs = exploded.withColumn("cleanText", cleanParUdf($"text"))
       .withColumn("parHash", xxhash64($"cleanText"))
 
     val joined = cookedDocs.join(stats, $"parHash" === $"hash", "left")
 
     val basicCols = (if (args.debug) {
                        joined.columns.filter {
-                         case "parHash"                => false
+                         case "parHash" => false
                          case "exactFreq" | "nearFreq" => false
-                         case _                        => true
+                         case _ => true
                        }
                      } else {
                        joined.columns.filter {
-                         case "hash" | "reprHash" | "parHash" | "cleanText" =>
-                           false
+                         case "hash" | "reprHash" | "parHash" | "cleanText" => false
                          case "exactFreq" | "nearFreq" => false
-                         case _                        => true
+                         case _ => true
                        }
                      }).map(joined.col)
 
     val computedCols = Seq( // common newly computed columns
-      when($"exactFreq".isNotNull, $"exactFreq")
-        .otherwise(lit(1))
-        .as("exactFreq"),
-      when($"nearFreq".isNotNull, $"nearFreq")
-        .otherwise(lit(1))
-        .as("nearFreq")
+      when($"exactFreq".isNotNull, $"exactFreq").otherwise(lit(1)).as("exactFreq"),
+      when($"nearFreq".isNotNull, $"nearFreq").otherwise(lit(1)).as("nearFreq")
     )
 
     joined.select(
@@ -582,12 +537,9 @@ class DeduplicateParagraphs(
 
     val allColumns = ds.columns
 
-    val passthroughColumns = allColumns.toSeq
-      .filterNot(_ == "docId")
-      .filterNot(docParts.contains(_))
+    val passthroughColumns = allColumns.toSeq.filterNot(_ == "docId").filterNot(docParts.contains(_))
 
-    val aggQueryBasicColumns = passthroughColumns
-      .map(colName => first(colName).as(colName))
+    val aggQueryBasicColumns = passthroughColumns.map(colName => first(colName).as(colName))
     val aggColumns = docParts.map(x => collect_list(x).as(x))
 
     val aggOpFirst :: aggOpRest = (aggColumns ++ aggQueryBasicColumns).toList
@@ -595,41 +547,37 @@ class DeduplicateParagraphs(
     val aggOpResult = ds.groupBy("docId").agg(aggOpFirst, aggOpRest: _*)
 
     val args = this.args
-    val convertUdf =
-      udf(
-        (
-            text: Array[String],
-            pos: Array[Int],
-            exactFreq: Array[Int],
-            nearFreq: Array[Int]
-        ) => {
-          val sorted =
-            DeduplicateParagraphs.collectDocParts(
-              text,
-              pos,
-              exactFreq,
-              nearFreq
-            )
-          DeduplicateParagraphs.processDocumentParts(args, sorted)
-        }
-      ).asNonNullable()
+    val convertUdf = udf(
+      (
+          text: Array[String],
+          pos: Array[Int],
+          exactFreq: Array[Int],
+          nearFreq: Array[Int]
+      ) => {
+        val sorted = DeduplicateParagraphs.collectDocParts(
+          text,
+          pos,
+          exactFreq,
+          nearFreq
+        )
+        DeduplicateParagraphs.processDocumentParts(args, sorted)
+      }
+    ).asNonNullable()
 
     val transformCols = Seq(
       $"docId",
       convertUdf(docParts.map(aggOpResult.col): _*).as("text")
     ) ++ passthroughColumns.map(aggOpResult.col)
 
-    aggOpResult
-      .select(
-        transformCols: _*
-      )
-      .filter(octet_length($"text") > 0)
+    aggOpResult.select(
+      transformCols: _*
+    ).filter(octet_length($"text") > 0)
   }
 
   private def saveReassembled(ds: DataFrame) = {
     val cols = ds.columns.flatMap {
       case "text" | "date" | "charset" => None
-      case x                           => Some(ds.col(x))
+      case x => Some(ds.col(x))
     }
 
     val parFields = Set(
@@ -643,11 +591,8 @@ class DeduplicateParagraphs(
       "nearFreq"
     )
 
-    ds.select(cols: _*)
-      .repartition(args.partitions, $"docId")
-      .sortWithinPartitions($"docId", $"url", $"pos")
-      .write
-      .mode(SaveMode.Overwrite)
+    ds.select(cols: _*).repartition(args.partitions, $"docId")
+      .sortWithinPartitions($"docId", $"url", $"pos").write.mode(SaveMode.Overwrite)
       .json(args.output)
   }
 
@@ -656,25 +601,27 @@ class DeduplicateParagraphs(
 
     val basicData = prepareBasicData(rawData)
 
-    val reprParagraphs = if (args.hasStage("reprHashes")) {
-      computeReprHashes(basicData)
-    } else {
-      spark.read.parquet(args.cache.get)
-    }
+    val reprParagraphs =
+      if (args.hasStage("reprHashes")) {
+        computeReprHashes(basicData)
+      } else {
+        spark.read.parquet(args.cache.get)
+      }
 
     if (args.hasStage("saveReprHashes")) {
       saveStats(reprParagraphs)
       return
     }
 
-    val stats = if (args.hasStage("stats")) {
-      computeStats(
-        reprParagraphs,
-        filterOnes = args.intermediate && args.hasStage("saveStats")
-      )
-    } else {
-      spark.read.parquet(args.cache.get)
-    }
+    val stats =
+      if (args.hasStage("stats")) {
+        computeStats(
+          reprParagraphs,
+          filterOnes = args.intermediate && args.hasStage("saveStats")
+        )
+      } else {
+        spark.read.parquet(args.cache.get)
+      }
 
     if (args.hasStage("saveStats")) {
       if (args.debug) {
@@ -696,13 +643,8 @@ class DeduplicateParagraphs(
 
     // filtered.queryExecution.debug.toFile("""e:\data\nlp\corpora\cc\dups\CC-MAIN-2013-20\codegen""")
 
-    filtered
-      .coalesce(args.partitions)
-      .write
-      .mode(SaveMode.Overwrite)
-      .format(args.format)
-      .option("compression", args.compression)
-      .save(args.output)
+    filtered.coalesce(args.partitions).write.mode(SaveMode.Overwrite).format(args.format)
+      .option("compression", args.compression).save(args.output)
   }
 }
 
@@ -736,8 +678,8 @@ object DeduplicateParagraphs {
   }
 
   private object ParagraphIndexCompare extends Comparator[Paragraph] {
-    override def compare(o1: Paragraph, o2: Paragraph): Int =
-      java.lang.Integer.compare(o1.index, o2.index)
+    override def compare(o1: Paragraph, o2: Paragraph): Int = java.lang.Integer
+      .compare(o1.index, o2.index)
   }
 
   private def processDocumentParts(
@@ -764,8 +706,7 @@ object DeduplicateParagraphs {
         "how many partitions use to propagate (use ~100MB per partition, e.g. 30 for 3GB dataset)",
       default = Some(64)
     )
-    val execution =
-      opt[String](descr = "stages to execute", default = Some("all"))
+    val execution = opt[String](descr = "stages to execute", default = Some("all"))
     val debug = toggle(default = Some(false))
     val format = opt[String](default = Some("parquet"))
     val compression = opt[String](default = Some("zstd"))
@@ -796,7 +737,7 @@ object DeduplicateParagraphs {
     )
 
     def makeStages(): Set[String] = execution.toOption match {
-      case None    => Set("")
+      case None => Set("")
       case Some(s) => s.split(",").map(_.trim).toSet
     }
 

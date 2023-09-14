@@ -49,10 +49,8 @@ class LangEstimation(private val minBytes: Int = 1024) {
   ): Option[Int] = {
     val decBuf = decodeBuffer
     val buf = internalBuffer
-    val inputData =
-      ByteBuffer.wrap(bytes, offset, (bytes.length - offset).min(20 * 1024))
-    val decoder =
-      charset.newDecoder().onUnmappableCharacter(CodingErrorAction.REPORT)
+    val inputData = ByteBuffer.wrap(bytes, offset, (bytes.length - offset).min(20 * 1024))
+    val decoder = charset.newDecoder().onUnmappableCharacter(CodingErrorAction.REPORT)
     decBuf.clear()
     buf.clear()
 
@@ -70,10 +68,9 @@ class LangEstimation(private val minBytes: Int = 1024) {
     Some(buf.limit())
   }
 
-  /** Estimate language by taking at most 5k characters from first 20kb of text.
-    * This detector ignores all ASCII characters, so languages which use such
-    * scripts are not detectable. Returns [[BadEncoding]] if there exist
-    * non-mappable characters using the passed encoding.
+  /** Estimate language by taking at most 5k characters from first 20kb of text. This detector
+    * ignores all ASCII characters, so languages which use such scripts are not detectable. Returns
+    * [[BadEncoding]] if there exist non-mappable characters using the passed encoding.
     *
     * @param data
     *   text to detect language from
@@ -111,15 +108,10 @@ class LangEstimation(private val minBytes: Int = 1024) {
 object LangEstimation {
 
   private lazy val cachedDetector = {
-    val builtinLangs =
-      com.optimaize.langdetect.profiles.BuiltInLanguages.getLanguages
-    val profileReader =
-      new com.optimaize.langdetect.profiles.LanguageProfileReader
+    val builtinLangs = com.optimaize.langdetect.profiles.BuiltInLanguages.getLanguages
+    val profileReader = new com.optimaize.langdetect.profiles.LanguageProfileReader
     val profiles = profileReader.readBuiltIn(builtinLangs)
-    LanguageDetectorBuilder
-      .create(NgramExtractor.gramLengths(1, 2))
-      .withProfiles(profiles)
-      .build()
+    LanguageDetectorBuilder.create(NgramExtractor.gramLengths(1, 2)).withProfiles(profiles).build()
   }
 
 }

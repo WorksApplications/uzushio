@@ -32,8 +32,7 @@ object ExtractParagraphsFromWARC {
       s"filtering out documents in following languages: ${args.languages.mkString(",")}"
     )
 
-    val warcData =
-      WarcLoader.readWarcFiles(spark.sparkContext, args.input.mkString(","))
+    val warcData = WarcLoader.readWarcFiles(spark.sparkContext, args.input.mkString(","))
     val crawlResponses = warcData.filter(x => x.isResponse && !x.isTruncated)
 
     val inputDocuments = spark.sparkContext.longAccumulator("inputDocs")
@@ -58,11 +57,8 @@ object ExtractParagraphsFromWARC {
     )
 
     val frame = items.coalesce(args.maxPartitions).toDF()
-    frame.write
-      .mode(SaveMode.Overwrite)
-      .partitionBy("language")
-      .option("compression", args.compression)
-      .parquet(args.output)
+    frame.write.mode(SaveMode.Overwrite).partitionBy("language")
+      .option("compression", args.compression).parquet(args.output)
     logger.info(
       s"input docs=${inputDocuments.value}, processed=${convertedDocs.value}"
     )
@@ -70,8 +66,7 @@ object ExtractParagraphsFromWARC {
   }
 }
 
-/** This is entry point for WARC text extraction run as a simple application,
-  * e.g. from IDE
+/** This is entry point for WARC text extraction run as a simple application, e.g. from IDE
   */
 object WarcTextExtractionRaw {
 
@@ -84,28 +79,22 @@ object WarcTextExtractionRaw {
     val compression = opt[String](default = Some("zstd"))
     verify()
 
-    def asArgs(): ExtractParagraphsFromWARC.Args =
-      ExtractParagraphsFromWARC.Args(
-        input = input.apply(),
-        output = output.apply(),
-        languages = language.apply().flatMap(_.split(',')).toSet,
-        maxPartitions = maxPartitions(),
-        compression = compression()
-      )
+    def asArgs(): ExtractParagraphsFromWARC.Args = ExtractParagraphsFromWARC.Args(
+      input = input.apply(),
+      output = output.apply(),
+      languages = language.apply().flatMap(_.split(',')).toSet,
+      maxPartitions = maxPartitions(),
+      compression = compression()
+    )
   }
 
   def main(args: Array[String]): Unit = {
     import com.worksap.nlp.uzushio.lib.utils.Resources._
 
     val cfg = new ConfigParser(args)
-    SparkSession
-      .builder()
-      .master("local[*]")
-      .appName("WarcTextExtractor")
-      .getOrCreate()
-      .use { sc =>
-        ExtractParagraphsFromWARC.run(cfg.asArgs())(sc)
-      }
+    SparkSession.builder().master("local[*]").appName("WarcTextExtractor").getOrCreate().use { sc =>
+      ExtractParagraphsFromWARC.run(cfg.asArgs())(sc)
+    }
 
   }
 }

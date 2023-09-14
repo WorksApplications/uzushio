@@ -4,16 +4,15 @@ import collection.JavaConverters._
 
 import org.apache.spark.sql.{SparkSession, DataFrame, Dataset, Row}
 import org.apache.spark.sql.types._
-import org.apache.spark.ml.{Transformer}
+import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.param.{Param, ParamMap}
 import org.apache.spark.ml.param.shared.{HasInputCol, HasOutputCol}
-import org.apache.spark.ml.util.{Identifiable}
+import org.apache.spark.ml.util.Identifiable
 
 /** Tokenizer based on Sudachi.
   *
-  * The input col should contains document (String consists of "\n" delimited
-  * sentences). SudachiTokenizer runs sudachi for each sentences and returns
-  * concatenated array of surfaces.
+  * The input col should contains document (String consists of "\n" delimited sentences).
+  * SudachiTokenizer runs sudachi for each sentences and returns concatenated array of surfaces.
   */
 class SudachiTokenizer(override val uid: String)
     extends Transformer
@@ -29,13 +28,14 @@ class SudachiTokenizer(override val uid: String)
   def setOutputCol(value: String) = set(outputCol, value)
 
   // sudachi split mode.
-  val splitMode: Param[String] =
-    new Param(
-      this,
-      "splitMode",
-      "sudachi split mode (A/B/C)",
-      (c: String) => { c.length == 1 && "aAbBcC".contains(c) }
-    )
+  val splitMode: Param[String] = new Param(
+    this,
+    "splitMode",
+    "sudachi split mode (A/B/C)",
+    (c: String) => {
+      c.length == 1 && "aAbBcC".contains(c)
+    }
+  )
   def setSplitMode(value: String): this.type = set(splitMode, value)
   def getSplitMode: String = $(splitMode)
 
@@ -62,19 +62,16 @@ class SudachiTokenizer(override val uid: String)
     val outputSchema = transformSchema(dataset.schema)
 
     val mode = Sudachi.parseSplitMode($(splitMode))
-    val tokenized = dataset.toDF.rdd
-      .mapPartitions(iter => {
-        val tok = Sudachi.setupSudachiTokenizer()
+    val tokenized = dataset.toDF.rdd.mapPartitions(iter => {
+      val tok = Sudachi.setupSudachiTokenizer()
 
-        iter.map(row => {
-          val tokens = row
-            .getAs[String]($(inputCol))
-            .split("\n")
-            .flatMap(sent => tok.tokenize(mode, sent).asScala.map(_.surface()))
+      iter.map(row => {
+        val tokens = row.getAs[String]($(inputCol)).split("\n")
+          .flatMap(sent => tok.tokenize(mode, sent).asScala.map(_.surface()))
 
-          Row(row.toSeq :+ tokens: _*)
-        })
+        Row(row.toSeq :+ tokens: _*)
       })
+    })
 
     dataset.sparkSession.createDataFrame(tokenized, outputSchema)
   }

@@ -2,8 +2,8 @@ package com.worksap.nlp.uzushio.cleaning
 
 /** Set class field via setField method.
   *
-  * T must be the type of the class this is implemented with, e.g. `class
-  * MyClass extends FieldSettable[MyClass]`.
+  * T must be the type of the class this is implemented with, e.g. `class MyClass extends
+  * FieldSettable[MyClass]`.
   */
 trait FieldSettable[T] {
   def setFields(map: Map[String, Any]): T = {
@@ -17,7 +17,7 @@ trait FieldSettable[T] {
         field.setAccessible(true)
         field.set(this, value)
       }
-      case None => throw new IllegalArgumentException(s"No field named ${key}")
+      case None => throw new IllegalArgumentException(s"No field named $key")
     }
     this.asInstanceOf[T]
   }

@@ -10,21 +10,17 @@ class ConcatShortSentence(concatThr: Int = 2)
     if (doc.length <= 1) {
       doc
     } else {
-      val shortSentIdx = doc.zipWithIndex
-        .map(z => { if (z._1.length <= concatThr) z._2 else -1 })
-        .filter(_ > 0) // keep first sentence regardless of its length
+      val shortSentIdx = doc.zipWithIndex.map(z => {
+        if (z._1.length <= concatThr) z._2 else -1
+      }).filter(_ > 0) // keep first sentence regardless of its length
 
-      val appended = shortSentIdx.reverse.foldLeft(doc)((d, i) =>
-        d.updated(i - 1, d(i - 1) + d(i))
-      )
+      val appended = shortSentIdx.reverse.foldLeft(doc)((d, i) => d.updated(i - 1, d(i - 1) + d(i)))
 
-      for (i <- 0 until appended.length if (!shortSentIdx.contains(i)))
-        yield appended(i)
+      for (i <- 0 until appended.length if !shortSentIdx.contains(i)) yield appended(i)
     }
   }
 
-  override def toString(): String =
-    s"${this.getClass.getSimpleName}(${concatThr})"
+  override def toString(): String = s"${this.getClass.getSimpleName}($concatThr)"
 }
 
 object ConcatShortSentence extends FromConfig {

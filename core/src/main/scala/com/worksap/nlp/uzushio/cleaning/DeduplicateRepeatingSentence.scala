@@ -21,7 +21,7 @@ class DeduplicateRepeatingSentence(minRep: Int = 2)
     for (i <- indices) yield doc(i)
   }
 
-  override def toString(): String = s"${this.getClass.getSimpleName}(${minRep})"
+  override def toString(): String = s"${this.getClass.getSimpleName}($minRep)"
 }
 
 object DeduplicateRepeatingSentence extends FromConfig {

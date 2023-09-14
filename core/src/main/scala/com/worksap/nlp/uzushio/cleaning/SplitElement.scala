@@ -10,9 +10,7 @@ import org.apache.spark.sql.Dataset
   * @param delim
   *   the delimiter to split each elements.
   */
-class SplitElement(delim: String = "\n")
-    extends Transformer
-    with FieldSettable[SplitElement] {
+class SplitElement(delim: String = "\n") extends Transformer with FieldSettable[SplitElement] {
   override def transform(ds: Dataset[Seq[String]]): Dataset[Seq[String]] = {
     import ds.sparkSession.implicits._
     ds.map(_.flatMap(_.split(delim)))
@@ -30,13 +28,11 @@ object SplitElement extends FromConfig {
 /** Split element into sentences. */
 class SplitIntoSentence extends SplitElement(delim = "\n")
 object SplitIntoSentence extends FromConfig {
-  override def fromConfig(conf: ConfigObject): SplitIntoSentence =
-    new SplitIntoSentence()
+  override def fromConfig(conf: ConfigObject): SplitIntoSentence = new SplitIntoSentence()
 }
 
 /** Split element into paragraphs. */
 class SplitIntoParagraph extends SplitElement(delim = "\n\n")
 object SplitIntoParagraph extends FromConfig {
-  override def fromConfig(conf: ConfigObject): SplitIntoParagraph =
-    new SplitIntoParagraph()
+  override def fromConfig(conf: ConfigObject): SplitIntoParagraph = new SplitIntoParagraph()
 }

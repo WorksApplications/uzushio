@@ -11,11 +11,8 @@ object Repackage {
 
     val repart = data.coalesce(args.maxParitions)
 
-    repart.write
-      .format(args.format)
-      .option("compression", args.compression)
-      .mode(SaveMode.Overwrite)
-      .save(args.output)
+    repart.write.format(args.format).option("compression", args.compression)
+      .mode(SaveMode.Overwrite).save(args.output)
   }
 
   class ArgParser(args: Seq[String]) extends ScallopConf(args) {

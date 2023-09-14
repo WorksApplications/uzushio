@@ -13,9 +13,7 @@ import java.nio.file.{Files, Paths}
 class Words(list: String, minimum: Int = 3) extends DocFilter {
   private val trie = Words.readToTrie(list)
   override def checkDocument(doc: Document): Document = {
-    val total = doc.paragraphs.foldLeft(0) { case (cnt, p) =>
-      cnt + coundWordInstances(p.text)
-    }
+    val total = doc.paragraphs.foldLeft(0) { case (cnt, p) => cnt + coundWordInstances(p.text) }
     doc.removeWhen(total > minimum, this)
   }
 
@@ -60,8 +58,7 @@ object Words {
   }
 
   private def readToTrie(classRes: URL): TrieNode[Boolean] = {
-    val reader =
-      new InputStreamReader(classRes.openStream(), StandardCharsets.UTF_8)
+    val reader = new InputStreamReader(classRes.openStream(), StandardCharsets.UTF_8)
     readToTrie(new BufferedReader(reader).lines())
   }
 

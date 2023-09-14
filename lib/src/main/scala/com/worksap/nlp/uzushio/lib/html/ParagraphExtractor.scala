@@ -1,10 +1,6 @@
 package com.worksap.nlp.uzushio.lib.html
 
-import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{
-  MAX_PATH_SIZE,
-  blockTags,
-  ignoreTags
-}
+import com.worksap.nlp.uzushio.lib.html.ParagraphExtractor.{MAX_PATH_SIZE, blockTags, ignoreTags}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import org.xml.sax.Attributes
 import org.xml.sax.helpers.DefaultHandler
@@ -15,8 +11,8 @@ import scala.collection.mutable.ArrayBuffer
 
 /** Handler to segment text into paragraphs.
   *
-  * The delimiter is used to indicate the start/end of paragraphs. It always
-  * locates the start of a line, but may contain additional text after it.
+  * The delimiter is used to indicate the start/end of paragraphs. It always locates the start of a
+  * line, but may contain additional text after it.
   */
 class ParagraphExtractor(
     val paragraphs: ArrayBuffer[String]
@@ -113,9 +109,7 @@ class ParagraphExtractor(
     writer.clear()
   }
 
-  override def toString: String = {
-    paragraphs.mkString("", "\n", writer.result())
-  }
+  override def toString: String = paragraphs.mkString("", "\n", writer.result())
 }
 
 object ParagraphExtractor {

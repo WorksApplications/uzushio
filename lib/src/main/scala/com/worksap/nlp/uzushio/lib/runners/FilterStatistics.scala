@@ -1,11 +1,7 @@
 package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
-import com.worksap.nlp.uzushio.lib.filters.{
-  CompressionRate,
-  HiraganaRatio,
-  LinkCharRatio
-}
+import com.worksap.nlp.uzushio.lib.filters.{CompressionRate, HiraganaRatio, LinkCharRatio}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -41,20 +37,13 @@ object FilterStatistics {
       }
     }
 
-    val withValues = textOnly
-      .withColumn("value", extractor(textOnly.col("text")))
-      .select(
-        $"value",
-        cleanPars($"text", rand()) as "text"
-      )
+    val withValues = textOnly.withColumn("value", extractor(textOnly.col("text"))).select(
+      $"value",
+      cleanPars($"text", rand()) as "text"
+    )
 
-    withValues
-      .persist()
-      .repartitionByRange(args.partitions(), withValues.col("value"))
-      .sortWithinPartitions("value")
-      .write
-      .option("escape", "\"")
-      .mode(SaveMode.Overwrite)
+    withValues.persist().repartitionByRange(args.partitions(), withValues.col("value"))
+      .sortWithinPartitions("value").write.option("escape", "\"").mode(SaveMode.Overwrite)
       .csv(args.output())
   }
 
@@ -66,13 +55,13 @@ object FilterStatistics {
     fiter match {
       case "compression" =>
         val filter = new CompressionRate(0, 100)
-        udf { (s: String) => filter.compressionRatio(Document.parse(s)) }
+        udf((s: String) => filter.compressionRatio(Document.parse(s)))
       case "hiragana" =>
         val filter = new HiraganaRatio()
-        udf { (s: String) => filter.computeHiraganaRatio(Document.parse(s)) }
+        udf((s: String) => filter.computeHiraganaRatio(Document.parse(s)))
       case "links" =>
         val filter = new LinkCharRatio()
-        udf { (s: String) => filter.calcLinkCharRatio(Document.parse(s)) }
+        udf((s: String) => filter.calcLinkCharRatio(Document.parse(s)))
     }
   }
 

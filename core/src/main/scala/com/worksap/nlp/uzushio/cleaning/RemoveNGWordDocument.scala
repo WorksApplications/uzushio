@@ -59,16 +59,14 @@ class RemoveNGWordDocument(ngwords: Set[String]) extends Transformer {
     }
   }
 
-  override def toString(): String =
-    s"${this.getClass.getSimpleName}(#word=${ngwords.size})"
+  override def toString(): String = s"${this.getClass.getSimpleName}(#word=${ngwords.size})"
 }
 
 object RemoveNGWordDocument extends FromConfig {
   val defaultPath = "ng_words.txt"
 
   def fromFile(ngwordsFile: Path): RemoveNGWordDocument = {
-    val fullstr =
-      new String(Files.readAllBytes(ngwordsFile), StandardCharsets.UTF_8)
+    val fullstr = new String(Files.readAllBytes(ngwordsFile), StandardCharsets.UTF_8)
     new RemoveNGWordDocument(
       fullstr.split("\n").map(_.trim).filter(_.nonEmpty).toSet
     )

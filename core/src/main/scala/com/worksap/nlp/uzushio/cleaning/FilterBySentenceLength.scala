@@ -18,8 +18,7 @@ class FilterBySentenceLength(min: Int = 10, max: Int = 200)
     min <= sent.length && sent.length <= max
   }
 
-  override def toString(): String =
-    s"${this.getClass.getSimpleName}(${min}, ${max})"
+  override def toString(): String = s"${this.getClass.getSimpleName}($min, $max)"
 }
 
 object FilterBySentenceLength extends FromConfig {

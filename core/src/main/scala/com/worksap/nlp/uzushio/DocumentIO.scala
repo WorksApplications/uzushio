@@ -64,11 +64,8 @@ object DocumentIO {
     // Assumes each input file contains multiple documents,
     // and they are separated by `sep` (by default two empty lines).
     val paths = formatPathList(input).map(_.toString)
-    spark.read
-      .option("lineSep", sep)
-      .text(paths: _*)
-      .filter(r => r.getAs[String](0).trim != "")
-      .select(expr(s"value as ${docCol}"))
+    spark.read.option("lineSep", sep).text(paths: _*).filter(r => r.getAs[String](0).trim != "")
+      .select(expr(s"value as $docCol"))
   }
 
   def saveIndexedDocuments(
@@ -79,8 +76,8 @@ object DocumentIO {
       format: String = "parquet"
   ): Unit = {
     val data = dataframe.select(
-      expr(s"${idxColName} as ${idxCol}"),
-      expr(s"${docColName} as ${docCol}")
+      expr(s"$idxColName as $idxCol"),
+      expr(s"$docColName as $docCol")
     )
 
     data.write.format(format).save(output.toString)
