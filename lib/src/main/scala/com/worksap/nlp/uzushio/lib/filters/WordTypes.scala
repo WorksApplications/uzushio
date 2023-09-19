@@ -60,7 +60,7 @@ object WordTypes {
       var score = 0.0
       val iter = v1.values().iterator()
       while (iter.hasNext) {
-        score += FastMath.sqrt(v1.size())
+        score += Math.sqrt(iter.nextInt())
       }
       score.toFloat
     }
@@ -71,7 +71,7 @@ object WordTypes {
       var score = v1.size().toDouble // log_10 (1) == 0, so add size to the score
       val iter = v1.values().iterator()
       while (iter.hasNext) {
-        score += FastMath.log10(v1.size())
+        score += Math.log10(iter.nextInt())
       }
       score.toFloat
     }
