@@ -11,6 +11,7 @@ class WordTypes(list: String, threshold: Float = 3, kind: String = "uniq") exten
     case "uniq" => WordTypes.SizeScorer
     case "log10" => WordTypes.Log10Scorer
     case "sqrt" => WordTypes.SqrtScorer
+    case _ => throw new IllegalArgumentException("unknown kind, can be one of: uniq, log10, sqrt")
   }
   override def checkDocument(doc: Document): Document = {
     val score = scoreDocument(doc)
