@@ -49,7 +49,7 @@ class WordTypes(list: String, threshold: Float = 3, kind: String = "uniq") exten
 }
 
 object WordTypes {
-  private trait Scorer extends (Int2IntOpenHashMap => Float)
+  private trait Scorer extends (Int2IntOpenHashMap => Float) with Serializable
 
   private object SizeScorer extends Scorer {
     override def apply(v1: Int2IntOpenHashMap): Float = v1.size()
