@@ -5,7 +5,8 @@ import com.worksap.nlp.uzushio.lib.filters.{
   CompressionRate,
   HiraganaRatio,
   LinkCharRatio,
-  WordInstances
+  WordInstances,
+  WordTypes
 }
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
@@ -30,7 +31,7 @@ object FilterStatistics {
     }
 
     val textOnly = limited.select("text").filter(octet_length($"text") > 2)
-    val extractor = extractFilteredMetric(spark, args.filter(), args.arg())
+    val extractor = extractFilteredMetric(spark, args)
 
     val exampleProb = args.examples()
     val cleanPars = udf { (s: String, rng: Double) =>
@@ -54,11 +55,12 @@ object FilterStatistics {
 
   def extractFilteredMetric(
       sparkSession: SparkSession,
-      fiter: String,
-      arg: String
+      args: Args
   ): UserDefinedFunction = {
     import sparkSession.implicits._
-    fiter match {
+    val ftype = args.filter()
+    val arg = args.arg()
+    ftype match {
       case "compression" =>
         val filter = new CompressionRate(0, 100)
         udf((s: String) => filter.compressionRatio(Document.parse(s)))
@@ -71,6 +73,10 @@ object FilterStatistics {
       case "word-instance" =>
         val filter = new WordInstances(arg)
         udf((s: String) => filter.scoreDocument(Document.parse(s)))
+      case "word-type" =>
+        val kind = args.arg2.toOption.getOrElse("uniq")
+        val filter = new WordTypes(arg, kind = kind)
+        udf((s: String) => filter.scoreDocument(Document.parse(s)))
     }
   }
 
@@ -80,6 +86,7 @@ object FilterStatistics {
     val filter = opt[String](required = true)
     val limit = opt[Int]()
     val arg = opt[String](default = Some(""))
+    val arg2 = opt[String]()
     val partitions = opt[Int](default = Some(10))
     val examples = opt[Double](default = Some(0.001))
     val master = opt[String]()
