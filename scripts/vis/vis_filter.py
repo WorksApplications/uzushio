@@ -12,12 +12,16 @@ class Args(object):
     output: str
     input: list[str]
     title: str = None
+    dpi: float = None
+    log: bool = False
 
     @staticmethod
     def parse():
         p = argparse.ArgumentParser()
         p.add_argument("--output", type=Path)
         p.add_argument("--title")
+        p.add_argument("--dpi", type=float)
+        p.add_argument("--log", action="store_true")
         p.add_argument("input", type=Path, nargs="+")
         return Args(**vars(p.parse_args()))
 
@@ -51,6 +55,7 @@ def plot_histogram(args: Args, folder_paths: list[Path]):
         label=titles,
         histtype="stepfilled",
         alpha=0.5,
+        log=args.log,
     )
     plt.legend(titles)
     plt.ylabel("Data %")
