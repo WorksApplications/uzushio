@@ -8,7 +8,7 @@ class PipelineSpec extends AnyFreeSpec {
   "Pipeline" - {
     "can instantiate class fully specified" in {
       val cfg = ConfigFactory.parseString(
-        """{class: "com.worksap.nlp.uzushio.lib.filters.Words", list: "ng_words.txt", minimum: 3}"""
+        """{class: WordInstances, list: "ng_words.txt", minimum: 3}"""
       )
       val filter = Pipeline.instantiateFilter(cfg)
       assert(filter != null)
@@ -17,7 +17,7 @@ class PipelineSpec extends AnyFreeSpec {
 
     "can instantiate class with default value" in {
       val cfg = ConfigFactory.parseString(
-        """{class: "com.worksap.nlp.uzushio.lib.filters.Words", list: "ng_words.txt"}"""
+        """{class: WordInstances, list: "ng_words.txt"}"""
       )
       val filter = Pipeline.instantiateFilter(cfg)
       assert(filter != null)
