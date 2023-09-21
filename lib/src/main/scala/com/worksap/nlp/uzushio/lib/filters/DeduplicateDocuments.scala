@@ -1,17 +1,31 @@
 package com.worksap.nlp.uzushio.lib.filters
 
+import com.worksap.nlp.uzushio.lib.stats.NgramHashExtractor
 import com.worksap.nlp.uzushio.lib.cleaning.Document
-import com.worksap.nlp.uzushio.lib.filters.base.HighLowDocFilter
+import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
 import com.worksap.nlp.uzushio.lib.utils.MathUtil
 
 
-class DeduplicateDocuments(
-  override val low: Float = 0.0f,
-  override val high: Float = 1.0f
-) extends HighLowDocFilter {
+trait DocumentRandomGeneratorBase {
+  def randomSeed(docId: String): Long
 
-  override def checkDocument(doc: Document): Document = {
-    val iter = doc.aliveParagraphs
+  def randomDouble(docId: String): Double
+}
+
+
+class DocumentRandomGenerator extends DocumentRandomGeneratorBase {
+  def randomSeed(docId: String): Long = NgramHashExtractor.hashString(docId)
+
+  def randomDouble(docId: String): Double = MathUtil.asRandomDouble(randomSeed(docId))
+}
+
+
+class DeduplicateDocuments(
+  val randomGenerator: DocumentRandomGeneratorBase = new DocumentRandomGenerator
+) extends DocFilter {
+
+  def computeNearDuplicateTextRatio(doc: Document): Float = {
+   val iter = doc.aliveParagraphs
 
     var lengthNearFreqOverOne = 0
     var totalLength = 0
@@ -29,10 +43,17 @@ class DeduplicateDocuments(
       }
     }
 
-    val nearDuplicateTextRatio = MathUtil.ratio(lengthNearFreqOverOne, totalLength)
-    
-    val thresholdProb = doc.randomDouble
-    if (nearDuplicateTextRatio >= thresholdProb) {
+    MathUtil.ratio(lengthNearFreqOverOne, totalLength)
+  }
+
+  def shouldRemoveDocument(doc: Document) = {
+    val nearDuplicateTextRatio = computeNearDuplicateTextRatio(doc)
+    val thresholdProb = randomGenerator.randomDouble(doc.docId)
+    nearDuplicateTextRatio >= thresholdProb
+  }
+
+  override def checkDocument(doc: Document): Document = {
+    if (shouldRemoveDocument(doc)) {
       doc.copy(remove = this)
     } else doc
   }
