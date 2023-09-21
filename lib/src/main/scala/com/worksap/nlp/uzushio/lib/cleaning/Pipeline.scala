@@ -2,7 +2,8 @@ package com.worksap.nlp.uzushio.lib.cleaning
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.worksap.nlp.uzushio.lib.filters.base.{DocFilter, ParagraphFilter}
-import com.worksap.nlp.uzushio.lib.utils.Paragraphs
+import com.worksap.nlp.uzushio.lib.stats.NgramHashExtractor
+import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs}
 import org.apache.commons.lang3.StringUtils
 
 import java.lang.reflect.{Constructor, Parameter}
@@ -43,6 +44,7 @@ case class Paragraph(
 
 case class Document(
     paragraphs: IndexedSeq[Paragraph],
+    docId: String = "",
     remove: AnyRef = null
 ) {
   def removeWhen(toRemove: Boolean, remover: AnyRef): Document = {
@@ -63,6 +65,12 @@ case class Document(
       first = false
     }
     bldr.toString
+  }
+
+  def randomSeed: Long = NgramHashExtractor.hashString(docId)
+
+  def randomDouble: Double = {
+    MathUtil.asRandomDouble(randomSeed)
   }
 }
 

@@ -102,4 +102,10 @@ public class MathUtil {
         return (float) count / (float) total;
     }
 
+    private static final double DOUBLE_UNIT = 1.0 / (1L << 54);
+    private static final long LONG_DOUBLE_MASK = (1L << 54) - 1L; // 53 bits
+    public static double asRandomDouble(long seed) {
+        long masked = seed & LONG_DOUBLE_MASK;
+        return masked * DOUBLE_UNIT;
+    }
  }
