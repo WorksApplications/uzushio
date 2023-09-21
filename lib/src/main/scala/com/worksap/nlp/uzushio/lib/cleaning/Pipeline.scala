@@ -69,9 +69,7 @@ case class Document(
 
   def randomSeed: Long = NgramHashExtractor.hashString(docId)
 
-  def randomDouble: Double = {
-    MathUtil.asRandomDouble(randomSeed)
-  }
+  def randomDouble: Double = MathUtil.asRandomDouble(randomSeed)
 }
 
 object Document {
