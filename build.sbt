@@ -46,6 +46,9 @@ lazy val root = (project in file("."))
     core,
     legacy
   )
+  .settings(
+    name := "uzushio-root"
+  )
   .settings(noPublishSettings)
   .settings(commonSettings)
 
