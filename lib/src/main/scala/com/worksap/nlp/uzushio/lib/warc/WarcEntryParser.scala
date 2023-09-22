@@ -1,18 +1,10 @@
 package com.worksap.nlp.uzushio.lib.warc
 
 import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor, ParseAbortException}
-import com.worksap.nlp.uzushio.lib.lang.{
-  EstimationFailure,
-  LangEstimation,
-  LangTagSniffer,
-  ProbableLanguage
-}
+import com.worksap.nlp.uzushio.lib.lang.{EstimationFailure, LangEstimation, LangTagSniffer, ProbableLanguage}
 import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.{logger, resolveEarliestDate}
-import org.apache.hc.core5.http.impl.nio.{
-  DefaultHttpResponseFactory,
-  DefaultHttpResponseParser,
-  SessionBufferAccess
-}
+import org.apache.commons.lang3.StringUtils
+import org.apache.hc.core5.http.impl.nio.{DefaultHttpResponseFactory, DefaultHttpResponseParser, SessionBufferAccess}
 import org.apache.hc.core5.http.{HttpException, HttpMessage, MessageHeaders}
 import org.apache.tika.detect.EncodingDetector
 import org.apache.tika.exception.TikaException
@@ -24,12 +16,7 @@ import org.mozilla.universalchardet.UniversalDetector
 import org.slf4j.LoggerFactory
 
 import java.io.{ByteArrayInputStream, IOException, InputStream}
-import java.nio.charset.{
-  Charset,
-  IllegalCharsetNameException,
-  StandardCharsets,
-  UnsupportedCharsetException
-}
+import java.nio.charset.{Charset, IllegalCharsetNameException, StandardCharsets, UnsupportedCharsetException}
 import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.util.{Locale, UUID}
@@ -90,8 +77,9 @@ class WarcEntryParser(
   }
 
   private def lookupCharset(name: String): Option[Charset] = {
+    val cleanName = name.stripSuffix(";")
     try {
-      Some(Charset.forName(name))
+      Some(Charset.forName(cleanName))
     } catch {
       case _: IllegalCharsetNameException => None
       case _: UnsupportedCharsetException => None
@@ -109,7 +97,8 @@ class WarcEntryParser(
   private val win31j = Charset.forName("windows-31j")
 
   private def lookupNormalizedCharset(name: String) = {
-    val charsetName = name.toLowerCase(Locale.ROOT)
+    val cleanName = StringUtils.strip(name, " \n\r\t;,")
+    val charsetName = cleanName.toLowerCase(Locale.ROOT)
     charsetName match {
       case "" => None
       case "utf-8" | "utf8" => Some(StandardCharsets.UTF_8)
@@ -220,6 +209,8 @@ class WarcEntryParser(
       case e: StringIndexOutOfBoundsException => reportSkippedDoc(result, record, e)
       case e: NullPointerException => reportSkippedDoc(result, record, e)
       case e: ParseAbortException => reportSkippedDoc(result, record, e)
+      case e: IllegalCharsetNameException => reportSkippedDoc(result, record, e) // can be thrown in malformed svgs
+      case e: UnsupportedCharsetException => reportSkippedDoc(result, record, e)
     }
     result
   }
