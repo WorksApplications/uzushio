@@ -4,6 +4,7 @@ import com.worksap.nlp.uzushio.lib.stats.NgramHashExtractor
 import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
 import com.worksap.nlp.uzushio.lib.utils.MathUtil
+import scala.math._
 
 
 trait DocumentRandomGeneratorBase {
@@ -21,29 +22,28 @@ class DocumentRandomGenerator extends DocumentRandomGeneratorBase {
 
 
 class DeduplicateDocuments(
+  val baseNumFreq: Int = 100,
   val randomGenerator: DocumentRandomGeneratorBase = new DocumentRandomGenerator
 ) extends DocFilter {
 
   def computeNearDuplicateTextRatio(doc: Document): Float = {
    val iter = doc.aliveParagraphs
 
-    var lengthNearFreqOverOne = 0
-    var totalLength = 0
+    var totalLengthWeightedNearFreq = 0.0
+    var totalLength = 0.0
 
     while (iter.hasNext) {
       val paragraph = iter.next()
       val text = paragraph.text
       val textLength = text.length()
-      val nearFreq = paragraph.nearFreq
+      val nearFreq = if (paragraph.nearFreq < baseNumFreq) paragraph.nearFreq else baseNumFreq
+      val weight = log(nearFreq) / log(baseNumFreq)
 
       totalLength += textLength
-
-      if (nearFreq > 1) {
-        lengthNearFreqOverOne += textLength
-      }
+      totalLengthWeightedNearFreq += (textLength * weight)
     }
 
-    MathUtil.ratio(lengthNearFreqOverOne, totalLength)
+    MathUtil.ratio(totalLengthWeightedNearFreq.toFloat, totalLength.toFloat)
   }
 
   def shouldRemoveDocument(doc: Document) = {
