@@ -56,7 +56,7 @@ class LangTagSniffer() {
 
 object LangTagSniffer {
   private val metaRegex = "<meta[^>]*>".r
-  private val charsetRegex = Pattern.compile("charset=([^\"' >]+)", Pattern.CASE_INSENSITIVE)
+  private val charsetRegex = Pattern.compile("charset=([^\"' ;,/>]+)", Pattern.CASE_INSENSITIVE)
 
   def extractCharset(tag: String): String = {
     val matcher = charsetRegex.matcher(tag)
