@@ -6,13 +6,11 @@ import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
 import com.worksap.nlp.uzushio.lib.utils.MathUtil
 import scala.math._
 
-
 trait DocumentRandomGeneratorBase {
   def randomSeed(docId: String): Long
 
   def randomDouble(docId: String): Double
 }
-
 
 class DocumentRandomGenerator extends DocumentRandomGeneratorBase {
   def randomSeed(docId: String): Long = NgramHashExtractor.hashString(docId)
@@ -20,14 +18,13 @@ class DocumentRandomGenerator extends DocumentRandomGeneratorBase {
   def randomDouble(docId: String): Double = MathUtil.asRandomDouble(randomSeed(docId))
 }
 
-
 class DeduplicateDocuments(
-  val baseNumFreq: Int = 100,
-  val randomGenerator: DocumentRandomGeneratorBase = new DocumentRandomGenerator
+    val baseNumFreq: Int = 100,
+    val randomGenerator: DocumentRandomGeneratorBase = new DocumentRandomGenerator
 ) extends DocFilter {
 
   def computeNearDuplicateTextRatio(doc: Document): Float = {
-   val iter = doc.aliveParagraphs
+    val iter = doc.aliveParagraphs
 
     var totalLengthWeightedNearFreq = 0.0
     var totalLength = 0.0
