@@ -6,13 +6,14 @@ import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
 import com.worksap.nlp.uzushio.lib.utils.MathUtil
 import scala.math._
 
-trait DocumentRandomGeneratorBase {
+trait RandomGeneratorFromStringBase {
   def randomSeed(docId: String): Long
 
   def randomDouble(docId: String): Double
 }
 
-class DocumentRandomGenerator extends DocumentRandomGeneratorBase {
+// An object in arguments of DocFilter on Spark needs to mixin Serializable.
+object RandomGeneratorFromString extends RandomGeneratorFromStringBase with Serializable {
   def randomSeed(docId: String): Long = NgramHashExtractor.hashString(docId)
 
   def randomDouble(docId: String): Double = MathUtil.asRandomDouble(randomSeed(docId))
@@ -20,7 +21,7 @@ class DocumentRandomGenerator extends DocumentRandomGeneratorBase {
 
 class DeduplicateDocuments(
     val baseNumFreq: Int = 100,
-    val randomGenerator: DocumentRandomGeneratorBase = new DocumentRandomGenerator
+    val randomGenerator: RandomGeneratorFromStringBase = RandomGeneratorFromString
 ) extends DocFilter {
 
   def computeNearDuplicateTextRatio(doc: Document): Float = {
@@ -45,13 +46,12 @@ class DeduplicateDocuments(
 
   def shouldRemoveDocument(doc: Document) = {
     val nearDuplicateTextRatio = computeNearDuplicateTextRatio(doc)
+
     val thresholdProb = randomGenerator.randomDouble(doc.docId)
     nearDuplicateTextRatio >= thresholdProb
   }
 
   override def checkDocument(doc: Document): Document = {
-    if (shouldRemoveDocument(doc)) {
-      doc.copy(remove = this)
-    } else doc
+    doc.removeWhen(shouldRemoveDocument(doc), this)
   }
 }
