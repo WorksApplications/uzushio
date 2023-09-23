@@ -694,7 +694,8 @@ object DeduplicateParagraphs {
   ): String = {
     val doc = Document(parts)
     val filtered = args.pipeline.applyFilters(doc)
-    filtered.copy(paragraphs = doc.paragraphs.filter(_.remove != null)).render()
+    println(filtered.paragraphs.map(_.remove))
+    filtered.copy(paragraphs = doc.paragraphs.filter(_.remove == null)).render()
   }
 
   // noinspection TypeAnnotation,ScalaWeakerAccess
