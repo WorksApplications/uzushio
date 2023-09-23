@@ -88,13 +88,13 @@ class PerParagraphFilter(val filter: ParagraphFilter) extends DocFilter {
     .copy(paragraphs = doc.paragraphs.map(filter.checkParagraph))
 }
 
-final class Pipeline(filers: Array[DocFilter]) extends Serializable {
+final class Pipeline(filters: Array[DocFilter]) extends Serializable {
   def applyFilters(doc: Document): Document = {
     var i = 0
-    val len = filers.length
+    val len = filters.length
     var state = doc
-    while (i < len && state.remove != null) {
-      val f = filers(i)
+    while (i < len && state.remove == null) {
+      val f = filters(i)
       state = f.checkDocument(state)
       i += 1
     }
