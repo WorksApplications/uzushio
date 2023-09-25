@@ -5,23 +5,36 @@ import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
 import com.worksap.nlp.uzushio.lib.utils.MathUtil
 import scala.math._
+import scala.util.Random
+
 
 trait RandomGeneratorFromStringBase {
-  def randomSeed(docId: String): Long
-
-  def randomDouble(docId: String): Double
+  def generateRandom(docId: String): Double
 }
 
 // An object in arguments of DocFilter on Spark needs to mixin Serializable.
 object RandomGeneratorFromString extends RandomGeneratorFromStringBase with Serializable {
-  def randomSeed(docId: String): Long = NgramHashExtractor.hashString(docId)
+  def generateRandom(docId: String): Double = {
+    val seed = NgramHashExtractor.hashString(docId)    
+    MathUtil.asRandomDouble(seed)
+  }
+}
 
-  def randomDouble(docId: String): Double = MathUtil.asRandomDouble(randomSeed(docId))
+class GaussianRandomGeneratorFromString(
+  val mu: Double = 0.1,
+  val sd: Double = 0.1
+) extends RandomGeneratorFromStringBase with Serializable {
+  def generateRandom(docId: String): Double = {
+    val seed = NgramHashExtractor.hashString(docId)    
+    Random.setSeed(seed)
+
+    Random.nextGaussian() * mu + sd
+  }
 }
 
 class DeduplicateDocuments(
-    val baseNumFreq: Int = 100,
-    val randomGenerator: RandomGeneratorFromStringBase = RandomGeneratorFromString
+    val baseNumFreq: Int = 10,
+    val randomGenerator: RandomGeneratorFromStringBase = new GaussianRandomGeneratorFromString
 ) extends DocFilter {
 
   def computeNearDuplicateTextRatio(doc: Document): Float = {
@@ -46,7 +59,9 @@ class DeduplicateDocuments(
 
   def shouldRemoveDocument(doc: Document) = {
     val nearDuplicateTextRatio = computeNearDuplicateTextRatio(doc)
-    val thresholdProb = randomGenerator.randomDouble(doc.docId)
+    val thresholdProb = randomGenerator.generateRandom(doc.render())
+
+    println(("ratio", nearDuplicateTextRatio, thresholdProb, doc.docId, doc.paragraphs.map(x => x.nearFreq)))
     nearDuplicateTextRatio >= thresholdProb
   }
 
