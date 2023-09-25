@@ -46,7 +46,6 @@ class DeduplicateDocuments(
 
   def shouldRemoveDocument(doc: Document) = {
     val nearDuplicateTextRatio = computeNearDuplicateTextRatio(doc)
-
     val thresholdProb = randomGenerator.randomDouble(doc.docId)
     nearDuplicateTextRatio >= thresholdProb
   }
