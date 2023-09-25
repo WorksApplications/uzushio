@@ -7,7 +7,6 @@ import com.worksap.nlp.uzushio.lib.utils.MathUtil
 import scala.math._
 import scala.util.Random
 
-
 trait RandomGeneratorFromStringBase {
   def generateRandom(docId: String): Double
 }
@@ -27,7 +26,6 @@ class GaussianRandomGeneratorFromString(
   def generateRandom(docId: String): Double = {
     val seed = NgramHashExtractor.hashString(docId)    
     Random.setSeed(seed)
-
     Random.nextGaussian() * mu + sd
   }
 }
