@@ -2,6 +2,7 @@ package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
+import com.worksap.nlp.uzushio.lib.filters.DeduplicateDocuments
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{collect_list, octet_length, udf}
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -42,7 +43,7 @@ object DedupFilterStatistics {
 
     val withValues = assembledDocs.select(
       metric($"docId", $"text", $"pos", $"exactFreq", $"nearFreq") as "res"
-    ).select(// make columns in the same order as FilterStatistics
+    ).select( // make columns in the same order as FilterStatistics
       $"res._2" as "value",
       $"res._1" as "text"
     )
@@ -52,7 +53,14 @@ object DedupFilterStatistics {
       .csv(args.output())
   }
 
-  def ratioUdfConstructor[T: TypeTag](sample: Double)(extractor: Document => Float): UserDefinedFunction = {
+  def computeDuplicationScore(doc: Document, baseNumFreq: Int = 10) = {
+    val filter = new DeduplicateDocuments(baseNumFreq)
+    filter.computeNearDuplicateTextRatio(doc)
+  }
+
+  def ratioUdfConstructor[T: TypeTag](
+      sample: Double
+  )(extractor: Document => Float): UserDefinedFunction = {
     udf {
       (
           docId: String,
@@ -86,6 +94,8 @@ object DedupFilterStatistics {
         udfMaker(doc => doc.aliveParagraphs.map(_.nearFreq).foldRight(0)(_.max(_)))
       case "min-near-freq" =>
         udfMaker(doc => doc.aliveParagraphs.map(_.nearFreq).foldRight(0)(_.min(_)))
+      case "duplication-score" =>
+        udfMaker(doc => computeDuplicationScore(doc))
       case _ => throw new IllegalArgumentException(s"unknown metric $ftype")
     }
 

@@ -48,7 +48,7 @@ class DeduplicateDocumentsSpec extends AnyFreeSpec {
       )
       val doc = Document(paragraphs, "test")
       assert(1.0f == filter.computeNearDuplicateTextRatio(doc))
-      assert(true== filter.shouldRemoveDocument(doc))
+      assert(true == filter.shouldRemoveDocument(doc))
     }
 
     "computes correct ratio for deuplicated documents (boundary)" in {
@@ -58,7 +58,7 @@ class DeduplicateDocumentsSpec extends AnyFreeSpec {
       )
       val doc = Document(paragraphs, "test")
       assert(0.5f == filter.computeNearDuplicateTextRatio(doc))
-      assert(true== filter.shouldRemoveDocument(doc))
+      assert(true == filter.shouldRemoveDocument(doc))
     }
   }
 }

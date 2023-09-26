@@ -14,17 +14,18 @@ trait RandomGeneratorFromStringBase {
 // An object in arguments of DocFilter on Spark needs to mixin Serializable.
 object RandomGeneratorFromString extends RandomGeneratorFromStringBase with Serializable {
   def generateRandom(docId: String): Double = {
-    val seed = NgramHashExtractor.hashString(docId)    
+    val seed = NgramHashExtractor.hashString(docId)
     MathUtil.asRandomDouble(seed)
   }
 }
 
 class GaussianRandomGeneratorFromString(
-  val mu: Double = 0.1,
-  val sd: Double = 0.1
-) extends RandomGeneratorFromStringBase with Serializable {
+    val mu: Double = 0.1,
+    val sd: Double = 0.1
+) extends RandomGeneratorFromStringBase
+    with Serializable {
   def generateRandom(docId: String): Double = {
-    val seed = NgramHashExtractor.hashString(docId)    
+    val seed = NgramHashExtractor.hashString(docId)
     Random.setSeed(seed)
     Random.nextGaussian() * mu + sd
   }
@@ -59,7 +60,6 @@ class DeduplicateDocuments(
     val nearDuplicateTextRatio = computeNearDuplicateTextRatio(doc)
     val thresholdProb = randomGenerator.generateRandom(doc.render())
 
-    println(("ratio", nearDuplicateTextRatio, thresholdProb, doc.docId, doc.paragraphs.map(x => x.nearFreq)))
     nearDuplicateTextRatio >= thresholdProb
   }
 
