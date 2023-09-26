@@ -58,9 +58,7 @@ object DedupFilterStatistics {
     filter.computeNearDuplicateTextRatio(doc)
   }
 
-  def ratioUdfConstructor[T: TypeTag](
-      sample: Double
-  )(extractor: Document => Float): UserDefinedFunction = {
+  def ratioUdfConstructor[T: TypeTag](sample: Double)(extractor: Document => Float): UserDefinedFunction = {
     udf {
       (
           docId: String,
