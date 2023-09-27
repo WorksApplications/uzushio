@@ -20,7 +20,7 @@ object RandomGeneratorFromString extends RandomGeneratorFromStringBase with Seri
 }
 
 class GaussianRandomGeneratorFromString(
-    val mu: Double = 0.1,
+    val mu: Double = 0.3,
     val sd: Double = 0.1
 ) extends RandomGeneratorFromStringBase
     with Serializable {
@@ -60,6 +60,9 @@ class DeduplicateDocuments(
     val nearDuplicateTextRatio = computeNearDuplicateTextRatio(doc)
     val thresholdProb = randomGenerator.generateRandom(doc.render())
 
+    println(
+      ("ratio", nearDuplicateTextRatio, thresholdProb, doc.docId, doc.paragraphs.map(x => x.nearFreq))
+    )
     nearDuplicateTextRatio >= thresholdProb
   }
 
