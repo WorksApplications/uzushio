@@ -4,7 +4,8 @@ import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
 import spire.math.QuickSelect
 
-class DeduplicateDocumentsPercentile(percentile: Float = 0.05f, expected: Double = 1.0) extends DocFilter {
+class DeduplicateDocumentsPercentile(percentile: Float = 0.05f, expected: Double = 1.0)
+    extends DocFilter {
   override def checkDocument(doc: Document): Document = {
     val freq = DeduplicateDocumentsPercentile.freqAtPercentile(doc, percentile)
     val probability = expected / freq

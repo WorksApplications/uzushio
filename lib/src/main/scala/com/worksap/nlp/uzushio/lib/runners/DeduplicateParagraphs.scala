@@ -398,7 +398,8 @@ class DeduplicateParagraphs(
       return
     }
 
-    val paragraphsWithFreqs = DeduplicateParagraphs.prepareParagraphsForFiltering(rawData, stats, args.debug)
+    val paragraphsWithFreqs = DeduplicateParagraphs
+      .prepareParagraphsForFiltering(rawData, stats, args.debug)
 
     if (args.hasStage("saveReassembled")) {
       saveReassembled(paragraphsWithFreqs)
@@ -538,7 +539,6 @@ class DeduplicateParagraphs(
     )
   }
 
-
   // compile full documents from paragraphs
   // paragraphs are shuffled because of join with freqs,
   // groupBy op merges them back together, and we use an udf to perform the actual filtering
@@ -610,10 +610,10 @@ class DeduplicateParagraphs(
 object DeduplicateParagraphs {
 
   def prepareParagraphsForFiltering(
-                                             raw: DataFrame,
-                                             stats: DataFrame,
-                                             debug: Boolean
-                                           ): DataFrame = {
+      raw: DataFrame,
+      stats: DataFrame,
+      debug: Boolean
+  ): DataFrame = {
 
     import raw.sparkSession.implicits._
 
@@ -632,18 +632,18 @@ object DeduplicateParagraphs {
     val joined = cookedDocs.join(stats, $"parHash" === $"hash", "left")
 
     val basicCols = (if (debug) {
-      joined.columns.filter {
-        case "parHash" => false
-        case "exactFreq" | "nearFreq" => false
-        case _ => true
-      }
-    } else {
-      joined.columns.filter {
-        case "hash" | "reprHash" | "parHash" | "cleanText" => false
-        case "exactFreq" | "nearFreq" => false
-        case _ => true
-      }
-    }).map(joined.col)
+                       joined.columns.filter {
+                         case "parHash" => false
+                         case "exactFreq" | "nearFreq" => false
+                         case _ => true
+                       }
+                     } else {
+                       joined.columns.filter {
+                         case "hash" | "reprHash" | "parHash" | "cleanText" => false
+                         case "exactFreq" | "nearFreq" => false
+                         case _ => true
+                       }
+                     }).map(joined.col)
 
     val computedCols = Seq( // common newly computed columns
       when($"exactFreq".isNotNull, $"exactFreq").otherwise(lit(1)).as("exactFreq"),
@@ -654,7 +654,6 @@ object DeduplicateParagraphs {
       basicCols ++ computedCols: _*
     )
   }
-
 
   def collectDocParts(
       text: Array[String],
@@ -699,10 +698,10 @@ object DeduplicateParagraphs {
   ): String = {
     val doc = Document(parts)
     val filtered = args.pipeline.applyFilters(doc)
-    if (filtered.remove != null) {
-        return filtered.copy(IndexedSeq()).render()
+    if (filtered.isDeleted) {
+      return filtered.copy(IndexedSeq()).render()
     }
-    filtered.copy(paragraphs = filtered.paragraphs.filter(_.remove == null)).render()
+    filtered.copy(paragraphs = filtered.paragraphs.filter(_.isAlive)).render()
   }
 
   // noinspection TypeAnnotation,ScalaWeakerAccess
