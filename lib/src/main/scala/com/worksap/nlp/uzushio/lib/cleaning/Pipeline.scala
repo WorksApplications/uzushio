@@ -40,6 +40,9 @@ case class Paragraph(
     bldr.append(text)
     bldr
   }
+
+  def isAlive: Boolean = remove == null
+  def isDeleted: Boolean = !isAlive
 }
 
 case class Document(
@@ -51,7 +54,7 @@ case class Document(
     if (toRemove) copy(remove = remover) else this
   }
 
-  def aliveParagraphs: Iterator[Paragraph] = paragraphs.iterator.filter(_.remove == null)
+  def aliveParagraphs: Iterator[Paragraph] = paragraphs.iterator.filter(_.isAlive)
 
   def render(): String = {
     val bldr = new java.lang.StringBuilder()
@@ -70,6 +73,10 @@ case class Document(
   def randomSeed: Long = NgramHashExtractor.hashString(docId)
 
   def randomDouble: Double = MathUtil.asRandomDouble(randomSeed)
+
+  def isAlive: Boolean = this.remove == null
+
+  def isDeleted: Boolean = !isAlive
 }
 
 object Document {
@@ -93,7 +100,7 @@ final class Pipeline(filters: Array[DocFilter]) extends Serializable {
     var i = 0
     val len = filters.length
     var state = doc
-    while (i < len && state.remove == null) {
+    while (i < len && state.isAlive) {
       val f = filters(i)
       state = f.checkDocument(state)
       i += 1
