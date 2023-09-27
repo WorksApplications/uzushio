@@ -31,4 +31,11 @@ package object filters {
       }.toIndexedSeq
     )
   }
+
+  def testParagraphs(texts: Seq[String], nearFreqs: Seq[Int]): IndexedSeq[Paragraph] = {
+      (texts, nearFreqs)
+        .zipped
+        .map ((text, freq) => Paragraph("", text, 0, 1, freq))
+        .toIndexedSeq
+  }
 }
