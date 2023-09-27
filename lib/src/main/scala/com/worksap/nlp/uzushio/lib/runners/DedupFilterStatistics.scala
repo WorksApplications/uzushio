@@ -1,6 +1,7 @@
 package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
+import com.worksap.nlp.uzushio.lib.filters.{DeduplicateDocumentsPercentile, DuplicateDocumentsLengthWeighted}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import com.worksap.nlp.uzushio.lib.filters.DeduplicateDocuments
 import org.apache.spark.sql.expressions.UserDefinedFunction
@@ -53,11 +54,6 @@ object DedupFilterStatistics {
       .csv(args.output())
   }
 
-  def computeDuplicationScore(doc: Document, baseNumFreq: Int = 10) = {
-    val filter = new DeduplicateDocuments(baseNumFreq)
-    filter.computeNearDuplicateTextRatio(doc)
-  }
-
   def ratioUdfConstructor[T: TypeTag](sample: Double)(extractor: Document => Float): UserDefinedFunction = {
     udf {
       (
@@ -93,7 +89,12 @@ object DedupFilterStatistics {
       case "min-near-freq" =>
         udfMaker(doc => doc.aliveParagraphs.map(_.nearFreq).foldRight(0)(_.min(_)))
       case "duplication-score" =>
-        udfMaker(doc => computeDuplicationScore(doc))
+        val filter = new DeduplicateDocuments(10)
+        udfMaker(doc => filter.computeNearDuplicateTextRatio(doc))
+      case "length-weighted" =>
+        udfMaker(doc => DuplicateDocumentsLengthWeighted.nearFreqWeight(doc).toFloat)
+      case "freq-percentile" =>
+        udfMaker(doc => DeduplicateDocumentsPercentile.freqAtPercentile(doc, 0.05f).toFloat)
       case _ => throw new IllegalArgumentException(s"unknown metric $ftype")
     }
 

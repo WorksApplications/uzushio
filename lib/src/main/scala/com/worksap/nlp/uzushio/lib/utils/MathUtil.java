@@ -109,6 +109,20 @@ public class MathUtil {
         return (float) count / (float) total;
     }
 
+    public static double doubleRatio(long count, long total) {
+        if (count == 0 || total == 0) {
+            return 0.0;
+        }
+        return doubleRatio((double) count, (double) total);
+    }
+
+    public static double doubleRatio(double count, double total) {
+        if (count == 0 || total == 0) {
+            return 0.0;
+        }
+        return count / total;
+    }
+
     private static final double DOUBLE_UNIT = 1.0 / (1L << 54);
     private static final long LONG_DOUBLE_MASK = (1L << 54) - 1L; // 53 bits
     public static double asRandomDouble(long seed) {
