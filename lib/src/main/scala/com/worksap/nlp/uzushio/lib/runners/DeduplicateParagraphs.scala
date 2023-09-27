@@ -9,6 +9,7 @@ import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
 import org.apache.commons.codec.binary.Hex
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.storage.StorageLevel
 import org.rogach.scallop.ScallopConf
 import spire.std.LevenshteinDistance
 
@@ -461,7 +462,7 @@ class DeduplicateParagraphs(
       // need to persist datasets otherwise mapPartitions is called two times :/
       // to fix it cleanly, it is probably required to get into spark sql internals and
       // write a custom generator (probably) which will call our logic
-      .persist()
+      .cache(args.cacheLevel)
       // sort does not allow to specify number of partitions, so use this sequence of operations
       .repartitionByRange(args.propagatePartitions, $"signature".asc)
       .sortWithinPartitions($"signature".asc).as[DuplicateCandidateRow]
@@ -732,6 +733,9 @@ object DeduplicateParagraphs {
       descr = "size of buffer for near equivalence checking, in bytes",
       default = Some(10 * 1024 * 1024)
     )
+    val cacheLevel = opt[String](
+      descr = "Spark StorageLevel for caching operations"
+    )
     verify()
 
     def toArgs: Args = Args(
@@ -751,7 +755,8 @@ object DeduplicateParagraphs {
       compression = compression(),
       intermediate = intermediate(),
       pipeline = Pipeline.make(filters()),
-      bufferSizeInBytes = bufferSize()
+      bufferSizeInBytes = bufferSize(),
+      cacheLevel = cacheLevel.toOption.map(StorageLevel.fromString).getOrElse(StorageLevel.MEMORY_AND_DISK)
     )
 
     def makeStages(): Set[String] = execution.toOption match {
@@ -776,11 +781,12 @@ object DeduplicateParagraphs {
       intermediate: Boolean,
       format: String,
       compression: String,
+      pipeline: Pipeline,
       numShifts: Int = -1,
       bufferSizeInBytes: Int = 10000000,
       preFilterRatio: Double = 0.6,
       propagatePartitions: Int = 64,
-      pipeline: Pipeline
+      cacheLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK
   ) {
     val shiftIndices: Array[Int] = {
       val base = Array.range(0, simHashSize)
