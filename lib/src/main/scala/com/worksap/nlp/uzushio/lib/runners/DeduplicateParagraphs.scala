@@ -756,7 +756,8 @@ object DeduplicateParagraphs {
       intermediate = intermediate(),
       pipeline = Pipeline.make(filters()),
       bufferSizeInBytes = bufferSize(),
-      cacheLevel = cacheLevel.toOption.map(StorageLevel.fromString).getOrElse(StorageLevel.MEMORY_AND_DISK)
+      cacheLevel = cacheLevel.toOption.map(StorageLevel.fromString)
+        .getOrElse(StorageLevel.MEMORY_AND_DISK)
     )
 
     def makeStages(): Set[String] = execution.toOption match {
