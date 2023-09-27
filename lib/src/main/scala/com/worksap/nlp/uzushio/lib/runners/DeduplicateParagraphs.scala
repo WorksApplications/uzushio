@@ -462,7 +462,7 @@ class DeduplicateParagraphs(
       // need to persist datasets otherwise mapPartitions is called two times :/
       // to fix it cleanly, it is probably required to get into spark sql internals and
       // write a custom generator (probably) which will call our logic
-      .cache(args.cacheLevel)
+      .persist(args.cacheLevel)
       // sort does not allow to specify number of partitions, so use this sequence of operations
       .repartitionByRange(args.propagatePartitions, $"signature".asc)
       .sortWithinPartitions($"signature".asc).as[DuplicateCandidateRow]
