@@ -728,6 +728,10 @@ object DeduplicateParagraphs {
       descr = "filter pipeline configuration",
       default = Some("all_duplicate_paragraphs.conf")
     )
+    val bufferSize = opt[Int](
+      descr = "size of buffer for near equivalence checking, in bytes",
+      default = Some(10 * 1024 * 1024)
+    )
     verify()
 
     def toArgs: Args = Args(
@@ -746,7 +750,8 @@ object DeduplicateParagraphs {
       format = format(),
       compression = compression(),
       intermediate = intermediate(),
-      pipeline = Pipeline.make(filters())
+      pipeline = Pipeline.make(filters()),
+      bufferSizeInBytes = bufferSize()
     )
 
     def makeStages(): Set[String] = execution.toOption match {
