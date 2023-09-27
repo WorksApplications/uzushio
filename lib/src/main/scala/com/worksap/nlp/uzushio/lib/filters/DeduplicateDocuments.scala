@@ -26,8 +26,8 @@ class GaussianRandomGeneratorFromString(
     with Serializable {
   def generateRandom(docId: String): Double = {
     val seed = NgramHashExtractor.hashString(docId)
-    Random.setSeed(seed)
-    Random.nextGaussian() * mu + sd
+    val rng = new Random(seed)
+    rng.nextGaussian() * mu + sd
   }
 }
 
@@ -58,7 +58,7 @@ class DeduplicateDocuments(
 
   def shouldRemoveDocument(doc: Document) = {
     val nearDuplicateTextRatio = computeNearDuplicateTextRatio(doc)
-    val thresholdProb = randomGenerator.generateRandom(doc.render())
+    val thresholdProb = randomGenerator.generateRandom(doc.docId)
 
     nearDuplicateTextRatio >= thresholdProb
   }
