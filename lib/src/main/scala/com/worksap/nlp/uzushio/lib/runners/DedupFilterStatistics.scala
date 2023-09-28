@@ -2,17 +2,16 @@ package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.filters.{
+  DeduplicateDocuments,
   DeduplicateDocumentsPercentile,
-  DuplicateDocumentsLengthWeighted
+  DuplicateDocumentsLengthWeighted,
+  LargeFreqParagraphs
 }
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
-import com.worksap.nlp.uzushio.lib.filters.DeduplicateDocuments
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{collect_list, octet_length, udf}
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.rogach.scallop.ScallopConf
-
-import scala.reflect.runtime.universe.TypeTag
 
 object DedupFilterStatistics {
 
@@ -57,7 +56,7 @@ object DedupFilterStatistics {
       .csv(args.output())
   }
 
-  def ratioUdfConstructor[T: TypeTag](
+  def ratioUdfConstructor(
       sample: Double
   )(extractor: Document => Float): UserDefinedFunction = {
     udf {
@@ -101,6 +100,9 @@ object DedupFilterStatistics {
         udfMaker(doc => DuplicateDocumentsLengthWeighted.nearFreqWeight(doc).toFloat)
       case "freq-percentile" =>
         udfMaker(doc => DeduplicateDocumentsPercentile.freqAtPercentile(doc, 0.05f).toFloat)
+      case "large-freq-paragraphs" =>
+        val filter = new LargeFreqParagraphs(freq = 100)
+        udfMaker(doc => filter.markParagraphs(doc.paragraphs.toBuffer).toFloat)
       case _ => throw new IllegalArgumentException(s"unknown metric $ftype")
     }
 

@@ -70,7 +70,7 @@ object MergeDedupStats {
     val arg = new Args(args)
     val bldr = SparkSession.builder()
     arg.master.toOption.foreach(bldr.master)
-     bldr.getOrCreate().use { spark =>
+    bldr.getOrCreate().use { spark =>
       run(spark, arg)
     }
   }
