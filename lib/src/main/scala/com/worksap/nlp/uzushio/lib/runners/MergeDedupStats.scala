@@ -70,9 +70,7 @@ object MergeDedupStats {
     val arg = new Args(args)
     val bldr = SparkSession.builder()
     arg.master.toOption.foreach(bldr.master)
-    bldr.config("spark.sql.adaptive.maxShuffledHashJoinLocalMapThreshold", 256 * 1024 * 1024)
-    bldr.config("spark.sql.objectHashAggregate.sortBased.fallbackThreshold", 50 * 1000 * 1000)
-    bldr.getOrCreate().use { spark =>
+     bldr.getOrCreate().use { spark =>
       run(spark, arg)
     }
   }

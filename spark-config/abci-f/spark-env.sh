@@ -16,4 +16,4 @@ mkdir -p "$SPARK_LOG_DIR"
 export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 
-export JAVA_HOME=/home/ace14424uu/soft/graalvm-jdk-20.0.2+9.1
+export JAVA_HOME="$HOME/soft/jdk-17-2023-09-27"

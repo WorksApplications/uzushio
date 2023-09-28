@@ -1,10 +1,17 @@
-#!/bin/bash
+#!/bin/bash -x
 
 #$ -j y
 #$ -cwd
 #$ -l USE_SSH=1
 
-du -hs "$1" > /dev/null &
+OUTPUT=$1
+shift
+INPUT=()
+for arg in "$@"; do
+  INPUT+=("--input=$arg")
+  du -hs "$arg" > /dev/null &
+done
+
 
 # SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 UZUSHIO_ROOT=$HOME/work/uzushio
@@ -25,24 +32,15 @@ echo "$(date -Iseconds) $JOB_ID ssh abci -L8080:$(hostname):8080" >> /scratch/$U
 
 mkdir -p /scratch/$USER/spark-exlog
 
-INPUT=$1
-OUTPUT=$2
-CACHE=/dev/null
-NUM_PARTITIONS=${3:-50}
-NUM_PARTITIONS_PROPAGATION=${4:-$(($NUM_PARTITIONS * 4))}
-
 "$SPARK_HOME/bin/spark-submit" \
-    --class com.worksap.nlp.uzushio.main.DeduplicateParagraphs \
+    --class com.worksap.nlp.uzushio.lib.runners.MergeDedupStats \
     --master $SPARK_MASTER \
     --conf spark.driver.log.dfsDir=/scratch/$USER/spark-exlog \
     --conf spark.eventLog.dir=/scratch/$USER/spark-exlog \
     --conf spark.local.dir=$SPARK_LOCAL_DIRS \
-    --conf spark.sql.shuffle.partitions=${NUM_PARTITIONS_PROPAGATION} \
+    --conf spark.sql.shuffle.partitions=1000 \
     local://$UZUSHIO_JAR \
-    --input="$INPUT" \
-    --output="$OUTPUT" \
-    --execution=reprHashes,stats,saveStats \
-    --propagate-partitions=$NUM_PARTITIONS_PROPAGATION \
-    --partitions=$NUM_PARTITIONS --intermediate
+    ${INPUT[*]} \
+    --output="$OUTPUT"
 
 wait
