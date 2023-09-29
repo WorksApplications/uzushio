@@ -97,10 +97,14 @@ object Paragraphs {
   }
 
   def cleanParagraph(str: String): String = {
+    cleanTextBlocksInParagraph(str).filter(Paragraphs.hasContent).mkString("\n")
+  }
+
+  def cleanTextBlocksInParagraph(str: String): Array[String] = {
     StringUtils.split(cleanInsideLinks(str), '\n').map { s =>
       val collapsedSpaces = spacesRegex.replaceAllIn(s, " ")
       StringUtils.strip(collapsedSpaces)
-    }.filter(Paragraphs.hasContent).mkString("\n")
+    }
   }
 
 }
