@@ -27,8 +27,9 @@ class LargeFreqParagraphs(count: Int = 3, freq: Int = 100) extends DocFilter {
     var idx = 0
     val len = paragraphs.length
     while (idx < len) {
-      if (shouldRemove(paragraphs, idx)) {
-        paragraphs(idx) = paragraphs(idx).copy(remove = this)
+      val p = paragraphs(idx)
+      if (p.isAlive && (shouldRemoveBack(paragraphs, idx) || shouldRemoveFwd(paragraphs, idx, len))) {
+        paragraphs(idx) = p.copy(remove = this)
         nchanged += removePrev(paragraphs, idx)
         nchanged += 1
       }
@@ -43,7 +44,7 @@ class LargeFreqParagraphs(count: Int = 3, freq: Int = 100) extends DocFilter {
     var idx = offset - 1
     while (idx >= end) {
       val p = paragraphs(idx)
-      if (p.isAlive) {
+      if (p.isAlive && p.nearFreq >= freq) {
         paragraphs(idx) = p.copy(remove = this)
         result += 1
       }
@@ -53,7 +54,7 @@ class LargeFreqParagraphs(count: Int = 3, freq: Int = 100) extends DocFilter {
     result
   }
 
-  def shouldRemove(paragraphs: mutable.Buffer[Paragraph], offset: Int): Boolean = {
+  def shouldRemoveBack(paragraphs: mutable.Buffer[Paragraph], offset: Int): Boolean = {
     var idx = offset
     val end = math.max(offset - count, 0)
     while (idx >= end) {
@@ -66,4 +67,18 @@ class LargeFreqParagraphs(count: Int = 3, freq: Int = 100) extends DocFilter {
     true
   }
 
+  def shouldRemoveFwd(paragraphs: mutable.Buffer[Paragraph], offset: Int, length: Int): Boolean = {
+    var idx = offset
+    val end = math.min(offset + count, length)
+    while (idx < end) {
+      val p = paragraphs(idx)
+      if (p.nearFreq < freq) {
+        return false
+      }
+      idx += 1
+    }
+    true
+  }
+
+  override val toString = s"LargeFreqParagraphs($count,$freq)"
 }

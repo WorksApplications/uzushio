@@ -97,7 +97,8 @@ object DedupFilterStatistics {
       case "freq-percentile" =>
         udfMaker(doc => DeduplicateDocumentsPercentile.freqAtPercentile(doc, 0.05f).toFloat)
       case "large-freq-paragraphs" =>
-        val filter = new LargeFreqParagraphs(freq = 100)
+        val freq = if (arg == "") 100 else arg.toInt
+        val filter = new LargeFreqParagraphs(freq = freq)
         udfMaker(doc => filter.markParagraphs(doc.paragraphs.toBuffer).toFloat)
       case _ => throw new IllegalArgumentException(s"unknown metric $ftype")
     }
