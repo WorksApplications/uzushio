@@ -1,7 +1,12 @@
 package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
-import com.worksap.nlp.uzushio.lib.filters.{DeduplicateDocuments, DeduplicateDocumentsPercentile, DuplicateDocumentsLengthWeighted, LargeFreqParagraphs}
+import com.worksap.nlp.uzushio.lib.filters.{
+  DeduplicateDocuments,
+  DeduplicateDocumentsPercentile,
+  DuplicateDocumentsLengthWeighted,
+  LargeFreqParagraphs
+}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import org.apache.spark.sql.expressions.UserDefinedFunction
@@ -68,7 +73,8 @@ object DedupFilterStatistics {
         val ratio = extractor(doc)
         val docData =
           if (doc.randomDouble < sample) {
-            docParts.map(p => Paragraphs.cleanTextBlocksInParagraph(p.text).mkString("<br>")).mkString("<p>")
+            docParts.map(p => Paragraphs.cleanTextBlocksInParagraph(p.text).mkString("<br>"))
+              .mkString("<p>")
           } else ""
         (docData, ratio)
     }
