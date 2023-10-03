@@ -46,7 +46,7 @@ case class Paragraph(
 }
 
 case class Document(
-    paragraphs: IndexedSeq[Paragraph],
+    paragraphs: Seq[Paragraph],
     docId: String = "",
     remove: AnyRef = null
 ) {

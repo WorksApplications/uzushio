@@ -2,17 +2,17 @@ package com.worksap.nlp.uzushio.lib.runners
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
 import com.worksap.nlp.uzushio.lib.filters.{
+  DeduplicateDocuments,
   DeduplicateDocumentsPercentile,
-  DuplicateDocumentsLengthWeighted
+  DuplicateDocumentsLengthWeighted,
+  LargeFreqParagraphs
 }
+import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
-import com.worksap.nlp.uzushio.lib.filters.DeduplicateDocuments
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{collect_list, octet_length, udf}
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.rogach.scallop.ScallopConf
-
-import scala.reflect.runtime.universe.TypeTag
 
 object DedupFilterStatistics {
 
@@ -57,7 +57,7 @@ object DedupFilterStatistics {
       .csv(args.output())
   }
 
-  def ratioUdfConstructor[T: TypeTag](
+  def ratioUdfConstructor(
       sample: Double
   )(extractor: Document => Float): UserDefinedFunction = {
     udf {
@@ -73,7 +73,8 @@ object DedupFilterStatistics {
         val ratio = extractor(doc)
         val docData =
           if (doc.randomDouble < sample) {
-            docParts.map(_.text.replace("\n", "<br>")).mkString("<p>")
+            docParts.map(p => Paragraphs.cleanTextBlocksInParagraph(p.text).mkString("<br>"))
+              .mkString("<p>")
           } else ""
         (docData, ratio)
     }
@@ -101,6 +102,10 @@ object DedupFilterStatistics {
         udfMaker(doc => DuplicateDocumentsLengthWeighted.nearFreqWeight(doc).toFloat)
       case "freq-percentile" =>
         udfMaker(doc => DeduplicateDocumentsPercentile.freqAtPercentile(doc, 0.05f).toFloat)
+      case "large-freq-paragraphs" =>
+        val freq = if (arg == "") 100 else arg.toInt
+        val filter = new LargeFreqParagraphs(freq = freq)
+        udfMaker(doc => filter.markParagraphs(doc.paragraphs.toBuffer).toFloat)
       case _ => throw new IllegalArgumentException(s"unknown metric $ftype")
     }
 
