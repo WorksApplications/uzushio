@@ -32,6 +32,8 @@ case class Paragraph(
     nearFreq: Int = 1,
     remove: AnyRef = null
 ) {
+  final val cssSelectorSeparator = ">"
+
   def renderInto[T <: Appendable](bldr: T): T = {
     if (path != null && path.nonEmpty) {
       bldr.append(path)
@@ -40,6 +42,8 @@ case class Paragraph(
     bldr.append(text)
     bldr
   }
+
+  def cssSelectors: Seq[String] = this.path.split(cssSelectorSeparator)
 
   def isAlive: Boolean = remove == null
   def isDeleted: Boolean = !isAlive

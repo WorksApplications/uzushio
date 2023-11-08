@@ -32,10 +32,20 @@ package object filters {
     )
   }
 
-  def testParagraphs(texts: Seq[String], nearFreqs: Seq[Int]): IndexedSeq[Paragraph] = {
-      (texts, nearFreqs)
-        .zipped
-        .map ((text, freq) => Paragraph("", text, 0, 1, freq))
-        .toIndexedSeq
+  def testParagraphs(texts: Seq[String], nearFreqs: Seq[Int] = Seq(), exactFreqs: Seq[Int] = Seq(), paths: Seq[String] = Seq()): IndexedSeq[Paragraph] = {
+    require(texts.length == nearFreqs.length || nearFreqs.isEmpty)
+    require(texts.length == exactFreqs.length || exactFreqs.isEmpty)
+    require(texts.length == paths.length || paths.isEmpty)
+
+    val nearFreqs_ = if (!nearFreqs.isEmpty) nearFreqs else Seq.fill(texts.length)(1)
+    val exactFreqs_ = if (!exactFreqs.isEmpty) exactFreqs else Seq.fill(texts.length)(1)
+    val paths_ = if (!paths.isEmpty) paths else 0.to(texts.length).map(_ => "body>p.text")
+
+    texts
+      .zip(nearFreqs_)
+      .zip(exactFreqs_)
+      .zip(paths_)
+      .map { case (((text, nearFreq), exactFreq), path) => Paragraph(path, text, 0, exactFreq, nearFreq) }
+      .toIndexedSeq
   }
 }
