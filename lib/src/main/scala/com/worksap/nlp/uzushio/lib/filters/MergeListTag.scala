@@ -1,24 +1,23 @@
 package com.worksap.nlp.uzushio.lib.filters
 
 import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
-import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
-import scala.collection.mutable.ArrayBuffer
+import com.worksap.nlp.uzushio.lib.cleaning.Document
 
 class MergeListTag extends DocFilter {
   final val acceptedTags = Seq("li", "option")
   final val mdListSymbol = "- "
 
   def containsAcceptedTag(cssSelectorStrs: Seq[String]): Boolean = {
-    extractDescendantTagWithParentSelectors(cssSelectorStrs, acceptedTags) match {
+    extractDescendantTag(cssSelectorStrs, acceptedTags) match {
       case Some(_) => true
       case None => false
     }
   }
 
-  def extractDescendantTagWithParentSelectors(
+  def extractDescendantTag(
       cssSelectorStrs: Seq[String],
       tagNames: Seq[String]
-  ): Option[Tuple2[String, Seq[String]]] = {
+  ): Option[String] = {
     val iter = cssSelectorStrs.reverse.iterator
     var i = 0
 
@@ -27,22 +26,10 @@ class MergeListTag extends DocFilter {
       val tagWithAttrs = tagWithCSS.split("[#\\.]")
       i += 1
       if (acceptedTags.contains(tagWithAttrs.head)) {
-        return Option((tagWithCSS, cssSelectorStrs.take(cssSelectorStrs.length - i)))
+        return Option(tagWithCSS)
       }
     }
     return None
-  }
-
-  def matchesTagAndParentPath(paragraph1: Paragraph, paragraph2: Paragraph): Boolean = {
-    val tagWithCSS1 = extractDescendantTagWithParentSelectors(paragraph1.cssSelectors, acceptedTags)
-    val tagWithCSS2 = extractDescendantTagWithParentSelectors(paragraph2.cssSelectors, acceptedTags)
-
-    (tagWithCSS1, tagWithCSS2) match {
-      case (Some((tag1, path1)), Some((tag2, path2))) => {
-        tag1 == tag2 && path1 == path2
-      }
-      case _ => false
-    }
   }
 
   override def checkDocument(doc: Document): Document = {
@@ -55,7 +42,7 @@ class MergeListTag extends DocFilter {
         nextParagraph.cssSelectors
       )
 
-      if (isAccteptedTags && matchesTagAndParentPath(paragraph, nextParagraph)) {
+      if (isAccteptedTags && paragraph.path == nextParagraph.path) {
         val mergedParagraph = nextParagraph.copy(
           text = List(paragraph.text, nextParagraph.text)
             .map(s => if (s.startsWith(mdListSymbol)) s else mdListSymbol + s).mkString("\n"),
