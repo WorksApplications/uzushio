@@ -2,88 +2,65 @@ package com.worksap.nlp.uzushio.lib.filters
 
 import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
-import scala.collection.mutable.{ArrayBuffer, Queue}
+import scala.collection.mutable.ArrayBuffer
 
 class MergeListTag extends DocFilter {
-  final val listTagString = "li"
+  final val acceptedTags = Seq("li", "option")
   final val mdListSymbol = "- "
 
-  def containsListTag(cssSelectorStrs: Seq[String]): Boolean = {
-    extractDescendantTag(cssSelectorStrs, listTagString) match {
+  def containsAcceptedTag(cssSelectorStrs: Seq[String]): Boolean = {
+    extractDescendantTagWithParentSelectors(cssSelectorStrs, acceptedTags) match {
       case Some(_) => true
       case None => false
     }
   }
 
-  def extractDescendantTag(cssSelectorStrs: Seq[String], tagName: String): Option[String] = {
+  def extractDescendantTagWithParentSelectors(cssSelectorStrs: Seq[String], tagNames: Seq[String]): Option[Tuple2[String, Seq[String]]] = {
     val iter = cssSelectorStrs.reverse.iterator
+    var i = 0
 
     while (iter.hasNext) {
       val tagWithCSS = iter.next()
       val tagWithAttrs = tagWithCSS.split("[#\\.]")
-      if (tagWithAttrs.head == tagName) {
-        return Option(tagWithCSS)
+      i += 1
+      if (acceptedTags.contains(tagWithAttrs.head)) {
+        return Option((tagWithCSS, cssSelectorStrs.take(cssSelectorStrs.length - i)))
       }
     }
     return None
   }
 
-  def mergeListParagraphs(listTagParagraphs: Seq[Paragraph]): Seq[Paragraph] = {
-    val listParsGroup = listTagParagraphs
-      .groupBy(par => extractDescendantTag(par.cssSelectors, listTagString).get)
+  def matchesTagAndParentPath(paragraph1: Paragraph, paragraph2: Paragraph): Boolean = {
+    val tagWithCSS1 = extractDescendantTagWithParentSelectors(paragraph1.cssSelectors, acceptedTags)
+    val tagWithCSS2 = extractDescendantTagWithParentSelectors(paragraph2.cssSelectors, acceptedTags)
 
-    listParsGroup.map {
-      case (tagName, groupedPars) => {
-        val exactFreqs = groupedPars.map(par => par.exactFreq)
-        val nearFreqs = groupedPars.map(par => par.nearFreq)
-        val listTexts = groupedPars.map(par => mdListSymbol + par.text)
-        val text = listTexts.mkString("\n")
-        val mergedListParagraph = groupedPars.head
-          .copy(text = text, exactFreq = exactFreqs.min, nearFreq = nearFreqs.min)
-
-        // for consistency of paragraph index
-        val tail = groupedPars.tail.map(par => par.copy(remove = par))
-        mergedListParagraph +: tail
+    (tagWithCSS1, tagWithCSS2) match {
+      case (Some((tag1, path1)), Some((tag2, path2))) => {
+        tag1 == tag2 && path1 == path2
       }
-    }.flatten.to[Seq]
-  }
-
-  def findConsecutiveListTag(paragraphs: Seq[Paragraph]): Seq[Paragraph] = {
-    var isListBlock = true
-    val listTagParagraphs = ArrayBuffer.empty[Paragraph]
-    val iter = paragraphs.iterator
-    while (isListBlock && iter.hasNext) {
-      val paragraph = iter.next
-      isListBlock = containsListTag(paragraph.cssSelectors)
-      if (isListBlock) {
-        listTagParagraphs.append(paragraph)
-      }
+      case _ => false
     }
-    listTagParagraphs
   }
 
   override def checkDocument(doc: Document): Document = {
-    val paragraphs = doc.aliveParagraphs.to[Seq]
-    val iter = paragraphs.iterator.zipWithIndex
-    val newParagraphs = ArrayBuffer.empty[Paragraph]
-    val listTagParagraphQueue = Queue[Paragraph]()
+    var paragraphs = doc.aliveParagraphs.to[Seq]
 
-    while (iter.hasNext) {
-      val (paragraph, i) = iter.next
-      val cssSelectorStrs = paragraph.cssSelectors
+    (0 until paragraphs.length - 1).foreach { i =>
+      val paragraph = paragraphs(i)
+      val nextParagraph = paragraphs(i + 1)
+      val isAccteptedTags = containsAcceptedTag(paragraph.cssSelectors) && containsAcceptedTag(nextParagraph.cssSelectors)
 
-      if (listTagParagraphQueue.isEmpty && containsListTag(cssSelectorStrs)) {
-        val listTagParagraphs = findConsecutiveListTag(paragraphs.drop(i))
-        listTagParagraphQueue ++= mergeListParagraphs(listTagParagraphs)
-        newParagraphs += listTagParagraphQueue.dequeue
-      } else if (!listTagParagraphQueue.isEmpty) {
-        // if queue is not empty, add merged paragraph or remove-signed one
-        newParagraphs += listTagParagraphQueue.dequeue
-      } else {
-        newParagraphs += paragraph.copy()
+      if (isAccteptedTags && matchesTagAndParentPath(paragraph, nextParagraph)) {
+        val mergedParagraph = nextParagraph.copy(
+          text = List(paragraph.text, nextParagraph.text).map(s => if (s.startsWith(mdListSymbol)) s else mdListSymbol + s).mkString("\n"),
+          exactFreq = math.min(paragraph.exactFreq, nextParagraph.exactFreq),
+          nearFreq = math.min(paragraph.nearFreq, nextParagraph.nearFreq)
+        )
+        paragraphs = paragraphs.updated(i, paragraph.copy(remove = paragraph))
+        paragraphs = paragraphs.updated(i + 1, mergedParagraph)
       }
     }
 
-    doc.copy(paragraphs = newParagraphs)
+    doc.copy(paragraphs = paragraphs)
   }
 }
