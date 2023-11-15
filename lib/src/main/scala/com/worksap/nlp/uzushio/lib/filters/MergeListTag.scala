@@ -15,7 +15,10 @@ class MergeListTag extends DocFilter {
     }
   }
 
-  def extractDescendantTagWithParentSelectors(cssSelectorStrs: Seq[String], tagNames: Seq[String]): Option[Tuple2[String, Seq[String]]] = {
+  def extractDescendantTagWithParentSelectors(
+      cssSelectorStrs: Seq[String],
+      tagNames: Seq[String]
+  ): Option[Tuple2[String, Seq[String]]] = {
     val iter = cssSelectorStrs.reverse.iterator
     var i = 0
 
@@ -48,11 +51,14 @@ class MergeListTag extends DocFilter {
     (0 until paragraphs.length - 1).foreach { i =>
       val paragraph = paragraphs(i)
       val nextParagraph = paragraphs(i + 1)
-      val isAccteptedTags = containsAcceptedTag(paragraph.cssSelectors) && containsAcceptedTag(nextParagraph.cssSelectors)
+      val isAccteptedTags = containsAcceptedTag(paragraph.cssSelectors) && containsAcceptedTag(
+        nextParagraph.cssSelectors
+      )
 
       if (isAccteptedTags && matchesTagAndParentPath(paragraph, nextParagraph)) {
         val mergedParagraph = nextParagraph.copy(
-          text = List(paragraph.text, nextParagraph.text).map(s => if (s.startsWith(mdListSymbol)) s else mdListSymbol + s).mkString("\n"),
+          text = List(paragraph.text, nextParagraph.text)
+            .map(s => if (s.startsWith(mdListSymbol)) s else mdListSymbol + s).mkString("\n"),
           exactFreq = math.min(paragraph.exactFreq, nextParagraph.exactFreq),
           nearFreq = math.min(paragraph.nearFreq, nextParagraph.nearFreq)
         )
