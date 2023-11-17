@@ -43,8 +43,29 @@ case class Paragraph(
     bldr
   }
 
-  def cssSelectors: Seq[String] = this.path.split(cssSelectorSeparator)
+  def containsTags(tagNames: Seq[String]): Boolean = {
+    extractDescendantTag(tagNames) match {
+      case Some(_) => true
+      case None => false
+    }
+  }
 
+  def extractDescendantTag(tagNames: Seq[String]): Option[String] = {
+    val iter = cssSelectors.reverse.iterator
+    var i = 0
+
+    while (iter.hasNext) {
+      val tagWithCSS = iter.next()
+      val tagWithAttrs = tagWithCSS.split("[#\\.]")
+      i += 1
+      if (tagNames.contains(tagWithAttrs.head)) {
+        return Option(tagWithAttrs.head)
+      }
+    }
+    return None
+  }
+
+  def cssSelectors: Seq[String] = this.path.split(cssSelectorSeparator)
   def isAlive: Boolean = remove == null
   def isDeleted: Boolean = !isAlive
 }
