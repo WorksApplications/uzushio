@@ -13,7 +13,8 @@ class MergeListTag extends DocFilter {
     (0 until paragraphs.length - 1).foreach { i =>
       val paragraph = paragraphs(i)
       val nextParagraph = paragraphs(i + 1)
-      val isAccteptedTags = paragraph.containsTags(acceptedTags) && nextParagraph.containsTags(acceptedTags)
+      val isAccteptedTags = paragraph.containsTags(acceptedTags) && nextParagraph
+        .containsTags(acceptedTags)
 
       if (isAccteptedTags && paragraph.path == nextParagraph.path) {
         val mergedParagraph = nextParagraph.copy(
