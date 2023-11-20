@@ -8,7 +8,11 @@ class NoContentDOM extends ParagraphFilter {
   final val filteringDomNames = Seq("header", "footer", "aside", "nav")
 
   // I checked some of the Common Crawl extracts and noticed that `div#header` and `div.nav` are also often used instead of `<header>` and `<nav>`.
-  def containsTagWithIdAndClasses(p: Paragraph, tagName: String, classOrIdNames: Seq[String]): Boolean = {
+  def containsTagWithIdAndClasses(
+      p: Paragraph,
+      tagName: String,
+      classOrIdNames: Seq[String]
+  ): Boolean = {
     val iter = p.cssSelectors.reverse.iterator
 
     while (iter.hasNext) {
@@ -22,7 +26,9 @@ class NoContentDOM extends ParagraphFilter {
   }
 
   override def checkParagraph(p: Paragraph): Paragraph = {
-    if (p.containsTags(filteringDomNames) || containsTagWithIdAndClasses(p, "div", filteringDomNames)) {
+    if (
+      p.containsTags(filteringDomNames) || containsTagWithIdAndClasses(p, "div", filteringDomNames)
+    ) {
       p.copy(remove = p)
     } else {
       p
