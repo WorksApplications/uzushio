@@ -364,6 +364,7 @@ class DeduplicateParagraphs(
   private val clampLongToInt = udf((x: Long) => math.min(x, Int.MaxValue).toInt).asNonNullable()
 
   def process(): Unit = {
+    import com.worksap.nlp.uzushio.lib.utils.BuilderSyntax._
     val rawData = spark.read.parquet(args.inputs: _*)
 
     val basicData = prepareBasicData(rawData)
@@ -412,7 +413,8 @@ class DeduplicateParagraphs(
     // filtered.queryExecution.debug.toFile("""e:\data\nlp\corpora\cc\dups\CC-MAIN-2013-20\codegen""")
 
     filtered.coalesce(args.partitions).write.mode(SaveMode.Overwrite).format(args.format)
-      .option("compression", args.compression).save(args.output)
+      .ifEnabled(args.debug)(_.partitionBy("filter")).option("compression", args.compression)
+      .save(args.output)
   }
 
   private def prepareBasicData(rawData: DataFrame): DataFrame = {
@@ -544,14 +546,14 @@ class DeduplicateParagraphs(
   // paragraphs are shuffled because of join with freqs,
   // groupBy op merges them back together, and we use an udf to perform the actual filtering
   private def filterDuplicateDocs(ds: DataFrame): DataFrame = {
-    val docParts = Seq("text", "pos", "exactFreq", "nearFreq")
+    val docParts = Seq("docId", "text", "pos", "exactFreq", "nearFreq")
 
     val allColumns = ds.columns
 
-    val passthroughColumns = allColumns.toSeq.filterNot(_ == "docId").filterNot(docParts.contains(_))
+    val passthroughColumns = allColumns.toSeq.filterNot(docParts.contains(_))
 
     val aggQueryBasicColumns = passthroughColumns.map(colName => first(colName).as(colName))
-    val aggColumns = docParts.map(x => collect_list(x).as(x))
+    val aggColumns = docParts.filterNot(_ == "docId").map(x => collect_list(x).as(x))
 
     val aggOpFirst :: aggOpRest = (aggColumns ++ aggQueryBasicColumns).toList
 
@@ -560,6 +562,7 @@ class DeduplicateParagraphs(
     val args = this.args
     val convertUdf = udf(
       (
+          docId: String,
           text: Array[String],
           pos: Array[Int],
           exactFreq: Array[Int],
@@ -571,18 +574,38 @@ class DeduplicateParagraphs(
           exactFreq,
           nearFreq
         )
-        DeduplicateParagraphs.processDocumentParts(args, sorted)
+        DeduplicateParagraphs.processDocumentParts(args, docId, sorted)
       }
     ).asNonNullable()
 
     val transformCols = Seq(
       $"docId",
-      convertUdf(docParts.map(aggOpResult.col): _*).as("text")
+      explode(convertUdf(docParts.map(aggOpResult.col): _*)).as("converted")
     ) ++ passthroughColumns.map(aggOpResult.col)
 
-    aggOpResult.select(
+    val processed = aggOpResult.select(
       transformCols: _*
-    ).filter(octet_length($"text") > 0)
+    )
+
+    val processedCols = processed.columns.filterNot(_ == "converted")
+
+    val postprocessed =
+      if (args.debug) {
+        processed.select(
+          processedCols.map(processed.col) ++ Seq(
+            $"converted.text".as("text"),
+            $"converted.filter".as("filter"),
+          ): _*
+        )
+      } else {
+        processed.filter($"converted.filter" === "null").select(
+          processedCols.map(processed.col) ++ Seq(
+            $"converted.text".as("text")
+          ): _*
+        )
+      }
+
+    postprocessed.filter(octet_length($"text") > 0)
   }
 
   private def saveReassembled(ds: DataFrame) = {
@@ -693,16 +716,23 @@ object DeduplicateParagraphs {
     }
   }
 
+  case class ProcessedDocument(text: String, filter: String)
+
   private def processDocumentParts(
       args: Args,
+      docId: String,
       parts: IndexedSeq[Paragraph]
-  ): String = {
-    val doc = Document(parts)
+  ): Array[ProcessedDocument] = {
+    val doc = Document(parts, docId = docId)
     val filtered = args.pipeline.applyFilters(doc)
-    if (filtered.isDeleted) {
-      return filtered.copy(IndexedSeq()).render()
+    val droppedParagraphs = filtered.countDroppedParagraphs()
+    val textOnly = args.textOnly
+    if (droppedParagraphs == 0) {
+      return Array(ProcessedDocument(filtered.render(textOnly = textOnly), filtered.filterAsString))
     }
-    filtered.copy(paragraphs = filtered.paragraphs.filter(_.isAlive)).render()
+
+    val docs = filtered.splitByFilteredParagraphs()
+    docs.map(doc => ProcessedDocument(doc.render(textOnly), doc.filterAsString)).toArray
   }
 
   // noinspection TypeAnnotation,ScalaWeakerAccess
@@ -736,6 +766,7 @@ object DeduplicateParagraphs {
     val cacheLevel = opt[String](
       descr = "Spark StorageLevel for caching operations"
     )
+    val textOnly = toggle(default = Some(false), descrYes = "output only text")
     verify()
 
     def toArgs: Args = Args(
@@ -787,7 +818,8 @@ object DeduplicateParagraphs {
       bufferSizeInBytes: Int = 10000000,
       preFilterRatio: Double = 0.6,
       propagatePartitions: Int = 64,
-      cacheLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK
+      cacheLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK,
+      textOnly: Boolean = false
   ) {
     val shiftIndices: Array[Int] = {
       val base = Array.range(0, simHashSize)
