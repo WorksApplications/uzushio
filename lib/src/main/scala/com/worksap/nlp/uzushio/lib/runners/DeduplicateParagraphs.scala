@@ -413,8 +413,8 @@ class DeduplicateParagraphs(
     // filtered.queryExecution.debug.toFile("""e:\data\nlp\corpora\cc\dups\CC-MAIN-2013-20\codegen""")
 
     filtered.coalesce(args.partitions).write.mode(SaveMode.Overwrite).format(args.format)
-      .ifEnabled(args.debug)(_.partitionBy("filter")).option("compression", args.compression)
-      .save(args.output)
+      .ifEnabled(args.hasStage("filter-debug"))(_.partitionBy("filter"))
+      .option("compression", args.compression).save(args.output)
   }
 
   private def prepareBasicData(rawData: DataFrame): DataFrame = {
@@ -590,7 +590,7 @@ class DeduplicateParagraphs(
     val processedCols = processed.columns.filterNot(_ == "converted")
 
     val postprocessed =
-      if (args.debug) {
+      if (args.hasStage("filter-debug")) {
         processed.select(
           processedCols.map(processed.col) ++ Seq(
             $"converted.text".as("text"),
