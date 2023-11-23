@@ -8,8 +8,9 @@ import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap
 import org.apache.commons.codec.binary.Hex
+import org.apache.spark.sql.expressions.Aggregator
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, Encoder, Encoders, SaveMode, SparkSession}
 import org.apache.spark.storage.StorageLevel
 import org.rogach.scallop.ScallopConf
 import org.slf4j.LoggerFactory
@@ -17,6 +18,7 @@ import spire.std.LevenshteinDistance
 
 import java.util
 import java.util.{Comparator, Random}
+import scala.collection.mutable
 
 case class RowResult(
     text: String,
@@ -661,6 +663,35 @@ object DeduplicateParagraphs {
     count
   }
 
+  case class DocPairs(data: Seq[DocPair])
+
+  private final val testUdaf = udaf(new Aggregator[DocPair, mutable.PriorityQueue[DocPair], DocPairs] {
+    override def zero: mutable.PriorityQueue[DocPair] = new mutable.PriorityQueue[DocPair]()(DocPair.Reversed)
+
+    override def reduce(b: mutable.PriorityQueue[DocPair], a: DocPair): mutable.PriorityQueue[DocPair] = {
+      b += a
+      if (b.size > 100) {
+        b.dequeue()
+      }
+      b
+    }
+
+    override def merge(b1: mutable.PriorityQueue[DocPair], b2: mutable.PriorityQueue[DocPair]): mutable.PriorityQueue[DocPair] = {
+      while (b2.nonEmpty) {
+        reduce(b1, b2.dequeue())
+      }
+      b1
+    }
+
+    override def finish(reduction: mutable.PriorityQueue[DocPair]): DocPairs = {
+      DocPairs(reduction.dequeueAll)
+    }
+
+    override def bufferEncoder: Encoder[mutable.PriorityQueue[DocPair]] = Encoders.javaSerialization
+
+    override def outputEncoder: Encoder[DocPairs] = Encoders.product
+  })
+
   def prepareParagraphsForFiltering(
       raw: DataFrame,
       stats: DataFrame,
@@ -683,10 +714,12 @@ object DeduplicateParagraphs {
     val cookedDocs = exploded.withColumn("cleanText", cleanParUdf($"text"))
       .withColumn("parHash", xxhash64($"cleanText")).cache()
 
-    val topHashes = cookedDocs.groupBy("parHash").count().as[DocPair].rdd
-      .takeOrdered(100)(DocPair.Reversed)
+    val counts = cookedDocs.groupBy("parHash").count()
+    val hashesRow = counts.agg(testUdaf($"parHash", $"count")).as[Tuple1[DocPairs]].head()._1
 
-    logger.info(s"Top hashes: ${topHashes.toSeq}")
+    logger.info(s"Top hashes: $hashesRow")
+
+    val topHashes = hashesRow.data
 
     val convertionHashmap = {
       val x = new Long2LongOpenHashMap(topHashes.length)
