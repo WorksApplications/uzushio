@@ -6,11 +6,13 @@ import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap
 import org.apache.commons.codec.binary.Hex
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.storage.StorageLevel
 import org.rogach.scallop.ScallopConf
+import org.slf4j.LoggerFactory
 import spire.std.LevenshteinDistance
 
 import java.util
@@ -633,6 +635,32 @@ class DeduplicateParagraphs(
 
 object DeduplicateParagraphs {
 
+  private final val logger = LoggerFactory.getLogger(classOf[DeduplicateParagraphs])
+
+  case class DocPair(parHash: Long, count: Long)
+
+  object DocPair {
+    implicit object Reversed extends Ordering[DocPair] {
+      override def compare(x: DocPair, y: DocPair): Int = java.lang.Long.compare(y.count, x.count)
+    }
+  }
+
+  final private val countParagraphs = udf { (s: String) =>
+    var count = 1
+    var offset = 0
+    val len = s.length
+    while (offset < len) {
+      val idx = s.indexOf("\n\n", offset)
+      if (idx < 0) {
+        offset = len
+      } else {
+        offset = idx + 2
+        count += 1
+      }
+    }
+    count
+  }
+
   def prepareParagraphsForFiltering(
       raw: DataFrame,
       stats: DataFrame,
@@ -646,24 +674,53 @@ object DeduplicateParagraphs {
       case col => raw.col(col)
     }
 
-    val exploded = raw.select(explodeCols: _*)
+    val exploded = raw
+      .filter(octet_length($"text") < 2 * 1024 * 1024 && countParagraphs($"text") < 1000)
+      .select(explodeCols: _*)
 
     val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
 
     val cookedDocs = exploded.withColumn("cleanText", cleanParUdf($"text"))
-      .withColumn("parHash", xxhash64($"cleanText"))
+      .withColumn("parHash", xxhash64($"cleanText")).cache()
 
-    val joined = cookedDocs.join(stats, $"parHash" === $"hash", "left")
+    val topHashes = cookedDocs.groupBy("parHash").count().as[DocPair].rdd
+      .takeOrdered(100)(DocPair.Reversed)
+
+    logger.info(s"Top hashes: ${topHashes.toSeq}")
+
+    val convertionHashmap = {
+      val x = new Long2LongOpenHashMap(topHashes.length)
+      topHashes.zipWithIndex.foreach { case (DocPair(hash, _), i) => x.put(hash, i) }
+      x.defaultReturnValue(-1)
+      x
+    }
+    val convertUdf = udf { (x: Long, id: Long) =>
+      convertionHashmap.get(x) match {
+        case -1 => x
+        case _ => NgramHashExtractor.mix(x, id)
+      }
+    }
+
+    val cols = cookedDocs.columns.flatMap {
+      case "cleanText" => Some(cookedDocs.col("parHash").as("origHash"))
+      case "parHash" =>
+        Some(convertUdf(cookedDocs.col("parHash"), monotonically_increasing_id()).as("parHash"))
+      case x => Some(cookedDocs.col(x))
+    }
+
+    val newCooked = cookedDocs.select(cols: _*)
+
+    val joined = newCooked.join(stats, $"parHash" === $"hash", "left")
 
     val basicCols = (if (debug) {
                        joined.columns.filter {
-                         case "parHash" => false
+                         case "parHash" | "origHash" => false
                          case "exactFreq" | "nearFreq" => false
                          case _ => true
                        }
                      } else {
                        joined.columns.filter {
-                         case "hash" | "reprHash" | "parHash" | "cleanText" => false
+                         case "hash" | "reprHash" | "parHash" | "cleanText" | "origHash" => false
                          case "exactFreq" | "nearFreq" => false
                          case _ => true
                        }
