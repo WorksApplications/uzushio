@@ -82,6 +82,7 @@ case class Document(
     docId: String = "",
     remove: AnyRef = null
 ) {
+
   def removeWhen(toRemove: Boolean, remover: AnyRef): Document = {
     if (toRemove) copy(remove = remover) else this
   }
@@ -125,19 +126,26 @@ case class Document(
    * @return split documents using the criterion described above, in a non-determined order
    */
   def splitByFilteredParagraphs(): Seq[Document] = {
-    val cached = new mutable.HashMap[String, mutable.Buffer[Paragraph]]
+    val cached = new java.util.HashMap[String, mutable.Buffer[Paragraph]]
 
     paragraphs.foreach { par =>
-      val buf = cached.getOrElse(par.filterAsString, new ArrayBuffer[Paragraph]())
+      val buf = cached.computeIfAbsent(par.filterAsString, _ => new ArrayBuffer[Paragraph]())
       buf += par
     }
 
-    cached.map { case (k, v) =>
-      k match {
+    val result = new ArrayBuffer[Document]()
+    val iterator = cached.entrySet().iterator()
+
+    while (iterator.hasNext) {
+      val e = iterator.next()
+      val k = e.getKey
+      val v = e.getValue
+      result += (k match {
         case "null" => Document(v, docId, remove)
         case _ => Document(v, docId, v.head.remove)
-      }
-    }.toSeq
+      })
+    }
+    result
   }
 }
 
@@ -152,6 +160,8 @@ object Document {
     }
     Document(parObjects)
   }
+
+  def apply(paragraphs: Paragraph*): Document = new Document(paragraphs)
 }
 
 class PerParagraphFilter(val filter: ParagraphFilter) extends DocFilter {

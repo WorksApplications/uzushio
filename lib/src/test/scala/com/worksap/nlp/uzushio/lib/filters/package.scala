@@ -37,9 +37,9 @@ package object filters {
     require(texts.length == exactFreqs.length || exactFreqs.isEmpty)
     require(texts.length == paths.length || paths.isEmpty)
 
-    val nearFreqs_ = if (!nearFreqs.isEmpty) nearFreqs else Seq.fill(texts.length)(1)
-    val exactFreqs_ = if (!exactFreqs.isEmpty) exactFreqs else Seq.fill(texts.length)(1)
-    val paths_ = if (!paths.isEmpty) paths else 0.to(texts.length).map(_ => "body>p.text")
+    val nearFreqs_ = if (nearFreqs.nonEmpty) nearFreqs else Seq.fill(texts.length)(1)
+    val exactFreqs_ = if (exactFreqs.nonEmpty) exactFreqs else Seq.fill(texts.length)(1)
+    val paths_ = if (paths.nonEmpty) paths else 0.to(texts.length).map(_ => "body>p.text")
 
     texts
       .zip(nearFreqs_)
