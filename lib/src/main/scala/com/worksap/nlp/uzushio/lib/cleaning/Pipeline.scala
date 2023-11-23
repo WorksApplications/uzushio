@@ -55,11 +55,11 @@ case class Paragraph(
   }
 
   def extractDescendantTag(tagNames: Seq[String]): Option[String] = {
-    val iter = cssSelectors.reverse.iterator
+    val iter = cssSelectors.reverseIterator
 
     while (iter.hasNext) {
       val tagWithCSS = iter.next()
-      val tagWithAttrs = tagWithCSS.split("[#\\.]")
+      val tagWithAttrs = tagWithCSS.split("[#.]")
       if (tagNames.contains(tagWithAttrs.head)) {
         return Option(tagWithAttrs.head)
       }
@@ -67,13 +67,13 @@ case class Paragraph(
     None
   }
 
-  def cssSelectors: Seq[String] = this.path.split(Document.cssSelectorSeparator)
+  @transient lazy val cssSelectors: Seq[String] = this.path.split(Document.cssSelectorSeparator)
   def isAlive: Boolean = remove == null
   def isDeleted: Boolean = !isAlive
 
   def filterAsString: String = remove match {
     case null => "null"
-    case x => x.toString
+    case o => o.toString
   }
 }
 

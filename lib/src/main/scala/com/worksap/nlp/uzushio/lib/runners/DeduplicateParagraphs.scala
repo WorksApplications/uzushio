@@ -614,20 +614,10 @@ class DeduplicateParagraphs(
 
   private def saveReassembled(ds: DataFrame) = {
     val cols = ds.columns.flatMap {
-      case "text" | "date" | "charset" => None
+      case "date" | "charset" => None
+      case "text" => Some(ds.col("text"))
       case x => Some(ds.col(x))
     }
-
-    val parFields = Set(
-      "text",
-      "cleanText",
-      "hash",
-      "reprHash",
-      "repr",
-      "pos",
-      "exactFreq",
-      "nearFreq"
-    )
 
     ds.select(cols: _*).repartition(args.partitions, $"docId")
       .sortWithinPartitions($"docId", $"url", $"pos").write.mode(SaveMode.Overwrite)
@@ -711,8 +701,8 @@ object DeduplicateParagraphs {
 
     val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
 
-    val cookedDocs = exploded.withColumn("cleanText", cleanParUdf($"text"))
-      .withColumn("parHash", xxhash64($"cleanText")).cache()
+    val cookedDocs = exploded.withColumn("parHash", xxhash64(cleanParUdf($"text")))
+      .persist(StorageLevel.DISK_ONLY)
 
     val counts = cookedDocs.groupBy("parHash").count()
     val hashesRow = counts.agg(testUdaf($"parHash", $"count")).as[Tuple1[DocPairs]].head()._1
@@ -753,7 +743,7 @@ object DeduplicateParagraphs {
                        }
                      } else {
                        joined.columns.filter {
-                         case "hash" | "reprHash" | "parHash" | "cleanText" | "origHash" => false
+                         case "hash" | "reprHash" | "parHash" | "origHash" => false
                          case "exactFreq" | "nearFreq" => false
                          case _ => true
                        }
