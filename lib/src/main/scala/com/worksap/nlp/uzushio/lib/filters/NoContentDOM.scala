@@ -5,7 +5,8 @@ import com.worksap.nlp.uzushio.lib.filters.base.ParagraphFilter
 
 class NoContentDOM extends ParagraphFilter {
   // This names are tag names, but also class names and id names
-  final private val filteringDomNames: Seq[String] = Array("header", "footer", "aside", "nav")
+  final private val filteringDomNames: Seq[String] =
+    Array("header", "footer", "aside", "nav", "left-box", "sidebar")
 
   // I checked some of the Common Crawl extracts and noticed that `div#header` and `div.nav` are also often used instead of `<header>` and `<nav>`.
   def containsTagWithIdAndClasses(

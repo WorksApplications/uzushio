@@ -732,8 +732,7 @@ object DeduplicateParagraphs {
     }
 
     val cols = cookedDocs.columns.flatMap {
-      case "parHash" =>
-        Seq(
+      case "parHash" => Seq(
           convertUdf(cookedDocs.col("parHash"), monotonically_increasing_id()).as("parHash"),
           cookedDocs.col("parHash").as("origHash")
         )
@@ -772,7 +771,8 @@ object DeduplicateParagraphs {
     }
 
     val computedCols = Seq( // common newly computed columns
-      fixup($"origHash", when($"exactFreq".isNotNull, $"exactFreq").otherwise(lit(1))).as("exactFreq"),
+      fixup($"origHash", when($"exactFreq".isNotNull, $"exactFreq").otherwise(lit(1)))
+        .as("exactFreq"),
       fixup($"origHash", when($"nearFreq".isNotNull, $"nearFreq").otherwise(lit(1))).as("nearFreq")
     )
 
