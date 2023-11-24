@@ -67,7 +67,8 @@ object Paragraphs {
       } else {
         cleanLinksImpl(new lang.StringBuilder(x), idx)
       }
-    emptyLinks.replaceAllIn(noBreaks, "")
+    val preClean = emptyLinks.replaceAllIn(noBreaks, "")
+    linkChars.replaceAllIn(preClean, "")
   }
 
   private def cleanLinksImpl(
