@@ -34,7 +34,7 @@ object DedupFilterStatistics {
     val textOnly = limited.select("text", "docId").filter(octet_length($"text") > 2)
 
     val docsWithStats = DeduplicateParagraphs
-      .prepareParagraphsForFiltering(textOnly, stats, debug = false)
+      .prepareParagraphsForFilteringDefault(textOnly, stats, debug = false)
 
     val assembledDocs = docsWithStats.groupBy("docId").agg(
       collect_list("text") as "text",

@@ -405,7 +405,7 @@ class DeduplicateParagraphs(
     }
 
     val paragraphsWithFreqs = DeduplicateParagraphs
-      .prepareParagraphsForFiltering(rawData, stats, args.debug)
+      .prepareParagraphsForFilteringWithLocalFrequencyBias(rawData, stats, args.debug)
 
     if (args.hasStage("saveReassembled")) {
       saveReassembled(paragraphsWithFreqs)
@@ -689,7 +689,31 @@ object DeduplicateParagraphs {
     override def outputEncoder: Encoder[DocPairs] = Encoders.product
   })
 
-  def prepareParagraphsForFiltering(
+  /** Join the raw text dataset with paragraph-wise duplication statistics data. This function
+    * performs mitigation against Zipf law which causes unbalanced processing time during document
+    * reassembly.
+    *
+    * Because paragraphs are joined with duplication statistics data using paragraph hashes and
+    * natural language phenomena generally follow Zipf law, there would be a small amount of
+    * paragraphs with extremely large counts, especially in large datasets. Spark usually assign
+    * them to a single partition and that can cause a single partition to be >50 times larger than
+    * other ones, yielding a partition which has >50 times processing time than other ones.
+    *
+    * This function replaces top 100 frequent hashes, which are used during the join with random
+    * hashes, balancing the partitions. After this, global duplicate-wise frequencies of replaced
+    * paragraphs are replaced with local exact ones. This will cause processing to under-estimate
+    * such high-frequency paragraphs, however they usually have very high frequency nevertheless
+    *
+    * @param raw
+    *   raw documents
+    * @param stats
+    *   frequency statistics data
+    * @param debug
+    *   output additional fields for debug
+    * @return
+    *   dataset with statistics data added to paragraphs. Documents are disassembled to paragraphs.
+    */
+  def prepareParagraphsForFilteringWithLocalFrequencyBias(
       raw: DataFrame,
       stats: DataFrame,
       debug: Boolean
@@ -697,19 +721,7 @@ object DeduplicateParagraphs {
 
     import raw.sparkSession.implicits._
 
-    val explodeCols = raw.columns.map {
-      case "text" => posexplode(split(raw.col("text"), "\n\n")).as(Seq("pos", "text"))
-      case col => raw.col(col)
-    }
-
-    val exploded = raw
-      .filter(octet_length($"text") < 2 * 1024 * 1024 && countParagraphs($"text") < 1000)
-      .select(explodeCols: _*)
-
-    val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
-
-    val cookedDocs = exploded.withColumn("parHash", xxhash64(cleanParUdf($"text")))
-      .persist(StorageLevel.DISK_ONLY)
+    val cookedDocs = hashParagraphs(raw).persist(StorageLevel.DISK_ONLY)
 
     val counts = cookedDocs.groupBy("parHash").count()
     val hashesRow = counts.agg(testUdaf($"parHash", $"count")).as[Tuple1[DocPairs]].head()._1
@@ -779,6 +791,72 @@ object DeduplicateParagraphs {
     joined.select(
       basicCols ++ computedCols: _*
     )
+  }
+
+  /** This function merges raw documents with frequency data. Compared to
+    * [[DeduplicateParagraphs.prepareParagraphsForFilteringWithLocalFrequencyBias()]], this function
+    * does not perform any mitigations for Zipf law which causes very unbalanced processing time for
+    * document reassembly.
+    *
+    * @param raw
+    *   raw documents
+    * @param stats
+    *   frequency statistics data
+    * @param debug
+    *   output additional fields for debug
+    * @return
+    *   dataset with statistics data added to paragraphs. Documents are disassembled to paragraphs.
+    */
+  def prepareParagraphsForFilteringDefault(
+      raw: DataFrame,
+      stats: DataFrame,
+      debug: Boolean
+  ): DataFrame = {
+
+    import raw.sparkSession.implicits._
+
+    val withHash = hashParagraphs(raw)
+    val cookedDocs = withHash.persist(StorageLevel.DISK_ONLY)
+
+    val joined = cookedDocs.join(stats, $"parHash" === $"hash", "left")
+
+    val basicCols = (if (debug) {
+                       joined.columns.filter {
+                         case "parHash" => false
+                         case "exactFreq" | "nearFreq" => false
+                         case _ => true
+                       }
+                     } else {
+                       joined.columns.filter {
+                         case "hash" | "reprHash" | "parHash" => false
+                         case "exactFreq" | "nearFreq" => false
+                         case _ => true
+                       }
+                     }).map(joined.col)
+
+    val computedCols = Seq( // common newly computed columns
+      when($"exactFreq".isNotNull, $"exactFreq").otherwise(lit(1)).as("exactFreq"),
+      when($"nearFreq".isNotNull, $"nearFreq").otherwise(lit(1)).as("nearFreq")
+    )
+
+    joined.select(
+      basicCols ++ computedCols: _*
+    )
+  }
+
+  private def hashParagraphs(raw: DataFrame) = {
+    val explodeCols = raw.columns.map {
+      case "text" => posexplode(split(raw.col("text"), "\n\n")).as(Seq("pos", "text"))
+      case col => raw.col(col)
+    }
+
+    val exploded = raw.filter(
+      octet_length(raw.col("text")) < 2 * 1024 * 1024 && countParagraphs(raw.col("text")) < 1000
+    ).select(explodeCols: _*)
+
+    val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
+
+    exploded.withColumn("parHash", xxhash64(cleanParUdf(exploded.col("text"))))
   }
 
   def collectDocParts(
