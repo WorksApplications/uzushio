@@ -48,26 +48,21 @@ case class Paragraph(
   }
 
   def containsTags(tagNames: Seq[String]): Boolean = {
-    extractDescendantTag(tagNames) match {
-      case Some(_) => true
-      case None => false
-    }
+    cssPath.exists(p => tagNames.contains(p.tag))
   }
 
-  def extractDescendantTag(tagNames: Seq[String]): Option[String] = {
-    val iter = cssSelectors.reverseIterator
-
+  def firstMatchingTag(tagNames: Seq[String]): Option[PathSegment] = {
+    val iter = cssPath.reverseIterator
     while (iter.hasNext) {
-      val tagWithCSS = iter.next()
-      val tagWithAttrs = tagWithCSS.split("[#.]")
-      if (tagNames.contains(tagWithAttrs.head)) {
-        return Option(tagWithAttrs.head)
+      val step = iter.next()
+      if (tagNames.contains(step.tag)) {
+        return Option(step)
       }
     }
     None
   }
 
-  @transient lazy val cssSelectors: Seq[String] = this.path.split(Document.cssSelectorSeparator)
+  @transient lazy val cssPath: Seq[PathSegment] = PathSegment.parsePath(path)
   def isAlive: Boolean = remove == null
   def isDeleted: Boolean = !isAlive
 
@@ -113,18 +108,16 @@ case class Document(
 
   def countDroppedParagraphs(): Int = paragraphs.count(_.isDeleted)
 
-  def filterAsString: String = {
-    remove match {
-      case null => "null"
-      case o => o.toString
-    }
+  def filterAsString: String = remove match {
+    case null => "null"
+    case o => o.toString
   }
 
-  /**
-   * Split paragraphs which have non-null deleters into other documents.
-   * Paragraphs without deleters are grouped together and will have document-level deleter.
-   * @return split documents using the criterion described above, in a non-determined order
-   */
+  /** Split paragraphs which have non-null deleters into other documents. Paragraphs without
+    * deleters are grouped together and will have document-level deleter.
+    * @return
+    *   split documents using the criterion described above, in a non-determined order
+    */
   def splitByFilteredParagraphs(): Seq[Document] = {
     val cached = new java.util.HashMap[String, mutable.Buffer[Paragraph]]
 
@@ -166,7 +159,7 @@ object Document {
 
 class PerParagraphFilter(val filter: ParagraphFilter) extends DocFilter {
   override def checkDocument(doc: Document): Document = doc
-    .copy(paragraphs = doc.paragraphs.map(filter.checkParagraph))
+    .copy(paragraphs = doc.paragraphs.map(p => if (p.isDeleted) p else filter.checkParagraph(p)))
 }
 
 final class Pipeline(filters: Array[DocFilter]) extends Serializable {

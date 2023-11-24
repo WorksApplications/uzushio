@@ -627,7 +627,7 @@ class DeduplicateParagraphs(
 
 object DeduplicateParagraphs {
 
-  private final val logger = LoggerFactory.getLogger(classOf[DeduplicateParagraphs])
+  final private val logger = LoggerFactory.getLogger(classOf[DeduplicateParagraphs])
 
   case class DocPair(parHash: Long, count: Long)
 
@@ -655,18 +655,25 @@ object DeduplicateParagraphs {
 
   case class DocPairs(data: Seq[DocPair])
 
-  private final val testUdaf = udaf(new Aggregator[DocPair, mutable.PriorityQueue[DocPair], DocPairs] {
-    override def zero: mutable.PriorityQueue[DocPair] = new mutable.PriorityQueue[DocPair]()(DocPair.Reversed)
+  final private val testUdaf = udaf(new Aggregator[DocPair, mutable.PriorityQueue[DocPair], DocPairs] {
+    override def zero: mutable.PriorityQueue[DocPair] =
+      new mutable.PriorityQueue[DocPair]()(DocPair.Reversed)
 
-    override def reduce(b: mutable.PriorityQueue[DocPair], a: DocPair): mutable.PriorityQueue[DocPair] = {
+    override def reduce(
+        b: mutable.PriorityQueue[DocPair],
+        a: DocPair
+    ): mutable.PriorityQueue[DocPair] = {
       b += a
-      if (b.size > 100) {
+      if (b.size > 1000) {
         b.dequeue()
       }
       b
     }
 
-    override def merge(b1: mutable.PriorityQueue[DocPair], b2: mutable.PriorityQueue[DocPair]): mutable.PriorityQueue[DocPair] = {
+    override def merge(
+        b1: mutable.PriorityQueue[DocPair],
+        b2: mutable.PriorityQueue[DocPair]
+    ): mutable.PriorityQueue[DocPair] = {
       while (b2.nonEmpty) {
         reduce(b1, b2.dequeue())
       }

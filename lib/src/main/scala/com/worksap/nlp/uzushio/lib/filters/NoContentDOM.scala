@@ -5,7 +5,7 @@ import com.worksap.nlp.uzushio.lib.filters.base.ParagraphFilter
 
 class NoContentDOM extends ParagraphFilter {
   // This names are tag names, but also class names and id names
-  private final val filteringDomNames: Seq[String] = Array("header", "footer", "aside", "nav")
+  final private val filteringDomNames: Seq[String] = Array("header", "footer", "aside", "nav")
 
   // I checked some of the Common Crawl extracts and noticed that `div#header` and `div.nav` are also often used instead of `<header>` and `<nav>`.
   def containsTagWithIdAndClasses(
@@ -13,16 +13,18 @@ class NoContentDOM extends ParagraphFilter {
       tagName: String,
       classOrIdNames: Seq[String]
   ): Boolean = {
-    val iter = p.cssSelectors.reverseIterator
+    val iter = p.cssPath.reverseIterator
 
     while (iter.hasNext) {
-      val tagWithCSS = iter.next()
-      val tagWithAttrs = tagWithCSS.split("[#.]")
-      if (tagWithAttrs.head == tagName && (tagWithAttrs.tail.toSet & classOrIdNames.toSet).nonEmpty) {
+      val css = iter.next()
+      if (
+        classOrIdNames
+          .exists(name => css.tag == tagName || css.id == name || css.classes.contains(name))
+      ) {
         return true
       }
     }
-    return false
+    false
   }
 
   override def checkParagraph(p: Paragraph): Paragraph = {

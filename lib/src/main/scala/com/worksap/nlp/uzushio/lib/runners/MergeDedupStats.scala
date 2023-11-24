@@ -35,8 +35,8 @@ object MergeDedupStats {
       array_min($"reprHashes").as("reprHash")
     ).persist()
 
-    val correctHashes = intermediate
-      .join(remapReprHashes, $"reprHash" === $"oldReprHash", "left").select(
+    val correctHashes = intermediate.join(remapReprHashes, $"reprHash" === $"oldReprHash", "left")
+      .select(
         $"hash",
         when($"oldReprHash".isNotNull, $"newReprHash").otherwise($"reprHash").as("reprHash"),
         $"exactFreq",
@@ -47,8 +47,7 @@ object MergeDedupStats {
       max($"nearFreq").as("nearFreq")
     )
 
-    val merged = correctHashes.select("hash", "reprHash", "exactFreq")
-      .join(correctFreqs, "reprHash")
+    val merged = correctHashes.select("hash", "reprHash", "exactFreq").join(correctFreqs, "reprHash")
 
     val filtered =
       if (arg.noOnes()) {

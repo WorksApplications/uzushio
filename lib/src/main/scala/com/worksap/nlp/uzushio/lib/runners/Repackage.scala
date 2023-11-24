@@ -13,10 +13,11 @@ object Repackage {
 
     val reparitioned = data.coalesce(args.maxParitions)
 
-    val cleaned = if (args.clear && reparitioned.columns.contains("text")) {
-      val cleanUdf = udf { s: String => Paragraphs.extractCleanParagraphs(s).mkString("\n\n") }
-      reparitioned.withColumn("text", cleanUdf(reparitioned.col("text")))
-    } else reparitioned
+    val cleaned =
+      if (args.clear && reparitioned.columns.contains("text")) {
+        val cleanUdf = udf { s: String => Paragraphs.extractCleanParagraphs(s).mkString("\n\n") }
+        reparitioned.withColumn("text", cleanUdf(reparitioned.col("text")))
+      } else reparitioned
 
     cleaned.write.format(args.format).option("compression", args.compression)
       .mode(SaveMode.Overwrite).save(args.output)
