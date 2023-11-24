@@ -6,7 +6,7 @@ import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
-import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap
+import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, LongOpenHashSet}
 import org.apache.commons.codec.binary.Hex
 import org.apache.spark.sql.expressions.Aggregator
 import org.apache.spark.sql.functions._
@@ -664,7 +664,7 @@ object DeduplicateParagraphs {
         a: DocPair
     ): mutable.PriorityQueue[DocPair] = {
       b += a
-      if (b.size > 1000) {
+      if (b.size > 100) {
         b.dequeue()
       }
       b
@@ -718,23 +718,25 @@ object DeduplicateParagraphs {
 
     val topHashes = hashesRow.data
 
-    val convertionHashmap = {
-      val x = new Long2LongOpenHashMap(topHashes.length)
-      topHashes.zipWithIndex.foreach { case (DocPair(hash, _), i) => x.put(hash, i) }
-      x.defaultReturnValue(-1)
+    val frequentHashCodes = {
+      val x = new LongOpenHashSet(topHashes.length)
+      topHashes.foreach { case DocPair(hash, _) => x.add(hash) }
       x
     }
-    val convertUdf = udf { (x: Long, id: Long) =>
-      convertionHashmap.get(x) match {
-        case -1 => x
-        case _ => NgramHashExtractor.mix(x, id)
+    val convertUdf = udf { (hash: Long, salt: Long) =>
+      if (frequentHashCodes.contains(hash)) {
+        NgramHashExtractor.mix(hash, salt)
+      } else {
+        hash
       }
     }
 
     val cols = cookedDocs.columns.flatMap {
-      case "cleanText" => Some(cookedDocs.col("parHash").as("origHash"))
       case "parHash" =>
-        Some(convertUdf(cookedDocs.col("parHash"), monotonically_increasing_id()).as("parHash"))
+        Seq(
+          convertUdf(cookedDocs.col("parHash"), monotonically_increasing_id()).as("parHash"),
+          cookedDocs.col("parHash").as("origHash")
+        )
       case x => Some(cookedDocs.col(x))
     }
 
@@ -756,9 +758,22 @@ object DeduplicateParagraphs {
                        }
                      }).map(joined.col)
 
+    val fixupMap = {
+      val x = new Long2IntOpenHashMap(topHashes.length)
+      topHashes.foreach { case DocPair(hash, cnt) =>
+        x.put(hash, math.min(cnt, Int.MaxValue).toInt)
+      }
+      x
+    }
+
+    val fixup = udf { (hash: Long, count: Int) =>
+      val localCount = fixupMap.get(hash)
+      math.max(count, localCount)
+    }
+
     val computedCols = Seq( // common newly computed columns
-      when($"exactFreq".isNotNull, $"exactFreq").otherwise(lit(1)).as("exactFreq"),
-      when($"nearFreq".isNotNull, $"nearFreq").otherwise(lit(1)).as("nearFreq")
+      fixup($"origHash", when($"exactFreq".isNotNull, $"exactFreq").otherwise(lit(1))).as("exactFreq"),
+      fixup($"origHash", when($"nearFreq".isNotNull, $"nearFreq").otherwise(lit(1))).as("nearFreq")
     )
 
     joined.select(

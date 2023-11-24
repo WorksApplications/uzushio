@@ -19,7 +19,7 @@ class NoContentDOM extends ParagraphFilter {
       val css = iter.next()
       if (
         classOrIdNames
-          .exists(name => css.tag == tagName || css.id == name || css.classes.contains(name))
+          .exists(name => css.tag == tagName && (css.id == name || css.classes.contains(name)))
       ) {
         return true
       }
