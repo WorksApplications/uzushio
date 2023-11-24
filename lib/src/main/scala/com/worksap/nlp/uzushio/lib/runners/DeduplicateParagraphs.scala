@@ -6,15 +6,19 @@ import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
 import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs, RowBuffer}
 import it.unimi.dsi.fastutil.ints.{Int2ObjectOpenHashMap, IntArrays}
+import it.unimi.dsi.fastutil.longs.{Long2IntOpenHashMap, LongOpenHashSet}
 import org.apache.commons.codec.binary.Hex
+import org.apache.spark.sql.expressions.Aggregator
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, Encoder, Encoders, SaveMode, SparkSession}
 import org.apache.spark.storage.StorageLevel
 import org.rogach.scallop.ScallopConf
+import org.slf4j.LoggerFactory
 import spire.std.LevenshteinDistance
 
 import java.util
 import java.util.{Comparator, Random}
+import scala.collection.mutable
 
 case class RowResult(
     text: String,
@@ -364,6 +368,7 @@ class DeduplicateParagraphs(
   private val clampLongToInt = udf((x: Long) => math.min(x, Int.MaxValue).toInt).asNonNullable()
 
   def process(): Unit = {
+    import com.worksap.nlp.uzushio.lib.utils.BuilderSyntax._
     val rawData = spark.read.parquet(args.inputs: _*)
 
     val basicData = prepareBasicData(rawData)
@@ -400,7 +405,7 @@ class DeduplicateParagraphs(
     }
 
     val paragraphsWithFreqs = DeduplicateParagraphs
-      .prepareParagraphsForFiltering(rawData, stats, args.debug)
+      .prepareParagraphsForFilteringWithLocalFrequencyBias(rawData, stats, args.debug)
 
     if (args.hasStage("saveReassembled")) {
       saveReassembled(paragraphsWithFreqs)
@@ -412,6 +417,7 @@ class DeduplicateParagraphs(
     // filtered.queryExecution.debug.toFile("""e:\data\nlp\corpora\cc\dups\CC-MAIN-2013-20\codegen""")
 
     filtered.coalesce(args.partitions).write.mode(SaveMode.Overwrite).format(args.format)
+      .ifEnabled(args.hasStage("filter-debug"))(_.partitionBy("filter"))
       .option("compression", args.compression).save(args.output)
   }
 
@@ -544,14 +550,14 @@ class DeduplicateParagraphs(
   // paragraphs are shuffled because of join with freqs,
   // groupBy op merges them back together, and we use an udf to perform the actual filtering
   private def filterDuplicateDocs(ds: DataFrame): DataFrame = {
-    val docParts = Seq("text", "pos", "exactFreq", "nearFreq")
+    val docParts = Seq("docId", "text", "pos", "exactFreq", "nearFreq")
 
     val allColumns = ds.columns
 
-    val passthroughColumns = allColumns.toSeq.filterNot(_ == "docId").filterNot(docParts.contains(_))
+    val passthroughColumns = allColumns.toSeq.filterNot(docParts.contains(_))
 
     val aggQueryBasicColumns = passthroughColumns.map(colName => first(colName).as(colName))
-    val aggColumns = docParts.map(x => collect_list(x).as(x))
+    val aggColumns = docParts.filterNot(_ == "docId").map(x => collect_list(x).as(x))
 
     val aggOpFirst :: aggOpRest = (aggColumns ++ aggQueryBasicColumns).toList
 
@@ -560,6 +566,7 @@ class DeduplicateParagraphs(
     val args = this.args
     val convertUdf = udf(
       (
+          docId: String,
           text: Array[String],
           pos: Array[Int],
           exactFreq: Array[Int],
@@ -571,36 +578,46 @@ class DeduplicateParagraphs(
           exactFreq,
           nearFreq
         )
-        DeduplicateParagraphs.processDocumentParts(args, sorted)
+        DeduplicateParagraphs.processDocumentParts(args, docId, sorted)
       }
     ).asNonNullable()
 
     val transformCols = Seq(
       $"docId",
-      convertUdf(docParts.map(aggOpResult.col): _*).as("text")
+      explode(convertUdf(docParts.map(aggOpResult.col): _*)).as("converted")
     ) ++ passthroughColumns.map(aggOpResult.col)
 
-    aggOpResult.select(
+    val processed = aggOpResult.select(
       transformCols: _*
-    ).filter(octet_length($"text") > 0)
+    )
+
+    val processedCols = processed.columns.filterNot(_ == "converted")
+
+    val postprocessed =
+      if (args.hasStage("filter-debug")) {
+        processed.select(
+          processedCols.map(processed.col) ++ Seq(
+            $"converted.text".as("text"),
+            $"converted.filter".as("filter"),
+          ): _*
+        )
+      } else {
+        processed.filter($"converted.filter" === "null").select(
+          processedCols.map(processed.col) ++ Seq(
+            $"converted.text".as("text")
+          ): _*
+        )
+      }
+
+    postprocessed.filter(octet_length($"text") > 0)
   }
 
   private def saveReassembled(ds: DataFrame) = {
     val cols = ds.columns.flatMap {
-      case "text" | "date" | "charset" => None
+      case "date" | "charset" => None
+      case "text" => Some(ds.col("text"))
       case x => Some(ds.col(x))
     }
-
-    val parFields = Set(
-      "text",
-      "cleanText",
-      "hash",
-      "reprHash",
-      "repr",
-      "pos",
-      "exactFreq",
-      "nearFreq"
-    )
 
     ds.select(cols: _*).repartition(args.partitions, $"docId")
       .sortWithinPartitions($"docId", $"url", $"pos").write.mode(SaveMode.Overwrite)
@@ -610,7 +627,93 @@ class DeduplicateParagraphs(
 
 object DeduplicateParagraphs {
 
-  def prepareParagraphsForFiltering(
+  final private val logger = LoggerFactory.getLogger(classOf[DeduplicateParagraphs])
+
+  case class DocPair(parHash: Long, count: Long)
+
+  object DocPair {
+    implicit object Reversed extends Ordering[DocPair] {
+      override def compare(x: DocPair, y: DocPair): Int = java.lang.Long.compare(y.count, x.count)
+    }
+  }
+
+  final private val countParagraphs = udf { (s: String) =>
+    var count = 1
+    var offset = 0
+    val len = s.length
+    while (offset < len) {
+      val idx = s.indexOf("\n\n", offset)
+      if (idx < 0) {
+        offset = len
+      } else {
+        offset = idx + 2
+        count += 1
+      }
+    }
+    count
+  }
+
+  case class DocPairs(data: Seq[DocPair])
+
+  final private val testUdaf = udaf(new Aggregator[DocPair, mutable.PriorityQueue[DocPair], DocPairs] {
+    override def zero: mutable.PriorityQueue[DocPair] =
+      new mutable.PriorityQueue[DocPair]()(DocPair.Reversed)
+
+    override def reduce(
+        b: mutable.PriorityQueue[DocPair],
+        a: DocPair
+    ): mutable.PriorityQueue[DocPair] = {
+      b += a
+      if (b.size > 100) {
+        b.dequeue()
+      }
+      b
+    }
+
+    override def merge(
+        b1: mutable.PriorityQueue[DocPair],
+        b2: mutable.PriorityQueue[DocPair]
+    ): mutable.PriorityQueue[DocPair] = {
+      while (b2.nonEmpty) {
+        reduce(b1, b2.dequeue())
+      }
+      b1
+    }
+
+    override def finish(reduction: mutable.PriorityQueue[DocPair]): DocPairs = {
+      DocPairs(reduction.dequeueAll)
+    }
+
+    override def bufferEncoder: Encoder[mutable.PriorityQueue[DocPair]] = Encoders.javaSerialization
+
+    override def outputEncoder: Encoder[DocPairs] = Encoders.product
+  })
+
+  /** Join the raw text dataset with paragraph-wise duplication statistics data. This function
+    * performs mitigation against Zipf law which causes unbalanced processing time during document
+    * reassembly.
+    *
+    * Because paragraphs are joined with duplication statistics data using paragraph hashes and
+    * natural language phenomena generally follow Zipf law, there would be a small amount of
+    * paragraphs with extremely large counts, especially in large datasets. Spark usually assign
+    * them to a single partition and that can cause a single partition to be >50 times larger than
+    * other ones, yielding a partition which has >50 times processing time than other ones.
+    *
+    * This function replaces top 100 frequent hashes, which are used during the join with random
+    * hashes, balancing the partitions. After this, global duplicate-wise frequencies of replaced
+    * paragraphs are replaced with local exact ones. This will cause processing to under-estimate
+    * such high-frequency paragraphs, however they usually have very high frequency nevertheless
+    *
+    * @param raw
+    *   raw documents
+    * @param stats
+    *   frequency statistics data
+    * @param debug
+    *   output additional fields for debug
+    * @return
+    *   dataset with statistics data added to paragraphs. Documents are disassembled to paragraphs.
+    */
+  def prepareParagraphsForFilteringWithLocalFrequencyBias(
       raw: DataFrame,
       stats: DataFrame,
       debug: Boolean
@@ -618,17 +721,102 @@ object DeduplicateParagraphs {
 
     import raw.sparkSession.implicits._
 
-    val explodeCols = raw.columns.map {
-      case "text" => posexplode(split(raw.col("text"), "\n\n")).as(Seq("pos", "text"))
-      case col => raw.col(col)
+    val cookedDocs = hashParagraphs(raw).persist(StorageLevel.DISK_ONLY)
+
+    val counts = cookedDocs.groupBy("parHash").count()
+    val hashesRow = counts.agg(testUdaf($"parHash", $"count")).as[Tuple1[DocPairs]].head()._1
+
+    logger.info(s"Top hashes: $hashesRow")
+
+    val topHashes = hashesRow.data
+
+    val frequentHashCodes = {
+      val x = new LongOpenHashSet(topHashes.length)
+      topHashes.foreach { case DocPair(hash, _) => x.add(hash) }
+      x
+    }
+    val convertUdf = udf { (hash: Long, salt: Long) =>
+      if (frequentHashCodes.contains(hash)) {
+        NgramHashExtractor.mix(hash, salt)
+      } else {
+        hash
+      }
     }
 
-    val exploded = raw.select(explodeCols: _*)
+    val cols = cookedDocs.columns.flatMap {
+      case "parHash" => Seq(
+          convertUdf(cookedDocs.col("parHash"), monotonically_increasing_id()).as("parHash"),
+          cookedDocs.col("parHash").as("origHash")
+        )
+      case x => Some(cookedDocs.col(x))
+    }
 
-    val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
+    val newCooked = cookedDocs.select(cols: _*)
 
-    val cookedDocs = exploded.withColumn("cleanText", cleanParUdf($"text"))
-      .withColumn("parHash", xxhash64($"cleanText"))
+    val joined = newCooked.join(stats, $"parHash" === $"hash", "left")
+
+    val basicCols = (if (debug) {
+                       joined.columns.filter {
+                         case "parHash" | "origHash" => false
+                         case "exactFreq" | "nearFreq" => false
+                         case _ => true
+                       }
+                     } else {
+                       joined.columns.filter {
+                         case "hash" | "reprHash" | "parHash" | "origHash" => false
+                         case "exactFreq" | "nearFreq" => false
+                         case _ => true
+                       }
+                     }).map(joined.col)
+
+    val fixupMap = {
+      val x = new Long2IntOpenHashMap(topHashes.length)
+      topHashes.foreach { case DocPair(hash, cnt) =>
+        x.put(hash, math.min(cnt, Int.MaxValue).toInt)
+      }
+      x
+    }
+
+    val fixup = udf { (hash: Long, count: Int) =>
+      val localCount = fixupMap.get(hash)
+      math.max(count, localCount)
+    }
+
+    val computedCols = Seq( // common newly computed columns
+      fixup($"origHash", when($"exactFreq".isNotNull, $"exactFreq").otherwise(lit(1)))
+        .as("exactFreq"),
+      fixup($"origHash", when($"nearFreq".isNotNull, $"nearFreq").otherwise(lit(1))).as("nearFreq")
+    )
+
+    joined.select(
+      basicCols ++ computedCols: _*
+    )
+  }
+
+  /** This function merges raw documents with frequency data. Compared to
+    * [[DeduplicateParagraphs.prepareParagraphsForFilteringWithLocalFrequencyBias()]], this function
+    * does not perform any mitigations for Zipf law which causes very unbalanced processing time for
+    * document reassembly.
+    *
+    * @param raw
+    *   raw documents
+    * @param stats
+    *   frequency statistics data
+    * @param debug
+    *   output additional fields for debug
+    * @return
+    *   dataset with statistics data added to paragraphs. Documents are disassembled to paragraphs.
+    */
+  def prepareParagraphsForFilteringDefault(
+      raw: DataFrame,
+      stats: DataFrame,
+      debug: Boolean
+  ): DataFrame = {
+
+    import raw.sparkSession.implicits._
+
+    val withHash = hashParagraphs(raw)
+    val cookedDocs = withHash.persist(StorageLevel.DISK_ONLY)
 
     val joined = cookedDocs.join(stats, $"parHash" === $"hash", "left")
 
@@ -640,7 +828,7 @@ object DeduplicateParagraphs {
                        }
                      } else {
                        joined.columns.filter {
-                         case "hash" | "reprHash" | "parHash" | "cleanText" => false
+                         case "hash" | "reprHash" | "parHash" => false
                          case "exactFreq" | "nearFreq" => false
                          case _ => true
                        }
@@ -654,6 +842,21 @@ object DeduplicateParagraphs {
     joined.select(
       basicCols ++ computedCols: _*
     )
+  }
+
+  private def hashParagraphs(raw: DataFrame) = {
+    val explodeCols = raw.columns.map {
+      case "text" => posexplode(split(raw.col("text"), "\n\n")).as(Seq("pos", "text"))
+      case col => raw.col(col)
+    }
+
+    val exploded = raw.filter(
+      octet_length(raw.col("text")) < 2 * 1024 * 1024 && countParagraphs(raw.col("text")) < 1000
+    ).select(explodeCols: _*)
+
+    val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
+
+    exploded.withColumn("parHash", xxhash64(cleanParUdf(exploded.col("text"))))
   }
 
   def collectDocParts(
@@ -693,16 +896,23 @@ object DeduplicateParagraphs {
     }
   }
 
+  case class ProcessedDocument(text: String, filter: String)
+
   private def processDocumentParts(
       args: Args,
+      docId: String,
       parts: IndexedSeq[Paragraph]
-  ): String = {
-    val doc = Document(parts)
+  ): Array[ProcessedDocument] = {
+    val doc = Document(parts, docId = docId)
     val filtered = args.pipeline.applyFilters(doc)
-    if (filtered.isDeleted) {
-      return filtered.copy(IndexedSeq()).render()
+    val droppedParagraphs = filtered.countDroppedParagraphs()
+    val textOnly = args.textOnly
+    if (droppedParagraphs == 0) {
+      return Array(ProcessedDocument(filtered.render(textOnly = textOnly), filtered.filterAsString))
     }
-    filtered.copy(paragraphs = filtered.paragraphs.filter(_.isAlive)).render()
+
+    val docs = filtered.splitByFilteredParagraphs()
+    docs.map(doc => ProcessedDocument(doc.render(textOnly), doc.filterAsString)).toArray
   }
 
   // noinspection TypeAnnotation,ScalaWeakerAccess
@@ -736,6 +946,7 @@ object DeduplicateParagraphs {
     val cacheLevel = opt[String](
       descr = "Spark StorageLevel for caching operations"
     )
+    val textOnly = toggle(default = Some(false), descrYes = "output only text")
     verify()
 
     def toArgs: Args = Args(
@@ -757,7 +968,8 @@ object DeduplicateParagraphs {
       pipeline = Pipeline.make(filters()),
       bufferSizeInBytes = bufferSize(),
       cacheLevel = cacheLevel.toOption.map(StorageLevel.fromString)
-        .getOrElse(StorageLevel.MEMORY_AND_DISK)
+        .getOrElse(StorageLevel.MEMORY_AND_DISK),
+      textOnly = textOnly()
     )
 
     def makeStages(): Set[String] = execution.toOption match {
@@ -787,7 +999,8 @@ object DeduplicateParagraphs {
       bufferSizeInBytes: Int = 10000000,
       preFilterRatio: Double = 0.6,
       propagatePartitions: Int = 64,
-      cacheLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK
+      cacheLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK,
+      textOnly: Boolean = false
   ) {
     val shiftIndices: Array[Int] = {
       val base = Array.range(0, simHashSize)

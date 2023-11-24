@@ -46,6 +46,8 @@ class WordTypes(list: String, threshold: Float = 3, kind: String = "uniq") exten
     if (map.isEmpty) return 0
     scorer(map)
   }
+
+  override val toString = s"WordInstances($list,$threshold,$kind)"
 }
 
 object WordTypes {

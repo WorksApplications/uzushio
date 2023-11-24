@@ -10,7 +10,12 @@ class LargeFreqParagraphs(count: Int = 3, freq: Int = 100) extends DocFilter {
     doc.paragraphs match {
       case p: mutable.Buffer[Paragraph] =>
         markParagraphs(p)
-        doc
+        val nmarked = markParagraphs(p)
+        if (nmarked > 0) {
+          doc.copy(paragraphs = p)
+        } else {
+          doc
+        }
       case _ =>
         val buf = doc.paragraphs.toBuffer
         val nmarked = markParagraphs(buf)
@@ -56,7 +61,7 @@ class LargeFreqParagraphs(count: Int = 3, freq: Int = 100) extends DocFilter {
 
   def shouldRemoveBack(paragraphs: mutable.Buffer[Paragraph], offset: Int): Boolean = {
     var idx = offset
-    val end = math.max(offset - count, 0)
+    val end = math.max(offset - count + 1, 0)
     while (idx >= end) {
       val p = paragraphs(idx)
       if (p.nearFreq < freq) {

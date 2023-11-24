@@ -1,33 +1,78 @@
 package com.worksap.nlp.uzushio.lib.filters
 
 import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
-import com.worksap.nlp.uzushio.lib.cleaning.Document
+import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
+
+import scala.collection.mutable.ArrayBuffer
 
 class MergeListTag extends DocFilter {
-  final val acceptedTags = Seq("li", "option")
-  final val mdListSymbol = "- "
+  final private val acceptedTags: Seq[String] = Array("li", "option")
 
   override def checkDocument(doc: Document): Document = {
-    var paragraphs = doc.aliveParagraphs.to[Seq]
+    val iter = doc.paragraphs.iterator
 
-    (0 until paragraphs.length - 1).foreach { i =>
-      val paragraph = paragraphs(i)
-      val nextParagraph = paragraphs(i + 1)
-      val isAccteptedTags = paragraph.containsTags(acceptedTags) && nextParagraph
-        .containsTags(acceptedTags)
-
-      if (isAccteptedTags && paragraph.path == nextParagraph.path) {
-        val mergedParagraph = nextParagraph.copy(
-          text = List(paragraph.text, nextParagraph.text)
-            .map(s => if (s.startsWith(mdListSymbol)) s else mdListSymbol + s).mkString("\n"),
-          exactFreq = math.min(paragraph.exactFreq, nextParagraph.exactFreq),
-          nearFreq = math.min(paragraph.nearFreq, nextParagraph.nearFreq)
-        )
-        paragraphs = paragraphs.updated(i, paragraph.copy(remove = paragraph))
-        paragraphs = paragraphs.updated(i + 1, mergedParagraph)
-      }
+    if (!iter.hasNext) {
+      return doc
     }
 
-    doc.copy(paragraphs = paragraphs)
+    var paragraph = iter.next()
+    var merged = false
+    val result = new ArrayBuffer[Paragraph]()
+    val textBuffer = new ArrayBuffer[String]()
+    var exactFreq = paragraph.exactFreq
+    var nearFreq = paragraph.nearFreq
+
+    while (iter.hasNext) {
+      val nextParagraph = iter.next()
+      val isList = nextParagraph.containsTags(acceptedTags)
+      if (
+        paragraph.isAlive && nextParagraph.isAlive && isList && paragraph.path == nextParagraph.path
+      ) {
+        merged = true
+        textBuffer += paragraph.text
+        exactFreq = math.min(exactFreq, nextParagraph.exactFreq)
+        nearFreq = math.min(nearFreq, nextParagraph.nearFreq)
+      } else {
+        if (textBuffer.nonEmpty) {
+          textBuffer += paragraph.text
+          val mergedText = textBuffer.mkString("- ", "\n- ", "")
+          result += Paragraph(
+            path = paragraph.path,
+            text = mergedText,
+            index = result.size,
+            exactFreq = exactFreq,
+            nearFreq = nearFreq
+          )
+          textBuffer.clear()
+        } else {
+          result += paragraph.copy(index = result.size)
+        }
+
+        exactFreq = nextParagraph.exactFreq
+        nearFreq = nextParagraph.nearFreq
+      }
+
+      paragraph = nextParagraph
+    }
+
+    if (merged) {
+      if (textBuffer.nonEmpty) {
+        textBuffer += paragraph.text
+        val mergedText = textBuffer.mkString("- ", "\n- ", "")
+        result += Paragraph(
+          path = paragraph.path,
+          text = mergedText,
+          index = result.size,
+          exactFreq = exactFreq,
+          nearFreq = nearFreq
+        )
+      } else {
+        result += paragraph.copy(index = result.size)
+      }
+
+      doc.copy(paragraphs = result)
+    } else {
+      doc
+    }
   }
 }

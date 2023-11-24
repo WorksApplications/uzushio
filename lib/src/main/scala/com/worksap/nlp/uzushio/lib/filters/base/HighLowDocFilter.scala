@@ -2,7 +2,7 @@ package com.worksap.nlp.uzushio.lib.filters.base
 
 import com.worksap.nlp.uzushio.lib.cleaning.Document
 
-trait HighLowDocFilter extends DocFilter {
+trait HighLowDocFilter extends DocFilter { self =>
   def high: Float
 
   def low: Float
@@ -16,17 +16,17 @@ trait HighLowDocFilter extends DocFilter {
   }
 
   @transient object Low {
-    override val toString = s"${getClass.getSimpleName}.Low($low)"
+    override val toString = s"${self.getClass.getSimpleName}.Low($low)"
   }
 
   @transient object High {
-    override val toString = s"${getClass.getSimpleName}.High($high)"
+    override val toString = s"${self.getClass.getSimpleName}.High($high)"
   }
 
-  override def toString = s"${getClass.getSimpleName}($low,$high)"
+  override def toString = s"${self.getClass.getSimpleName}($low,$high)"
 }
 
-trait HighLowDocIntFilter extends DocFilter {
+trait HighLowDocIntFilter extends DocFilter { self =>
   def high: Int
 
   def low: Int
@@ -40,12 +40,12 @@ trait HighLowDocIntFilter extends DocFilter {
   }
 
   @transient object Low {
-    override val toString = s"${getClass.getSimpleName}.Low($low)"
+    override val toString = s"${self.getClass.getSimpleName}.Low($low)"
   }
 
   @transient object High {
-    override val toString = s"${getClass.getSimpleName}.High($high)"
+    override val toString = s"${self.getClass.getSimpleName}.High($high)"
   }
 
-  override def toString = s"${getClass.getSimpleName}($low,$high)"
+  override def toString = s"${self.getClass.getSimpleName}($low,$high)"
 }

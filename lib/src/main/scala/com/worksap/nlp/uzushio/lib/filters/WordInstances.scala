@@ -59,7 +59,7 @@ class WordInstances(list: String, threshold: Float = 3, full: Float = 1.0f, part
     score
   }
 
-  override def toString = s"WordInstances($list,$threshold,$full,$partial)"
+  override val toString = s"WordInstances($list,$threshold,$full,$partial)"
 }
 
 object WordInstances {
@@ -92,7 +92,7 @@ object WordInstances {
       s: java.util.stream.Stream[String]
   ): TrieNode[Boolean] = {
     try {
-      TrieNode.make(s.iterator().asScala)
+      TrieNode.make(s.iterator().asScala.filterNot(_.startsWith("#")))
     } finally {
       s.close()
     }

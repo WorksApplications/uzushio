@@ -9,6 +9,8 @@ import org.apache.commons.lang3.StringUtils
 import java.lang.reflect.{Constructor, Parameter}
 import java.net.URL
 import java.nio.file.{Files, Path, Paths}
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.iterableAsScalaIterableConverter
 
 /** @param path
@@ -32,40 +34,42 @@ case class Paragraph(
     nearFreq: Int = 1,
     remove: AnyRef = null
 ) {
-  final val cssSelectorSeparator = ">"
-
-  def renderInto[T <: Appendable](bldr: T): T = {
-    if (path != null && path.nonEmpty) {
+  def renderInto[T <: Appendable](bldr: T, textOnly: Boolean = false): T = {
+    if (!textOnly && path != null && path.nonEmpty) {
       bldr.append(path)
       bldr.append(Paragraphs.HTML_PATH_SEPARATOR)
     }
-    bldr.append(text)
+    if (textOnly) {
+      bldr.append(Paragraphs.cleanParagraph(text))
+    } else {
+      bldr.append(text)
+    }
     bldr
   }
 
   def containsTags(tagNames: Seq[String]): Boolean = {
-    extractDescendantTag(tagNames) match {
-      case Some(_) => true
-      case None => false
-    }
+    cssPath.exists(p => tagNames.contains(p.tag))
   }
 
-  def extractDescendantTag(tagNames: Seq[String]): Option[String] = {
-    val iter = cssSelectors.reverse.iterator
-
+  def firstMatchingTag(tagNames: Seq[String]): Option[PathSegment] = {
+    val iter = cssPath.reverseIterator
     while (iter.hasNext) {
-      val tagWithCSS = iter.next()
-      val tagWithAttrs = tagWithCSS.split("[#\\.]")
-      if (tagNames.contains(tagWithAttrs.head)) {
-        return Option(tagWithAttrs.head)
+      val step = iter.next()
+      if (tagNames.contains(step.tag)) {
+        return Option(step)
       }
     }
-    return None
+    None
   }
 
-  def cssSelectors: Seq[String] = this.path.split(cssSelectorSeparator)
+  @transient lazy val cssPath: Seq[PathSegment] = PathSegment.parsePath(path)
   def isAlive: Boolean = remove == null
   def isDeleted: Boolean = !isAlive
+
+  def filterAsString: String = remove match {
+    case null => "null"
+    case o => o.toString
+  }
 }
 
 case class Document(
@@ -73,13 +77,14 @@ case class Document(
     docId: String = "",
     remove: AnyRef = null
 ) {
+
   def removeWhen(toRemove: Boolean, remover: AnyRef): Document = {
     if (toRemove) copy(remove = remover) else this
   }
 
   def aliveParagraphs: Iterator[Paragraph] = paragraphs.iterator.filter(_.isAlive)
 
-  def render(): String = {
+  def render(textOnly: Boolean = false): String = {
     val bldr = new java.lang.StringBuilder()
     val iter = paragraphs.iterator
     var first = true
@@ -87,7 +92,7 @@ case class Document(
       if (!first) {
         bldr.append("\n\n")
       }
-      iter.next().renderInto(bldr)
+      iter.next().renderInto(bldr, textOnly = textOnly)
       first = false
     }
     bldr.toString
@@ -100,9 +105,46 @@ case class Document(
   def isAlive: Boolean = this.remove == null
 
   def isDeleted: Boolean = !isAlive
+
+  def countDroppedParagraphs(): Int = paragraphs.count(_.isDeleted)
+
+  def filterAsString: String = remove match {
+    case null => "null"
+    case o => o.toString
+  }
+
+  /** Split paragraphs which have non-null deleters into other documents. Paragraphs without
+    * deleters are grouped together and will have document-level deleter.
+    * @return
+    *   split documents using the criterion described above, in a non-determined order
+    */
+  def splitByFilteredParagraphs(): Seq[Document] = {
+    val cached = new java.util.HashMap[String, mutable.Buffer[Paragraph]]
+
+    paragraphs.foreach { par =>
+      val buf = cached.computeIfAbsent(par.filterAsString, _ => new ArrayBuffer[Paragraph]())
+      buf += par
+    }
+
+    val result = new ArrayBuffer[Document]()
+    val iterator = cached.entrySet().iterator()
+
+    while (iterator.hasNext) {
+      val e = iterator.next()
+      val k = e.getKey
+      val v = e.getValue
+      result += (k match {
+        case "null" => Document(v, docId, remove)
+        case _ => Document(v, docId, v.head.remove)
+      })
+    }
+    result
+  }
 }
 
 object Document {
+  final val cssSelectorSeparator = ">"
+
   def parse(s: String): Document = {
     val paragraphs = StringUtils.split(s, "\n\n")
     val parObjects = paragraphs.map { text =>
@@ -111,11 +153,13 @@ object Document {
     }
     Document(parObjects)
   }
+
+  def apply(paragraphs: Paragraph*): Document = new Document(paragraphs)
 }
 
 class PerParagraphFilter(val filter: ParagraphFilter) extends DocFilter {
   override def checkDocument(doc: Document): Document = doc
-    .copy(paragraphs = doc.paragraphs.map(filter.checkParagraph))
+    .copy(paragraphs = doc.paragraphs.map(p => if (p.isDeleted) p else filter.checkParagraph(p)))
 }
 
 final class Pipeline(filters: Array[DocFilter]) extends Serializable {
