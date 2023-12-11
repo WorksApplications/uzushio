@@ -950,9 +950,8 @@ object DeduplicateParagraphs {
       descr = "Spark StorageLevel for caching operations"
     )
     val textOnly = toggle(default = Some(false), descrYes = "output only text")
-    verify()
-
     val replacements = props[String]('P', descr = "Properties to resolve in filter chains")
+    verify()
 
     def toArgs: Args = Args(
       inputs = input(),

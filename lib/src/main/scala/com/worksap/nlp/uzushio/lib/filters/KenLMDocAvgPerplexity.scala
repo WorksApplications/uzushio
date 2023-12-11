@@ -1,10 +1,11 @@
 package com.worksap.nlp.uzushio.lib.filters
 
 import com.github.jbaiter.kenlm.BufferEvaluator
-import com.worksap.nlp.sudachi.Dictionary
+import com.worksap.nlp.sudachi.{Dictionary, Morpheme}
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
 import com.worksap.nlp.uzushio.lib.filters.base.{DocFilter, HighLowDocFilter}
 import com.worksap.nlp.uzushio.lib.resources.{KenLM, Sudachi}
+import com.worksap.nlp.uzushio.lib.utils.Paragraphs
 
 class KenLMDocAvgPerplexity(
     sudachi: String,
@@ -15,7 +16,7 @@ class KenLMDocAvgPerplexity(
 ) extends HighLowDocFilter {
 
   @transient
-  private val processor = KenLMEvaluator.make(sudachi, kenlm, outliers)
+  private lazy val processor = KenLMEvaluator.make(sudachi, kenlm, outliers)
 
   override def checkDocument(doc: Document): Document = {
     val perplexity = measureDoc(doc)
@@ -40,17 +41,6 @@ class KenLMDocAvgPerplexity(
   override def describeFilter: String = s"KenLMAvgDoc($outliers)"
 }
 
-class KenLMParagraphPerplexity(
-    sudachi: String,
-    kenlm: String,
-    adjacent: Int = 3,
-    threshold: Float = 1e6f
-) extends DocFilter {
-  override def checkDocument(doc: Document): Document = ???
-
-  override val toString = s"KenLMPar($adjacent,$threshold)"
-}
-
 class KenLMEvaluator(sudachi: String, kenlm: String) {
   private val dictionary: Dictionary = Sudachi.get(sudachi)
   final protected val tokenizer = dictionary.create()
@@ -64,12 +54,28 @@ class KenLMEvaluator(sudachi: String, kenlm: String) {
     ev.clear()
     while (iter.hasNext && continue) {
       val token = iter.next()
-      if (token.normalizedForm() != " ") {
+      if (acceptedToken(token)) {
         val remaining = ev.append(token.surface())
         continue = remaining > 0
       }
     }
     ev
+  }
+
+  def acceptedToken(x: Morpheme): Boolean = {
+    if (x.normalizedForm() == " ") {
+      return false
+    }
+
+    val s = x.surface()
+    if (s.length == 1) {
+      s.charAt(0) match {
+        case Paragraphs.HTML_LINK_START | Paragraphs.HTML_LINK_END | '\n' => return false
+        case _ => return true
+      }
+    }
+
+    true
   }
 
   def extractScore(ev: BufferEvaluator): Double = ev.evaluate()
