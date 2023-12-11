@@ -5,7 +5,6 @@ import com.worksap.nlp.uzushio.lib.filters.WordInstances
 import com.worksap.nlp.uzushio.lib.filters.base.DocFilter
 import org.scalatest.freespec.AnyFreeSpec
 
-
 case class TestFilter(test: String) extends DocFilter {
   override def checkDocument(doc: Document): Document = Document(Paragraph("", test))
 }
@@ -37,9 +36,9 @@ class PipelineSpec extends AnyFreeSpec {
 
     "can instantiate filter with props" - {
       val cfg = ConfigFactory.parseString(
-        s"""filters: [
-           {class: "com.worksap.nlp.uzushio.lib.cleaning.TestFilter", test: $${a} }
-          ]"""
+        """filters: [
+           {class: "com.worksap.nlp.uzushio.lib.cleaning.TestFilter", test: ${a} }
+        ]"""
       )
       val props = ConfigFactory.parseString("""a: value""")
       val pipeline = Pipeline.make(cfg, props)
