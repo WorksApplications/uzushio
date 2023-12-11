@@ -51,11 +51,10 @@ class KenLMParagraphPerplexity(
   override val toString = s"KenLMPar($adjacent,$threshold)"
 }
 
-
 class KenLMEvaluator(sudachi: String, kenlm: String) {
   private val dictionary: Dictionary = Sudachi.get(sudachi)
-  protected final val tokenizer = dictionary.create()
-  protected final val evaluator = KenLM.get(kenlm).bufferEvaluator(64 * 1024, 1024)
+  final protected val tokenizer = dictionary.create()
+  final protected val evaluator = KenLM.get(kenlm).bufferEvaluator(64 * 1024, 1024)
 
   def processParagraph(p: Paragraph): BufferEvaluator = {
     val tokens = tokenizer.tokenize(p.text)
@@ -91,6 +90,7 @@ object KenLMEvaluator {
   }
 }
 
-class KenLMEvaluatorNoOutliers(sudachi: String, kenlm: String, ratio: Float) extends KenLMEvaluator(sudachi, kenlm) {
+class KenLMEvaluatorNoOutliers(sudachi: String, kenlm: String, ratio: Float)
+    extends KenLMEvaluator(sudachi, kenlm) {
   override def extractScore(ev: BufferEvaluator): Double = ev.evaluateNoOutliers(ratio)
 }

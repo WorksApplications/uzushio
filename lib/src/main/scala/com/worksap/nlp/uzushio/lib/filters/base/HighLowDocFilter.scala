@@ -18,7 +18,7 @@ trait HighLowDocFilter extends DocFilter { self =>
   def describeFilter: String = self.getClass.getSimpleName
 
   @transient object Low {
-    override val toString = s"${describeFilter}.Low($low)"
+    override val toString = s"$describeFilter.Low($low)"
   }
 
   @transient object High {

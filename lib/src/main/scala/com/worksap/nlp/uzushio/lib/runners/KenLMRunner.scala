@@ -67,8 +67,7 @@ object KenLMRunner {
     val ppx = new LMPerplexity(opts.sudachiDict(), opts.kenlmModel())
 
     val probs = pars.withColumn("perplexity", ppx.asUdf($"text"))
-      .repartitionByRange(20, $"perplexity".desc)
-      .sortWithinPartitions($"perplexity".desc)
+      .repartitionByRange(20, $"perplexity".desc).sortWithinPartitions($"perplexity".desc)
 
     probs.write.json(opts.output())
   }
