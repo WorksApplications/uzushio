@@ -1,5 +1,6 @@
 package com.worksap.nlp.uzushio.lib.runners
 
+import com.typesafe.config.ConfigFactory
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph, Pipeline}
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
 import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
@@ -917,6 +918,8 @@ object DeduplicateParagraphs {
 
   // noinspection TypeAnnotation,ScalaWeakerAccess
   class ArgParser(args: Seq[String]) extends ScallopConf(args) {
+    import scala.collection.JavaConverters._
+
     val input = opt[List[String]]()
     val output = opt[String]()
     val numShifts = opt[Int](default = Some(5))
@@ -947,6 +950,7 @@ object DeduplicateParagraphs {
       descr = "Spark StorageLevel for caching operations"
     )
     val textOnly = toggle(default = Some(false), descrYes = "output only text")
+    val replacements = props[String]('P', descr = "Properties to resolve in filter chains")
     verify()
 
     def toArgs: Args = Args(
@@ -965,7 +969,7 @@ object DeduplicateParagraphs {
       format = format(),
       compression = compression(),
       intermediate = intermediate(),
-      pipeline = Pipeline.make(filters()),
+      pipeline = Pipeline.make(filters(), ConfigFactory.parseMap(replacements.asJava, "props")),
       bufferSizeInBytes = bufferSize(),
       cacheLevel = cacheLevel.toOption.map(StorageLevel.fromString)
         .getOrElse(StorageLevel.MEMORY_AND_DISK),

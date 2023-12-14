@@ -63,7 +63,7 @@ lazy val core = (project in file("core"))
   .enablePlugins(sbtassembly.AssemblyPlugin)
   .settings(
     name := "uzushio",
-    libraryDependencies ++= coreDependencies ++ sparkDependencies.map(
+    libraryDependencies ++= sparkDependencies.map(
       _ % Provided
     )
   )
@@ -84,7 +84,7 @@ lazy val lib = (project in file("lib"))
       } else {
         Seq.empty
       }
-    )
+    ),
   )
   .settings(commonSettings)
   .settings(lintSettings)
