@@ -44,21 +44,47 @@ class KenLMDocAvgPerplexity(
 class KenLMEvaluator(sudachi: String, kenlm: String) {
   private val dictionary: Dictionary = Sudachi.get(sudachi)
   final protected val tokenizer = dictionary.create()
-  final protected val evaluator = KenLM.get(kenlm).bufferEvaluator(64 * 1024, 1024)
+  final protected val evaluator = KenLM.get(kenlm).bufferEvaluator(128 * 1024, 1024)
 
   def processParagraph(p: Paragraph): BufferEvaluator = {
-    val tokens = tokenizer.tokenize(p.text)
+    val text = p.text
+
+    var nextLineStart = 0
     val ev = evaluator
-    val iter = tokens.iterator()
-    var continue = true
-    ev.clear()
-    while (iter.hasNext && continue) {
-      val token = iter.next()
-      if (acceptedToken(token)) {
-        val remaining = ev.append(token.surface())
-        continue = remaining > 0
+
+    while (nextLineStart >= 0) {
+      val thisLineStart = nextLineStart
+      val eolOffset = p.text.indexOf('\n', nextLineStart)
+
+      var lineEnd = if (eolOffset == -1) {
+        nextLineStart = -1
+        text.length
+      } else {
+        nextLineStart = eolOffset + 1
+        eolOffset
+      }
+
+      val length = lineEnd - thisLineStart
+      if (length > 16 * 1024) {
+        lineEnd = thisLineStart + 16 * 1024
+        nextLineStart = lineEnd + 1
+      }
+
+      val singleLine = text.substring(thisLineStart, lineEnd)
+      val tokens = tokenizer.tokenize(singleLine)
+
+      val iter = tokens.iterator()
+      var continue = true
+      ev.clear()
+      while (iter.hasNext && continue) {
+        val token = iter.next()
+        if (acceptedToken(token)) {
+          val remaining = ev.append(token.surface())
+          continue = remaining > 0
+        }
       }
     }
+
     ev
   }
 

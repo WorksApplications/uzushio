@@ -1,8 +1,10 @@
 package com.worksap.nlp.uzushio.lib.runners
 
+import com.worksap.nlp.uzushio.lib.cleaning.Paragraph
+import com.worksap.nlp.uzushio.lib.filters.KenLMEvaluator
 import com.worksap.nlp.uzushio.lib.resources.{KenLM, Sudachi}
 import com.worksap.nlp.uzushio.lib.utils.Paragraphs
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{explode, udf}
 import org.rogach.scallop.ScallopConf
@@ -21,27 +23,10 @@ object KenLMRunner {
   class LMPerplexity(sudachi: String, kenlm: String) extends Serializable {
 
     @transient
-    private lazy val tokenizer = Sudachi.get(sudachi).create()
-
-    @transient
-    private lazy val evaluator = KenLM.get(kenlm).bufferEvaluator(64 * 1024, 1024)
+    private lazy val evaluator = KenLMEvaluator.make(sudachi, kenlm, 0.1f)
 
     def process(par: String): Double = {
-      val tokens = tokenizer.tokenize(par)
-      val proc = evaluator
-
-      proc.clear()
-
-      val iter = tokens.iterator()
-      var continue = true
-      while (iter.hasNext && continue) {
-        val token = iter.next()
-        if (token.normalizedForm() != " ") {
-          continue = proc.append(token.surface()) > 0
-        }
-      }
-
-      val prob = proc.evaluateNoOutliers(0.02f)
+      val prob = evaluator.scoreParagraph(Paragraph("body", par))
       Math.pow(10, -prob)
     }
 
@@ -69,7 +54,7 @@ object KenLMRunner {
     val probs = pars.withColumn("perplexity", ppx.asUdf($"text"))
       .repartitionByRange(20, $"perplexity".desc).sortWithinPartitions($"perplexity".desc)
 
-    probs.write.json(opts.output())
+    probs.write.mode(SaveMode.Overwrite).json(opts.output())
   }
 
 }
