@@ -22,7 +22,6 @@ object Build {
     val scala212 = "2.12.18"
     val scala3 = "3.3.1"
     val spark = "3.4.1"
-    val sudachi = "0.7.3"
   }
   val lintSettings = Def.settings {
     scalacOptions ++= (
@@ -36,15 +35,14 @@ object Build {
     )
   }
 
-  val coreDependencies = Seq(
-    "com.worksap.nlp" % "sudachi" % V.sudachi
-  )
   val sparkDependencies = Seq(
     "org.apache.spark" %% "spark-sql" % V.spark,
     "org.apache.spark" %% "spark-mllib" % V.spark
   )
   val libdependencies = Seq(
-    ("org.rogach" %% "scallop" % "4.1.0"),
+    "org.rogach" %% "scallop" % "4.1.0",
+    "com.worksap.nlp" % "sudachi" % "0.7.3",
+    "ws.kotonoha.uzushio" % "kenlm" % "0.1.0",
     "org.netpreserve.commons" % "webarchive-commons" % "1.1.9" // org.archive.io
       exclude ("org.apache.hadoop", "hadoop-core")
       exclude ("com.googlecode.juniversalchardet", "juniversalchardet"),

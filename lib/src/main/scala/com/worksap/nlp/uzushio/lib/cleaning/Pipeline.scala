@@ -1,6 +1,6 @@
 package com.worksap.nlp.uzushio.lib.cleaning
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigResolveOptions}
 import com.worksap.nlp.uzushio.lib.filters.base.{DocFilter, ParagraphFilter}
 import com.worksap.nlp.uzushio.lib.stats.NgramHashExtractor
 import com.worksap.nlp.uzushio.lib.utils.{MathUtil, Paragraphs}
@@ -197,6 +197,7 @@ object Pipeline {
       index: Int
   ): AnyRef = {
     if (!cfg.hasPath(par.getName)) {
+      // try to use default parameter for constructor, if such exist
       val defFnName = "$lessinit$greater$default$" + index
       try {
         val defMethod = clz.getMethod(defFnName) // should be static
@@ -262,34 +263,35 @@ object Pipeline {
     )
   }
 
-  def make(cfg: Config): Pipeline = {
-    val filterCfgs = cfg.getConfigList("filters")
-    val filters = filterCfgs.asScala.map(cfg => instantiateFilter(cfg)).toArray
+  def make(cfg: Config, props: Config): Pipeline = {
+    val resolved = cfg.resolveWith(props, ConfigResolveOptions.noSystem())
+    val filterCfgs = resolved.getConfigList("filters")
+    val filters = filterCfgs.asScala.map(c => instantiateFilter(c)).toArray
     new Pipeline(filters)
   }
 
-  def make(path: Path): Pipeline = {
+  def make(path: Path, props: Config): Pipeline = {
     val cfg = ConfigFactory.parseFile(path.toFile)
-    make(cfg)
+    make(cfg, props)
   }
 
-  def make(url: URL): Pipeline = {
+  def make(url: URL, props: Config): Pipeline = {
     val cfg = ConfigFactory.parseURL(url)
-    make(cfg)
+    make(cfg, props)
   }
 
-  def make(name: String): Pipeline = {
+  def make(name: String, props: Config): Pipeline = {
     val p = Paths.get(name)
     if (Files.exists(p)) {
-      return make(p)
+      return make(p, props)
     }
     val basicUri = getClass.getClassLoader.getResource(name)
     if (basicUri != null) {
-      return make(basicUri)
+      return make(basicUri, props)
     }
     val pipelinesUri = getClass.getClassLoader.getResource(s"pipeline/$name")
     if (pipelinesUri != null) {
-      return make(pipelinesUri)
+      return make(pipelinesUri, props)
     }
     throw new IllegalArgumentException(
       s"failed to find pipeline description: $name"
