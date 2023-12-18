@@ -3,9 +3,11 @@ package com.worksap.nlp.uzushio.lib.filters
 import com.github.jbaiter.kenlm.BufferEvaluator
 import com.worksap.nlp.sudachi.{Dictionary, Morpheme}
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
+import com.worksap.nlp.uzushio.lib.filters.KenLMEvaluator.logger
 import com.worksap.nlp.uzushio.lib.filters.base.{DocFilter, HighLowDocFilter}
 import com.worksap.nlp.uzushio.lib.resources.{KenLM, Sudachi}
 import com.worksap.nlp.uzushio.lib.utils.{Paragraphs, SentenceIterator}
+import org.slf4j.LoggerFactory
 
 class KenLMDocAvgPerplexity(
     sudachi: String,
@@ -88,12 +90,20 @@ class KenLMEvaluator(sudachi: String, kenlm: String) {
   def extractScore(ev: BufferEvaluator): Double = ev.evaluate()
 
   def scoreParagraph(p: Paragraph): Double = {
-    val e = processParagraph(p)
+    val e = try {
+      processParagraph(p)
+    } catch {
+      case ex: Exception =>
+        logger.error(s"failed to analyze ${p.text}", ex)
+        return -50.0
+    }
     extractScore(e)
   }
 }
 
 object KenLMEvaluator {
+  private final val logger = LoggerFactory.getLogger(classOf[KenLMEvaluator])
+
   def make(sudachi: String, kenlm: String, ratio: Float): KenLMEvaluator = {
     if (ratio < 1e-3) {
       new KenLMEvaluator(sudachi, kenlm)
