@@ -5,7 +5,7 @@ import com.worksap.nlp.sudachi.{Dictionary, Morpheme}
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph}
 import com.worksap.nlp.uzushio.lib.filters.base.{DocFilter, HighLowDocFilter}
 import com.worksap.nlp.uzushio.lib.resources.{KenLM, Sudachi}
-import com.worksap.nlp.uzushio.lib.utils.Paragraphs
+import com.worksap.nlp.uzushio.lib.utils.{Paragraphs, SentenceIterator}
 
 class KenLMDocAvgPerplexity(
     sudachi: String,
@@ -47,31 +47,13 @@ class KenLMEvaluator(sudachi: String, kenlm: String) {
   final protected val evaluator = KenLM.get(kenlm).bufferEvaluator(128 * 1024, 1024)
 
   def processParagraph(p: Paragraph): BufferEvaluator = {
-    val text = p.text
-
-    var nextLineStart = 0
     val ev = evaluator
 
-    while (nextLineStart >= 0) {
-      val thisLineStart = nextLineStart
-      val eolOffset = p.text.indexOf('\n', nextLineStart)
+    val linesIterator = new SentenceIterator(p.text, 16 * 1024)
 
-      var lineEnd = if (eolOffset == -1) {
-        nextLineStart = -1
-        text.length
-      } else {
-        nextLineStart = eolOffset + 1
-        eolOffset
-      }
-
-      val length = lineEnd - thisLineStart
-      if (length > 16 * 1024) {
-        lineEnd = thisLineStart + 16 * 1024
-        nextLineStart = lineEnd + 1
-      }
-
-      val singleLine = text.substring(thisLineStart, lineEnd)
-      val tokens = tokenizer.tokenize(singleLine)
+    while (linesIterator.hasNext) {
+      val line = linesIterator.next()
+      val tokens = tokenizer.tokenize(line)
 
       val iter = tokens.iterator()
       var continue = true
@@ -84,7 +66,6 @@ class KenLMEvaluator(sudachi: String, kenlm: String) {
         }
       }
     }
-
     ev
   }
 
