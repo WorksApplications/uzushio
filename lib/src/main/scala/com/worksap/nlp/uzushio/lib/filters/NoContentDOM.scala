@@ -58,7 +58,7 @@ class NoContentDOM extends ParagraphFilter {
     val id_segments = css.id.split("[_-]")
 
     (id_segments.toSet & filteringPartialMatchClassOrIdNames.toSet).nonEmpty ||
-      filteringPartialMatchClassOrIdNames.exists(name => css.id.capitalize.contains(name.capitalize))
+    filteringPartialMatchClassOrIdNames.exists(name => css.id.capitalize.contains(name.capitalize))
   }
 
   def partialMatchClasses(css: PathSegment): Boolean = {
