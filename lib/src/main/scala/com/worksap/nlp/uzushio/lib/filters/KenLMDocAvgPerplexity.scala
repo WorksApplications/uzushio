@@ -90,19 +90,20 @@ class KenLMEvaluator(sudachi: String, kenlm: String) {
   def extractScore(ev: BufferEvaluator): Double = ev.evaluate()
 
   def scoreParagraph(p: Paragraph): Double = {
-    val e = try {
-      processParagraph(p)
-    } catch {
-      case ex: Exception =>
-        logger.error(s"failed to analyze ${p.text}", ex)
-        return -50.0
-    }
+    val e =
+      try {
+        processParagraph(p)
+      } catch {
+        case ex: Exception =>
+          logger.error(s"failed to analyze ${p.text}", ex)
+          return -50.0
+      }
     extractScore(e)
   }
 }
 
 object KenLMEvaluator {
-  private final val logger = LoggerFactory.getLogger(classOf[KenLMEvaluator])
+  final private val logger = LoggerFactory.getLogger(classOf[KenLMEvaluator])
 
   def make(sudachi: String, kenlm: String, ratio: Float): KenLMEvaluator = {
     if (ratio < 1e-3) {
