@@ -1,18 +1,16 @@
-#!/bin/bash -x
+#!/bin/bash
 
 #$ -j y
 #$ -cwd
 #$ -l USE_SSH=1
 #$ -l USE_EXTRA_NETWORK=1
 
-OUTPUT=$1
-shift
-INPUT=()
-for arg in "$@"; do
-  INPUT+=("--input=$arg")
-  du -hs "$arg" > /dev/null &
-done
+INPUT=$1
+STATS=$2
+OUTPUT=$3
 
+du -hs "$INPUT" > /dev/null &
+du -hs "$STATS" > /dev/null &
 
 # SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 UZUSHIO_ROOT=$HOME/work/uzushio
@@ -33,15 +31,28 @@ echo "$(date -Iseconds) $JOB_ID ssh abci -L8080:$(hostname):8080" >> /scratch/$U
 
 mkdir -p /scratch/$USER/spark-exlog
 
+NUM_PARTITIONS=1000
+NUM_PARTITIONS_PROPAGATION=4000
+
 "$SPARK_HOME/bin/spark-submit" \
-    --class com.worksap.nlp.uzushio.lib.runners.MergeDedupStats \
+    --class com.worksap.nlp.uzushio.main.DeduplicateParagraphs \
     --master $SPARK_MASTER \
     --conf spark.driver.log.dfsDir=/scratch/$USER/spark-exlog \
     --conf spark.eventLog.dir=/scratch/$USER/spark-exlog \
     --conf spark.local.dir=$SPARK_LOCAL_DIRS \
-    --conf spark.sql.shuffle.partitions=1000 \
+    --conf spark.sql.shuffle.partitions=$NUM_PARTITIONS_PROPAGATION \
+    --conf spark.sql.parquet.columnarReaderBatchSize=256 \
     local://$UZUSHIO_JAR \
-    ${INPUT[*]} \
-    --output="$OUTPUT"
+    --input=$INPUT \
+    --cache=$STATS \
+    --output=$OUTPUT \
+    --propagate-partitions=$NUM_PARTITIONS_PROPAGATION \
+    --filters=$SCRIPT_DIR/pipeline_02.conf \
+    --partitions=$NUM_PARTITIONS \
+    --execution=filter-debug \
+    -Pkenlm=/groups/gcf51199/filter/n-gram_model/kenlm_model_sudachi_filter.bin \
+    -Psudachi=/groups/gcf51199/resources/sudachi-dictionary-20230927/system_core.dic \
+    --format=json --compression=gzip --text-only
+
 
 wait

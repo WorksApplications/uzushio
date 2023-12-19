@@ -39,9 +39,9 @@ mkdir -p /scratch/$USER/spark-exlog
     --conf spark.driver.log.dfsDir=/scratch/$USER/spark-exlog \
     --conf spark.eventLog.dir=/scratch/$USER/spark-exlog \
     --conf spark.local.dir=$SPARK_LOCAL_DIRS \
-    --conf spark.sql.shuffle.partitions=1000 \
+    --conf spark.sql.shuffle.partitions=4000 \
     local://$UZUSHIO_JAR \
     ${INPUT[*]} \
-    --output="$OUTPUT"
+    --output="$OUTPUT" --no-ones --partitions=1000
 
 wait

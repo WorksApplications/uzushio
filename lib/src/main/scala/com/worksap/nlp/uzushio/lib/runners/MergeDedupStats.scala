@@ -54,13 +54,16 @@ object MergeDedupStats {
         merged
       } else merged.where($"nearFreq" > 1)
 
-    filtered.write.option("compression", "zstd").mode(SaveMode.Overwrite).parquet(arg.output())
+    val partitioned = filtered.repartition(arg.partitions(), $"hash").sortWithinPartitions($"reprHash", $"hash")
+
+    partitioned.write.option("compression", "zstd").mode(SaveMode.Overwrite).parquet(arg.output())
   }
 
   class Args(args: Seq[String]) extends ScallopConf(args) {
     val input = opt[List[String]]()
     val output = opt[String]()
     val master = opt[String]()
+    val partitions = opt[Int](default=Some(500))
     val noOnes = toggle(default = Some(false))
     verify()
   }
