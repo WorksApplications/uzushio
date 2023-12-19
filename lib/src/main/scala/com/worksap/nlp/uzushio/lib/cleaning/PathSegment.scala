@@ -5,6 +5,9 @@ import scala.collection.mutable.ArrayBuffer
 case class PathSegment(tag: String, id: String, classes: Seq[String]) {
   override def toString: String = classes
     .mkString(tag + (if (classes.isEmpty) "" else "."), ".", if (id == null) "" else s"#$id")
+
+  def splitIdByCase: Seq[String] = id.split("[_-]")
+  def splitClassesByCase: Seq[Array[String]] = classes.map(_.split("[_-]"))
 }
 
 object PathSegment {
