@@ -1,6 +1,6 @@
 package com.worksap.nlp.uzushio.lib.filters
 
-import com.worksap.nlp.uzushio.lib.cleaning.Paragraph
+import com.worksap.nlp.uzushio.lib.cleaning.{Paragraph, PathSegment}
 import com.worksap.nlp.uzushio.lib.filters.base.ParagraphFilter
 
 class NoContentDOM extends ParagraphFilter {
@@ -50,7 +50,18 @@ class NoContentDOM extends ParagraphFilter {
     words.head + words.tail.map(_.capitalize).mkString
   }
 
-  // I checked some of the Common Crawl extracts and noticed that `div#header` and `div.nav` are also often used instead of `<header>` and `<nav>`.
+  def partialMatchIds(css: PathSegment): Boolean = filteringPartialMatchClassOrIdNames
+    .exists(name =>
+      css.id != null && (css.id.split("[_-]").contains(name) || css.id.capitalize
+        .contains(name.capitalize))
+    )
+
+  def partialMatchClasses(css: PathSegment): Boolean = filteringPartialMatchClassOrIdNames
+    .exists(name =>
+      css.classes.exists(_.split("[_-]").contains(name)) || css.classes
+        .exists(_.capitalize.contains(name.capitalize))
+    )
+
   def containsTagWithIdAndClasses(
       p: Paragraph,
       tagNames: Seq[String],
@@ -69,13 +80,10 @@ class NoContentDOM extends ParagraphFilter {
         return true
       }
 
+      // checking filtering keywords in snake case and camel case, kebab case
       if (
         partialMatchCandidates.exists(name =>
-          tagNames.contains(css.tag)
-            && ((css.id != null && (css.id.split("[_-]").contains(name) || css.id.capitalize
-              .contains(name.capitalize)))
-              || (css.classes.exists(_.split("[_-]").contains(name)) || css.classes
-                .exists(_.capitalize.contains(name.capitalize))))
+          tagNames.contains(css.tag) && (partialMatchIds(css) || partialMatchClasses(css))
         )
       ) {
         return true
