@@ -1,17 +1,16 @@
-#!/bin/bash -x
+#!/bin/bash
 
 #$ -j y
 #$ -cwd
 #$ -l USE_SSH=1
 #$ -l USE_EXTRA_NETWORK=1
 
-OUTPUT=$1
-shift
-INPUT=()
-for arg in "$@"; do
-  INPUT+=("--input=$arg")
-  du -hs "$arg" > /dev/null &
-done
+INPUT=$1
+OUTPUT=$2
+KENLM=$3
+SUDACHI=$4
+
+du -hs "$INPUT" > /dev/null &
 
 
 # SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -33,15 +32,18 @@ echo "$(date -Iseconds) $JOB_ID ssh abci -L8080:$(hostname):8080" >> /scratch/$U
 
 mkdir -p /scratch/$USER/spark-exlog
 
+
 "$SPARK_HOME/bin/spark-submit" \
-    --class com.worksap.nlp.uzushio.lib.runners.MergeDedupStats \
+    --class com.worksap.nlp.uzushio.lib.runners.KenLMRunner \
     --master $SPARK_MASTER \
     --conf spark.driver.log.dfsDir=/scratch/$USER/spark-exlog \
     --conf spark.eventLog.dir=/scratch/$USER/spark-exlog \
     --conf spark.local.dir=$SPARK_LOCAL_DIRS \
-    --conf spark.sql.shuffle.partitions=1000 \
+    --conf spark.sql.parquet.columnarReaderBatchSize=512 \
     local://$UZUSHIO_JAR \
-    ${INPUT[*]} \
-    --output="$OUTPUT"
+    --input=$INPUT \
+    --output=$OUTPUT \
+    --sudachi-dict=$SUDACHI \
+    --kenlm-model=$KENLM
 
 wait
