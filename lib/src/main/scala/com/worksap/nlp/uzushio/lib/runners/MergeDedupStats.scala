@@ -41,7 +41,8 @@ object MergeDedupStats {
     val remapReprHashes = notUnique.select("reprHashes").select(
       array_min($"reprHashes").as("newReprHash"),
       explode($"reprHashes").as("oldReprHash")
-    ).where($"newReprHash" =!= $"oldReprHash").distinct()
+    ).where($"newReprHash" =!= $"oldReprHash").groupBy($"oldReprHash")
+      .agg(min($"newReprHash").as("newReprHash"))
 
     val intermediate = combined.select(
       $"hash",
