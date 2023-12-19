@@ -7,7 +7,9 @@ class NoContentDOM extends ParagraphFilter {
   final private val filteringDomNames: Seq[String] =
     Array("header", "footer", "aside", "nav", "noscript", "form")
 
-  final private val filteringFullMatchClassOrIdNames: Seq[String] = Array(
+  final private val DOMCandidatesForFiliteringClassOrId = Array("div", "p", "ul", "h1")
+
+  final private val filteringFullMatchClassOrIdCandidates: Seq[String] = Array(
     "left-box",
     "blog-title-inner",
     "globalheader",
@@ -38,6 +40,10 @@ class NoContentDOM extends ParagraphFilter {
     // "profile",
     "button",
   )
+
+  final private val filteringFullMatchClassOrIdNames =
+    filteringPartialMatchClassOrIdNames ++ filteringFullMatchClassOrIdCandidates ++ filteringFullMatchClassOrIdCandidates
+      .map(toCamelCase)
 
   def toCamelCase(s: String): String = {
     val words = s.split("-")
@@ -79,14 +85,11 @@ class NoContentDOM extends ParagraphFilter {
   }
 
   override def checkParagraph(p: Paragraph): Paragraph = {
-    val fullMatchCandidates =
-      filteringPartialMatchClassOrIdNames ++ filteringFullMatchClassOrIdNames ++ filteringFullMatchClassOrIdNames
-        .map(toCamelCase)
     if (
       p.containsTags(filteringDomNames) || containsTagWithIdAndClasses(
         p,
-        Seq("div", "p", "ul", "h1"),
-        fullMatchCandidates,
+        DOMCandidatesForFiliteringClassOrId,
+        filteringFullMatchClassOrIdNames,
         filteringPartialMatchClassOrIdNames
       )
     ) {
