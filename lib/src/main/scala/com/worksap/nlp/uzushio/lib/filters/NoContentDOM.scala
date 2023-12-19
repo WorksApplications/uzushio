@@ -46,7 +46,7 @@ class NoContentDOM extends ParagraphFilter {
       .map(toCamelCase)
 
   def toCamelCase(s: String): String = {
-    val words = s.split("-")
+    val words = s.split("[_-]")
     words.head + words.tail.map(_.capitalize).mkString
   }
 
@@ -80,7 +80,7 @@ class NoContentDOM extends ParagraphFilter {
         return true
       }
 
-      // checking filtering keywords in snake case and camel case, kebab case
+      // check filtering keywords in snake case, camel case and kebab case
       if (
         partialMatchCandidates.exists(name =>
           tagNames.contains(css.tag) && (partialMatchIds(css) || partialMatchClasses(css))
