@@ -37,7 +37,6 @@ class NoContentDOM extends ParagraphFilter {
     "breadcrumb",
     "breadcrumbs",
     "widget",
-    // "profile",
     "button",
   )
 
@@ -55,18 +54,18 @@ class NoContentDOM extends ParagraphFilter {
       return false
     }
 
-    val id_segments = css.id.split("[_-]")
+    val idSegments = css.splitIdByCase.toSet
 
-    (id_segments.toSet & filteringPartialMatchClassOrIdNames.toSet).nonEmpty ||
-    filteringPartialMatchClassOrIdNames.exists(name => css.id.capitalize.contains(name.capitalize))
+    filteringPartialMatchClassOrIdNames
+      .exists(name => idSegments.contains(name) || css.id.capitalize.contains(name.capitalize))
   }
 
   def partialMatchClasses(css: PathSegment): Boolean = {
-    val class_segments = css.classes.flatMap(_.split("[_-]"))
+    val classSegments = css.splitClassesByCase.flatten.toSet
 
-    (class_segments.toSet & filteringPartialMatchClassOrIdNames.toSet).nonEmpty ||
-    (class_segments.map(_.capitalize).toSet & filteringPartialMatchClassOrIdNames.map(_.capitalize)
-      .toSet).nonEmpty
+    filteringPartialMatchClassOrIdNames.exists(name =>
+      classSegments.contains(name) || css.classes.exists(_.capitalize.contains(name.capitalize))
+    )
   }
 
   def containsTagWithIdAndClasses(
