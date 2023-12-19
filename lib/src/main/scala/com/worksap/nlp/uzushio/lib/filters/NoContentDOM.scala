@@ -12,7 +12,6 @@ class NoContentDOM extends ParagraphFilter {
   final private val filteringFullMatchClassOrIdCandidates: Seq[String] = Array(
     "left-box",
     "blog-title-inner",
-    "globalheader",
     "blogtitle",
     "blog-name",
     "head-block1",
@@ -24,18 +23,12 @@ class NoContentDOM extends ParagraphFilter {
     "header",
     "footer",
     "side",
-    "aside",
-    "sidebar",
     "menu",
     "nav",
-    "navi",
-    "navigation",
-    "navbar",
     "banner",
     "logo",
     "pankuzu",
     "breadcrumb",
-    "breadcrumbs",
     "widget",
     "button",
   )
@@ -54,18 +47,11 @@ class NoContentDOM extends ParagraphFilter {
       return false
     }
 
-    val idSegments = css.splitIdByCase.toSet
-
-    filteringPartialMatchClassOrIdNames
-      .exists(name => idSegments.contains(name) || css.id.capitalize.contains(name.capitalize))
+    filteringPartialMatchClassOrIdNames.exists(name => css.lowerId.contains(name))
   }
 
   def partialMatchClasses(css: PathSegment): Boolean = {
-    val classSegments = css.splitClassesByCase.flatten.toSet
-
-    filteringPartialMatchClassOrIdNames.exists(name =>
-      classSegments.contains(name) || css.classes.exists(_.capitalize.contains(name.capitalize))
-    )
+    filteringPartialMatchClassOrIdNames.exists(name => css.lowerClasses.exists(_.contains(name)))
   }
 
   def containsTagWithIdAndClasses(
@@ -80,17 +66,15 @@ class NoContentDOM extends ParagraphFilter {
       val css = iter.next()
 
       if (
-        fullMatchCandidates
-          .exists(name => tagNames.contains(css.tag) && (css.id == name || css.classes.contains(name)))
+        tagNames.contains(css.tag)
+        && fullMatchCandidates.exists(name => css.id == name || css.classes.contains(name))
       ) {
         return true
       }
 
-      // check filtering keywords in snake case, camel case and kebab case
       if (
-        partialMatchCandidates.exists(name =>
-          tagNames.contains(css.tag) && (partialMatchIds(css) || partialMatchClasses(css))
-        )
+        tagNames.contains(css.tag)
+        && partialMatchCandidates.exists(name => partialMatchIds(css) || partialMatchClasses(css))
       ) {
         return true
       }
