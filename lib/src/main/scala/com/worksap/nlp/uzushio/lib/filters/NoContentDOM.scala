@@ -50,17 +50,24 @@ class NoContentDOM extends ParagraphFilter {
     words.head + words.tail.map(_.capitalize).mkString
   }
 
-  def partialMatchIds(css: PathSegment): Boolean = filteringPartialMatchClassOrIdNames
-    .exists(name =>
-      css.id != null && (css.id.split("[_-]").contains(name) || css.id.capitalize
-        .contains(name.capitalize))
-    )
+  def partialMatchIds(css: PathSegment): Boolean = {
+    if (css.id == null) {
+      return false
+    }
 
-  def partialMatchClasses(css: PathSegment): Boolean = filteringPartialMatchClassOrIdNames
-    .exists(name =>
-      css.classes.exists(_.split("[_-]").contains(name)) || css.classes
-        .exists(_.capitalize.contains(name.capitalize))
-    )
+    val id_segments = css.id.split("[_-]")
+
+    (id_segments.toSet & filteringPartialMatchClassOrIdNames.toSet).nonEmpty ||
+      filteringPartialMatchClassOrIdNames.exists(name => css.id.capitalize.contains(name.capitalize))
+  }
+
+  def partialMatchClasses(css: PathSegment): Boolean = {
+    val class_segments = css.classes.flatMap(_.split("[_-]"))
+
+    (class_segments.toSet & filteringPartialMatchClassOrIdNames.toSet).nonEmpty ||
+    (class_segments.map(_.capitalize).toSet & filteringPartialMatchClassOrIdNames.map(_.capitalize)
+      .toSet).nonEmpty
+  }
 
   def containsTagWithIdAndClasses(
       p: Paragraph,
