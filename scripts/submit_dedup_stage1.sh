@@ -3,6 +3,7 @@
 #$ -j y
 #$ -cwd
 #$ -l USE_SSH=1
+#$ -l USE_EXTRA_NETWORK=1
 
 du -hs "$1" > /dev/null &
 
@@ -38,6 +39,7 @@ NUM_PARTITIONS_PROPAGATION=${4:-$(($NUM_PARTITIONS * 4))}
     --conf spark.eventLog.dir=/scratch/$USER/spark-exlog \
     --conf spark.local.dir=$SPARK_LOCAL_DIRS \
     --conf spark.sql.shuffle.partitions=${NUM_PARTITIONS_PROPAGATION} \
+    --conf spark.sql.parquet.columnarReaderBatchSize=512 \
     local://$UZUSHIO_JAR \
     --input="$INPUT" \
     --output="$OUTPUT" \

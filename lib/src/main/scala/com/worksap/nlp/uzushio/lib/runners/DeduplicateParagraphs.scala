@@ -820,7 +820,7 @@ object DeduplicateParagraphs {
 
     val basicCols = (if (debug) {
                        joined.columns.filter {
-                         case "parHash" => false
+                         case "parHash" => true
                          case "exactFreq" | "nearFreq" => false
                          case _ => true
                        }
@@ -901,7 +901,7 @@ object DeduplicateParagraphs {
 
   case class ProcessedDocument(text: String, filter: String)
 
-  private def processDocumentParts(
+    private def processDocumentParts(
       args: Args,
       docId: String,
       parts: IndexedSeq[Paragraph]

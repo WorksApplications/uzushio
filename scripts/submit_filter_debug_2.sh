@@ -50,7 +50,7 @@ NUM_PARTITIONS_PROPAGATION=4000
     --filters=$SCRIPT_DIR/pipeline_02.conf \
     --partitions=$NUM_PARTITIONS \
     --execution=filter-debug \
-    -Pkenlm=/groups/gcf51199/filter/n-gram_model/kenlm_model_sudachi_filter.bin \
+    -Pkenlm=/groups/gcf51199/filter/n-gram_model/kenlm_merge-code_0.05_model.bin \
     -Psudachi=/groups/gcf51199/resources/sudachi-dictionary-20230927/system_core.dic \
     --format=json --compression=gzip --text-only
 
