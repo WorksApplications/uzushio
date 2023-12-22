@@ -6,6 +6,25 @@ import org.scalatest.freespec.AnyFreeSpec
 class LargeFreqParagraphsSpec extends AnyFreeSpec {
   "LargeFreqParagraphs" - {
     val filter = new LargeFreqParagraphs(freq = 10)
+
+    "deletes all paragraphs" in {
+      val doc = Document(
+        Paragraph("p", "test1", nearFreq = 15),
+        Paragraph("p", "test2", nearFreq = 30),
+        Paragraph("p", "test3", nearFreq = 30),
+      )
+      val filtered = filter.checkDocument(doc)
+      assert(filtered.paragraphs(0).remove eq filter)
+      assert(filtered.paragraphs(1).remove eq filter)
+      assert(filtered.paragraphs(2).remove eq filter)
+
+      assert(filtered.countDroppedParagraphs() == 3)
+      val docs = filtered.splitByFilteredParagraphs()
+      assert(docs.length == 1)
+      val firstDoc = docs.head
+      assert(firstDoc.remove eq filter)
+    }
+
     "works with prefix (3)" in {
       val doc = Document(
         Paragraph("p", "test1", nearFreq = 15),
