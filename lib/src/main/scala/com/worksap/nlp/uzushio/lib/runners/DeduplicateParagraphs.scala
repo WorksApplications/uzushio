@@ -2,6 +2,7 @@ package com.worksap.nlp.uzushio.lib.runners
 
 import com.typesafe.config.ConfigFactory
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph, Pipeline}
+import com.worksap.nlp.uzushio.lib.runners.DeduplicateParagraphs.{cleanParagraphUdf, splitTextToParagraphs}
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
 import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
@@ -372,7 +373,7 @@ class DeduplicateParagraphs(
     import com.worksap.nlp.uzushio.lib.utils.BuilderSyntax._
     val rawData = spark.read.parquet(args.inputs: _*)
 
-    val basicData = prepareBasicData(rawData)
+    val basicData = prepareDataForDedup(rawData)
 
     val reprParagraphs =
       if (args.hasStage("reprHashes")) {
@@ -422,14 +423,10 @@ class DeduplicateParagraphs(
       .option("compression", args.compression).save(args.output)
   }
 
-  private def prepareBasicData(rawData: DataFrame): DataFrame = {
-    val cleanParagraphs = udf((x: String) => Paragraphs.extractCleanParagraphs(x))
-
-    val splitDocs = rawData.select(
-      posexplode(cleanParagraphs(rawData.col("text"))).as(Seq("pos", "text"))
-    )
-
-    prepareDataset(splitDocs)
+  private def prepareDataForDedup(rawData: DataFrame): DataFrame = {
+    val exploded = splitTextToParagraphs(rawData)
+    val noMetadata = exploded.withColumn("text", cleanParagraphUdf(exploded.col("text")))
+    prepareDataset(noMetadata)
   }
 
   def prepareDataset(ds: DataFrame): DataFrame = {
@@ -845,7 +842,9 @@ object DeduplicateParagraphs {
     )
   }
 
-  private def hashParagraphs(raw: DataFrame) = {
+  private val cleanParagraphUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
+
+  private def splitTextToParagraphs(raw: DataFrame) = {
     val explodeCols = raw.columns.map {
       case "text" => posexplode(split(raw.col("text"), "\n\n")).as(Seq("pos", "text"))
       case col => raw.col(col)
@@ -855,9 +854,12 @@ object DeduplicateParagraphs {
       octet_length(raw.col("text")) < 2 * 1024 * 1024 && countParagraphs(raw.col("text")) < 1000
     ).select(explodeCols: _*)
 
-    val cleanParUdf = udf((s: String) => Paragraphs.extractCleanParagraph(s))
+    exploded
+  }
 
-    exploded.withColumn("parHash", xxhash64(cleanParUdf(exploded.col("text"))))
+  private def hashParagraphs(raw: DataFrame) = {
+    val exploded = splitTextToParagraphs(raw)
+    exploded.withColumn("parHash", xxhash64(cleanParagraphUdf(exploded.col("text"))))
   }
 
   def collectDocParts(
