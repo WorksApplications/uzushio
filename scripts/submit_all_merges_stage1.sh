@@ -1,10 +1,10 @@
 #!/bin/bash
 
 COMMAND_START="qsub -g gcf51199 -l rt_F=10 -l h_rt=2:00:00 submit_merge_stats.sh"
-MERGE_ROOT=/groups/gcf51199/cc/stats_merged_v1/per_year
-MERGE_BASIC_ROOT=/groups/gcf51199/cc/stats
+MERGE_ROOT=/groups/gcf51199/cc/stats_merged_v2/per_year
+MERGE_BASIC_ROOT=/groups/gcf51199/cc/stats_raw_v2
 
-eval $COMMAND_START $MERGE_ROOT/2016 $MERGE_BASIC_ROOT/merged-2013 $MERGE_BASIC_ROOT/merged-2014 $MERGE_BASIC_ROOT/merged-2015 $MERGE_BASIC_ROOT/merged-2016
+eval $COMMAND_START $MERGE_ROOT/2016 $MERGE_BASIC_ROOT/segment=merged-*
 eval $COMMAND_START $MERGE_ROOT/2017 $MERGE_BASIC_ROOT/segment=CC-MAIN-2017-*
 eval $COMMAND_START $MERGE_ROOT/2018 $MERGE_BASIC_ROOT/segment=CC-MAIN-2018-*
 eval $COMMAND_START $MERGE_ROOT/2019 $MERGE_BASIC_ROOT/segment=CC-MAIN-2019-*

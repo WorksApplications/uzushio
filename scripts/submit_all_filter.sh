@@ -3,9 +3,21 @@
 submit() {
     qsub -g gcf51199 -l rt_F=10 -l h_rt=1:00:00 submit_filter_debug_2.sh \
         "/groups/gcf51199/cc/extracted/segment\=$1" \
-        /groups/gcf51199/cc/stats_merged_v1/for_filter/all \
-        "/groups/gcf51199/cc/filtered_v2/segment=$1"
+        /groups/gcf51199/cc/stats_merged_v2/for_filter/all \
+        "/groups/gcf51199/cc/filtered_v3/segment=$1"
 }
+
+submit_pre2016() {
+    qsub -g gcf51199 -l rt_F=10 -l h_rt=1:00:00 submit_filter_debug_2.sh \
+        "/groups/gcf51199/cc2/extracted/$1" \
+        /groups/gcf51199/cc/stats_merged_v2/for_filter/all \
+        "/groups/gcf51199/cc/filtered_v3/segment=$1"
+}
+
+submit_pre2016 merged-2013
+submit_pre2016 merged-2014
+submit_pre2016 merged-2015
+submit_pre2016 merged-2016
 
 submit CC-MAIN-2017-04
 submit CC-MAIN-2017-09
@@ -70,3 +82,4 @@ submit CC-MAIN-2022-49
 submit CC-MAIN-2023-06
 submit CC-MAIN-2023-14
 submit CC-MAIN-2023-23
+submit CC-MAIN-2023-40
