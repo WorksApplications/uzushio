@@ -11,7 +11,7 @@ object Paragraphs {
   final val FULLWIDTH_SPACE: Char = '　'
 
   def extractCleanParagraphs(text: String): Seq[String] = {
-    val paragraphs = StringUtils.split(text, PARAGRAPH_SEP)
+    val paragraphs = StringUtils.splitByWholeSeparator(text, PARAGRAPH_SEP)
     paragraphs.flatMap { x =>
       val par = extractCleanParagraph(x)
       if (hasContent(par)) Some(par) else None
