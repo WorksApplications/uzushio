@@ -2,7 +2,10 @@ package com.worksap.nlp.uzushio.lib.runners
 
 import com.typesafe.config.ConfigFactory
 import com.worksap.nlp.uzushio.lib.cleaning.{Document, Paragraph, Pipeline}
-import com.worksap.nlp.uzushio.lib.runners.DeduplicateParagraphs.{cleanParagraphUdf, splitTextToParagraphs}
+import com.worksap.nlp.uzushio.lib.runners.DeduplicateParagraphs.{
+  cleanParagraphUdf,
+  splitTextToParagraphs
+}
 import com.worksap.nlp.uzushio.lib.runners.DuplicateCandidateRow._
 import com.worksap.nlp.uzushio.lib.stats.{NgramBitSignatures, NgramHashExtractor, SimHashProcessor}
 import com.worksap.nlp.uzushio.lib.utils.Resources.AutoClosableResource
@@ -901,7 +904,7 @@ object DeduplicateParagraphs {
 
   case class ProcessedDocument(text: String, filter: String)
 
-    private def processDocumentParts(
+  private def processDocumentParts(
       args: Args,
       docId: String,
       parts: IndexedSeq[Paragraph]
