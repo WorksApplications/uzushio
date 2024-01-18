@@ -4,7 +4,20 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.Iterator;
 
+/**
+ * Buffer for row-like objects. Indices of entries are not preserved. Has O(1) {@link #removeElementAt(int)} method
+ * which removes an element at index and puts the last element to the removed position.
+ *
+ * @param <T>
+ *         row-like object
+ */
 public final class RowBuffer<T> extends ObjectArrayList<T> {
+
+    /**
+     * An iterator class which supports removing the just returned element.
+     *
+     * @param <T>
+     */
     public final static class DeletingIterator<T> implements Iterator<T> {
         private final T[] data;
         private final RowBuffer<T> parent;
@@ -28,6 +41,11 @@ public final class RowBuffer<T> extends ObjectArrayList<T> {
             return element;
         }
 
+        /**
+         * Remove the element which was returned by the previous {@link #next()} call.
+         *
+         * @return removed element
+         */
         public T removeElement() {
             int toRemoveIdx = position - 1;
             T element = parent.removeElementAt(toRemoveIdx);
@@ -47,9 +65,10 @@ public final class RowBuffer<T> extends ObjectArrayList<T> {
     }
 
     /**
-     * Removes the current element from the collection.
-     * Last element is placed instead of the current element.
-     * @param index where to remove
+     * Removes the current element from the collection. Last element is placed instead of the current element.
+     *
+     * @param index
+     *         where to remove
      * @return element which replaces current element
      */
     public T removeElementAt(int index) {
