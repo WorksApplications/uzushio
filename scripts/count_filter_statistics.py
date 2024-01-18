@@ -4,6 +4,9 @@ from pathlib import Path
 from multiprocessing.pool import ThreadPool
 import csv
 
+# Count filter statistics from the directory structure created by Uzushio
+# If tqdm is installed, show show a progress bar while processing.
+
 
 @dataclass
 class Args(object):
