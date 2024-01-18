@@ -32,6 +32,16 @@ class NoContentDOMSpec extends AnyFreeSpec {
       assert(filter.checkParagraph(p).remove != null)
     }
 
+    "sign remove for noscript tag paragraph" in {
+      val p = Paragraph("body>noscript", "test")
+      assert(filter.checkParagraph(p).remove != null)
+    }
+
+    "sign remove for form tag paragraph" in {
+      val p = Paragraph("body>form", "test")
+      assert(filter.checkParagraph(p).remove != null)
+    }
+
     "sign remove for div tag with header class paragraph" in {
       val p = Paragraph("body>div.header>p", "test")
       assert(filter.checkParagraph(p).remove != null)
@@ -39,6 +49,31 @@ class NoContentDOMSpec extends AnyFreeSpec {
 
     "sign remove for div tag with header id paragraph" in {
       val p = Paragraph("body>div#header>p", "test")
+      assert(filter.checkParagraph(p).remove != null)
+    }
+
+    "sign remove for div tag with header-test id paragraph" in {
+      val p = Paragraph("body>div#header-test>p", "test")
+      assert(filter.checkParagraph(p).remove != null)
+    }
+
+    "sign remove for div tag with breadcrumbs-test id paragraph" in {
+      val p = Paragraph("body>div.breadcrumbs-test>p", "test")
+      assert(filter.checkParagraph(p).remove != null)
+    }
+
+    "sign remove for div tag with widget_wrapper id paragraph" in {
+      val p = Paragraph("body>div#widget_wrapper>p", "test")
+      assert(filter.checkParagraph(p).remove != null)
+    }
+
+    "sign remove for div tag with testLogo id paragraph" in {
+      val p = Paragraph("body>div#testLogo>p", "test")
+      assert(filter.checkParagraph(p).remove != null)
+    }
+
+    "sign remove for div tag with headerTop id paragraph" in {
+      val p = Paragraph("body>div#headerTop>p", "test")
       assert(filter.checkParagraph(p).remove != null)
     }
   }

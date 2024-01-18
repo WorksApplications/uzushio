@@ -5,6 +5,9 @@ import scala.collection.mutable.ArrayBuffer
 case class PathSegment(tag: String, id: String, classes: Seq[String]) {
   override def toString: String = classes
     .mkString(tag + (if (classes.isEmpty) "" else "."), ".", if (id == null) "" else s"#$id")
+
+  lazy val lowerClasses: Set[String] = classes.map(_.toLowerCase).toSet
+  lazy val lowerId: String = if (id == null) null else id.toLowerCase
 }
 
 object PathSegment {
