@@ -99,6 +99,11 @@ spark-submit \
 * `--max-partitions` (default 2000) produce at most this number of partitions in output data.
 * `--compression` (default zstd) compress parquet data with this compression algorithm. See [supported algorithms](https://spark.apache.org/docs/latest/sql-data-sources-parquet.html#data-source-option).
 
+# License
+
+Copyright (c) 2024 Works Applications Co., Ltd. All rights reserved.
+
+Uzushio is distributed by [Works Applications Co.,Ltd.](https://www.worksap.co.jp/) under [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 # References
 
