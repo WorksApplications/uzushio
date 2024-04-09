@@ -204,7 +204,7 @@ object Pipeline {
         return defMethod.invoke(null)
       } catch {
         case _: NoSuchMethodException => throw new IllegalArgumentException(
-            s"could not instantiate $clz, ${par.getName} did not configured or have default value"
+            s"could not instantiate $clz, ${par.getName} was not configured or did not have a default value"
           )
       }
     }
