@@ -15,7 +15,7 @@ case class ProbableLanguage(lang: String) extends EstimationResult {
   override def str: String = lang
 }
 
-class LangEstimation(private val minBytes: Int = 1024) {
+class LangEstimation(private val minBytes: Int = 256) {
   private val internalBuffer = CharBuffer.allocate(5 * 1024)
   private val decodeBuffer = CharBuffer.allocate(4 * 1024)
   private def langDetector = LangEstimation.cachedDetector

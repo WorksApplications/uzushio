@@ -1,19 +1,11 @@
 package com.worksap.nlp.uzushio.lib.warc
 
 import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor, ParseAbortException}
-import com.worksap.nlp.uzushio.lib.lang.{
-  EstimationFailure,
-  LangEstimation,
-  LangTagSniffer,
-  ProbableLanguage
-}
+import com.worksap.nlp.uzushio.lib.lang.{EstimationFailure, LangEstimation, LangTagSniffer, ProbableLanguage}
 import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.{logger, resolveEarliestDate}
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import org.apache.commons.lang3.StringUtils
-import org.apache.hc.core5.http.impl.nio.{
-  DefaultHttpResponseFactory,
-  DefaultHttpResponseParser,
-  SessionBufferAccess
-}
+import org.apache.hc.core5.http.impl.nio.{DefaultHttpResponseFactory, DefaultHttpResponseParser, SessionBufferAccess}
 import org.apache.hc.core5.http.{HttpException, HttpMessage, MessageHeaders}
 import org.apache.tika.detect.EncodingDetector
 import org.apache.tika.exception.TikaException
@@ -25,14 +17,10 @@ import org.mozilla.universalchardet.UniversalDetector
 import org.slf4j.LoggerFactory
 
 import java.io.{ByteArrayInputStream, IOException, InputStream}
-import java.nio.charset.{
-  Charset,
-  IllegalCharsetNameException,
-  StandardCharsets,
-  UnsupportedCharsetException
-}
+import java.nio.charset.{Charset, IllegalCharsetNameException, StandardCharsets, UnsupportedCharsetException}
 import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
+import java.util
 import java.util.{Locale, UUID}
 import scala.collection.mutable.ArrayBuffer
 import scala.xml.SAXException
@@ -58,6 +46,8 @@ class WarcEntryParser(
   private val sessionInputBuffer = SessionBufferAccess.instance(4 * 1024, 1024)
   private val langEstimation = new LangEstimation()
 
+  private val failures = new Object2IntOpenHashMap[String]()
+
   private def detectCharsetFromBytes(
       data: Array[Byte],
       offset: Int,
@@ -68,6 +58,11 @@ class WarcEntryParser(
     detector.handleData(data, offset, length)
     detector.dataEnd()
     detector.getDetectedCharset
+  }
+
+  private def skipDoc(reason: String): None.type = {
+    failures.addTo(reason, 1)
+    None
   }
 
   def parseHttpHeader(bytes: Array[Byte]): Option[(HttpMessage, Int)] = {
@@ -84,9 +79,9 @@ class WarcEntryParser(
       }
       Some((resp, sessionInputBuffer.position()))
     } catch {
-      case _: HttpException => None
-      case _: IOException => None
-      case _: IllegalArgumentException => None
+      case _: HttpException => skipDoc("http.parse")
+      case _: IOException => skipDoc("http.ioex")
+      case _: IllegalArgumentException => skipDoc("http.ia")
     }
   }
 
@@ -95,8 +90,8 @@ class WarcEntryParser(
     try {
       Some(Charset.forName(cleanName))
     } catch {
-      case _: IllegalCharsetNameException => None
-      case _: UnsupportedCharsetException => None
+      case _: IllegalCharsetNameException => skipDoc("charset.illegal")
+      case _: UnsupportedCharsetException => skipDoc("charset.unsupported")
     }
   }
 
@@ -163,7 +158,7 @@ class WarcEntryParser(
     if (c1.isDefined) {
       langEstimation.estimateLang(data, offset, c1.get) match {
         case ProbableLanguage(lang) => return Some((c1.get, lang))
-        case EstimationFailure => return None
+        case EstimationFailure => return skipDoc("lang.c1")
         case _ => // do nothing
       }
     }
@@ -171,14 +166,14 @@ class WarcEntryParser(
     if (c2.isDefined) {
       langEstimation.estimateLang(data, offset, c2.get) match {
         case ProbableLanguage(lang) => return Some((c2.get, lang))
-        case EstimationFailure => return None
+        case EstimationFailure => return skipDoc("lang.c2")
         case _ => // do nothing
       }
     }
     val c3 = guessCharsetFromBytes(data, offset)
     langEstimation.estimateLang(data, offset, c3) match {
       case ProbableLanguage(lang) => Some((c3, lang))
-      case _ => None
+      case _ => skipDoc("lang.c3")
     }
   }
 
@@ -257,7 +252,7 @@ class WarcEntryParser(
               date = resolveEarliestDate(item.accessDate, header)
             )
           )
-        case _ => None
+        case (_, lang) => skipDoc(s"lang.$lang")
       }
     }
   }
