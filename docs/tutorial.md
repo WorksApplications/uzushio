@@ -5,6 +5,8 @@
 基本的な処理の説明を目標とし、計算機環境やデータについては最小限のものを扱います。
 また各フィルターの詳細等も扱いません。
 
+[こちらの記事](https://qiita.com/eiennohito/items/0774662332778c27116f) もご参照ください。
+
 ## セットアップ
 
 ### spark + scala
@@ -95,7 +97,7 @@ Uzushio は 2 つの主実行クラスを持ちます。
 
 output に指定したディレクトリ以下に、抽出されたデータが各言語ごとに parquet 形式で出力されます。
 出力 parquet は ['docId', 'url', 'charset', 'text', 'date'] をカラムに持ちます（[WarcEntryParser.scala](../lib/src/main/scala/com/worksap/nlp/uzushio/lib/warc/WarcEntryParser.scala) の `CrawlContent` で定義）。
-"text" カラムのテキストデータは段落ごとに空行 ("\n\n") で区切られており、さらに各段落の前にその段落へのセレクタが "0xc1" で区切って記録されています。
+出力形式の詳細な情報についてはこちらの記事（[Uzushio: Text Extraction](https://qiita.com/eiennohito/items/35c640ced80372906c44)）も参照してください。
 
 #### example
 
@@ -130,7 +132,7 @@ Uzushio は sim hash を用いた重複検出を行います。
 - "stats"
   - 各段落の重複数を計算
 - reassemble & filtering
-  - 元テキストに段落単位で重複数情報を付与
+  - 元テキスト群と重複数情報を再構成
   - 別途定義したフィルターにより重複を削除
 
 [デフォルトのフィルタ定義](../lib/src/main/resources/pipeline/all_duplicate_paragraphs.conf) では全ての（類似）重複文書について一つを残して削除を行い、そのほかの処理は行いません。
@@ -147,14 +149,14 @@ Uzushio は sim hash を用いた重複検出を行います。
 - execution: 実行ステージのリスト (',' 区切り)
 - cache: 途中計算結果の指定
   - 途中保存した結果を利用する場合はここで指定します
-- text-only: セレクタを削除しテキストのみを出力する
+- text-only: セレクタ等を削除しテキストのみを出力する
 
 デフォルトでは上記３段階のうち前２つの計算結果はキャッシュからの読み込みを前提とします。
 それらの計算を実行する場合は execution にそれぞれ "reprHashes", "stats" を指定します。
 従って全ての段階を一から実行するには、`execution="reprHashes,stats"` を指定します。
 
 execution に "saveReprHashes", "saveStats", "saveReassembled" を指定することで処理をその段階で終了しその時点の結果を出力します。
-`cache` にこれにより計算結果を保存したディレクトリを指定することで計算結果を再利用します。
+前者二つについては、`cache` にこれにより計算結果を保存したディレクトリを指定することで計算結果を再利用できます。
 
 #### example
 
@@ -165,7 +167,7 @@ spark-submit \
     --class=com.worksap.nlp.uzushio.main.DeduplicateParagraphs \
     --master='local[*]' \
     ./core/target/scala-2.12/uzushio-assembly-0.1.0-SNAPSHOT.jar \
-    --input=output_extracted/language=ja/ \
+    --input=output_extracted/ \
     --output=output_dedup/ \
     --execution="reprHashes,stats" \
     --text-only
@@ -180,7 +182,7 @@ spark-submit \
     --class=com.worksap.nlp.uzushio.main.DeduplicateParagraphs \
     --master='local[*]' \
     ./core/target/scala-2.12/uzushio-assembly-0.1.0-SNAPSHOT.jar \
-    --input=output_extracted/language=ja/ \
+    --input=output_extracted/ \
     --output=output_hashes/ \
     --execution="reprHashes,saveReprHashes"
 ```
@@ -192,7 +194,7 @@ spark-submit \
     --class=com.worksap.nlp.uzushio.main.DeduplicateParagraphs \
     --master='local[*]' \
     ./core/target/scala-2.12/uzushio-assembly-0.1.0-SNAPSHOT.jar \
-    --input=output_extracted/language=ja/ \
+    --input=output_extracted/ \
     --cache=output_hashes/ \
     --output=output_stats/ \
     --execution="stats,saveStats"
@@ -205,9 +207,11 @@ spark-submit \
 
 "saveStats": ['hash', 'reprHash', 'exactFreq', 'nearFreq'] をカラムに持つ parquet を出力します。
 各ハッシュ値に対して完全一致および類似での重複数を計算したものです。
+下記の重複情報のマージを行う際の中間出力となります。
 
 "saveReassembled": ['docId', 'url', 'pos', 'text', 'exactFreq', 'nearFreq'] を key に持つ jsonl を出力します。
 入力文書の段落と重複数情報を文書が再構成できるように join したものです。
+デバッグ用の出力で、キャッシュとしての使用はできません。
 
 最終出力: ['docId', 'url', 'charset', 'date', 'text'] をカラムに持つ parquet を出力します。
 `ExtractTextFromWarc` での抽出結果にフィルターを適用した結果です。
@@ -292,7 +296,7 @@ spark-submit \
     --class=com.worksap.nlp.uzushio.main.DeduplicateParagraphs \
     --master='local[*]' \
     ./core/target/scala-2.12/uzushio-assembly-0.1.0-SNAPSHOT.jar \
-    --input=output_extracted/language=ja \
+    --input=output_extracted/ \
     --cache=output_stats/ \
     --output=output_filtered/ \
     --filters=sample_filters.conf \
