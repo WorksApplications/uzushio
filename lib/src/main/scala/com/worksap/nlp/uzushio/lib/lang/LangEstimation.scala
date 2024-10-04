@@ -30,6 +30,10 @@ class LangEstimation(private val minBytes: Int = 256) {
     var prevWhitespace = false
     while (input.hasRemaining && output.remaining() > 1) {
       val char = input.get()
+      // <asdf> </asdf> <!--- --->
+      //problem: inline javascript, inline html
+      // take character from the middle of document
+
       if ((char & 0xffff) >= 128) {
         if (prevWhitespace) {
           output.put(' ')
@@ -60,7 +64,10 @@ class LangEstimation(private val minBytes: Int = 256) {
         return None
       }
       decBuf.flip()
-      copyNonAscii(decBuf, buf)
+      // TODO: very short documents!
+      if (inputData.position() >= inputData.capacity() / 2) {
+        copyNonAscii(decBuf, buf)
+      }
       decBuf.clear()
     }
 
