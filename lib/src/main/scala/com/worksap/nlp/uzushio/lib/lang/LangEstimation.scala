@@ -28,6 +28,7 @@ class LangEstimation(private val minBytes: Int = 256) {
     */
   private def copyNonAscii(input: CharBuffer, output: CharBuffer): Unit = {
     var prevWhitespace = false
+    //
     while (input.hasRemaining && output.remaining() > 1) {
       val char = input.get()
       if ((char & 0xffff) >= 128) {
@@ -53,7 +54,7 @@ class LangEstimation(private val minBytes: Int = 256) {
     val decoder = charset.newDecoder().onUnmappableCharacter(CodingErrorAction.REPORT)
     decBuf.clear()
     buf.clear()
-
+    //
     while (inputData.remaining() > 0 && buf.remaining() > 0) {
       val result = decoder.decode(inputData, decBuf, true)
       if (result.isUnmappable || result.isError || result.isMalformed) {

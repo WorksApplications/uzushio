@@ -149,7 +149,7 @@ final case class DuplicateCandidateRow(
 }
 
 object DuplicateCandidateRow {
-  final val NGRAM_SIG_LEN = 128
+  final val NGRAM_SIG_LEN = 256 // for en, increase to > 128.
   final val BITS_IN_LONG = 64
   final val BIT_MASK = BITS_IN_LONG - 1
   final val BYTE_MASK = (NGRAM_SIG_LEN * BITS_IN_LONG - 1) ^ BIT_MASK
@@ -159,7 +159,7 @@ object DuplicateCandidateRow {
   /** size of JVM object/array header */
   final val HEADER_SIZE = 16
   final val MAX_MATCHING_LENGTH = 50
-  private val ngrams = new NgramHashExtractor(3, 4)
+  private val ngrams = new NgramHashExtractor(2, 5)// en n-grams, 2-5 can capture most of the cases
 }
 
 class CandidateRowProcessor(
@@ -964,8 +964,8 @@ object DeduplicateParagraphs {
       cache = cache.toOption,
       partitions = partitions(),
       simHashSize = 128,
-      minNgramSize = 2,
-      maxNgramSize = 4,
+      minNgramSize = 3, // for en, change to 3, ja is 2
+      maxNgramSize = 8, // for en, change to 8-9, ja is 4
       numShifts = numShifts(),
       propagatePartitions = propagatePartitions(),
       execution = execution(),
