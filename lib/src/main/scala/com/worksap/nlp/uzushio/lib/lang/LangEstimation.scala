@@ -26,10 +26,63 @@ class LangEstimation(private val minBytes: Int = 256) {
     * @param output
     *   output buffer
     */
+
+  private def cleanHtmlAndScripts(input: CharBuffer): CharBuffer = {
+    val output = CharBuffer.allocate(input.capacity())
+    var inTag = false
+    var inScript = false
+    var inStyle = false
+    var prevChar: Char = 0
+
+    while (input.hasRemaining) {
+      val char = input.get()
+
+      // Check for start of HTML tag
+      if (char == '<') {
+        prevChar = char
+        inTag = true
+        // Check for script or style tags
+        if (input.remaining() > 6) {
+          val nextTag = input.subSequence(input.position(), input.position() + 6).toString().toLowerCase()
+          if (nextTag.startsWith("script")) {
+            inScript = true
+          } else if (nextTag.startsWith("style")) {
+            inStyle = true
+          }
+        }
+      }
+
+      // Skip content inside <script> or <style> tags
+      if (inScript || inStyle) {
+        if (char == '>' && prevChar == '/') {
+          inScript = false
+          inStyle = false
+        }
+        prevChar = char
+        continue
+      }
+
+      // Skip HTML tags
+      if (inTag && char == '>') {
+        inTag = false
+        prevChar = char
+        continue
+      }
+
+      // If not in a tag, script or style, add to output
+      if (!inTag && !inScript && !inStyle) {
+        output.put(char)
+      }
+    }
+
+    output.flip() // Flip the output buffer to make it readable
+    output
+  }
+
   private def copyNonAscii(input: CharBuffer, output: CharBuffer): Unit = {
     var prevWhitespace = false
     //
-    while (input.hasRemaining && output.remaining() > 1) {
+    /*while (input.hasRemaining && output.remaining() > 1) {
       val char = input.get()
       if ((char & 0xffff) >= 128) {
         if (prevWhitespace) {
@@ -40,6 +93,13 @@ class LangEstimation(private val minBytes: Int = 256) {
       } else {
         prevWhitespace = true
       }
+    }*/
+    val cleaned = cleanHtmlAndScripts(input)
+    // copy cleaned buffer to output
+    while (cleaned.hasRemaining && output.remaining() > 1) {
+      val char = cleaned.get()
+      //copy all characters
+      output.put(char)
     }
   }
 
