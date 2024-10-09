@@ -59,14 +59,13 @@ class LangEstimation(private val minBytes: Int = 256) {
           inStyle = false
         }
         prevChar = char
-        continue
+        
       }
 
       // Skip HTML tags
       if (inTag && char == '>') {
         inTag = false
         prevChar = char
-        continue
       }
 
       // If not in a tag, script or style, add to output
