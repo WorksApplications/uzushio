@@ -2,9 +2,9 @@ package com.worksap.nlp.uzushio.lib.lang
 
 import com.optimaize.langdetect.LanguageDetectorBuilder
 import com.optimaize.langdetect.ngram.NgramExtractor
-
 import java.nio.charset.{Charset, CodingErrorAction}
 import java.nio.{ByteBuffer, CharBuffer}
+import scala.util.matching.Regex
 
 sealed trait EstimationResult {
   def str: String = "unk"
@@ -20,17 +20,54 @@ class LangEstimation(private val minBytes: Int = 256) {
   private val decodeBuffer = CharBuffer.allocate(4 * 1024)
   private def langDetector = LangEstimation.cachedDetector
 
-  /** Copy non-ASCII characters into detection buffer
+  /** Remove HTML tags and inline JavaScript from the input.
     * @param input
-    *   input buffer
-    * @param output
-    *   output buffer
+    *   input buffer as a string
+    * @return
+    *   cleaned string with HTML and JavaScript removed
     */
-  private def copyNonAscii(input: CharBuffer, output: CharBuffer): Unit = {
-    var prevWhitespace = false
-    while (input.hasRemaining && output.remaining() > 1) {
-      output.put(input.get())
+  private def cleanHtmlContent(input: String): String = {
+    // Use regex to remove HTML tags and content inside <script> tags
+    val htmlTagPattern: Regex = """<[^>]+>""".r
+    val scriptPattern: Regex = """(?s)<script.*?>.*?</script>""".r
+
+    // First, remove the <script> block
+    val noScriptContent = scriptPattern.replaceAllIn(input, "")
+    // Then, remove all HTML tags
+    val cleaned = htmlTagPattern.replaceAllIn(noScriptContent, "")
+    println(s"Cleaned content: $cleaned") // Print the cleaned content
+    cleaned
+  }
+
+  /** Copy meaningful content into detection buffer, removing HTML, JavaScript, and retaining text.
+    * Retains both ASCII and non-ASCII characters, focusing on meaningful language content.
+    *
+    * @param input
+    *   input CharBuffer
+    * @param output
+    *   output CharBuffer
+    */
+  private def copyMeaningfulContent(input: CharBuffer, output: CharBuffer): Unit = {
+    // Convert the input to a string
+    val content = input.toString
+
+    // Use regex to remove HTML tags and JavaScript
+    val cleanedContent = cleanHtmlContent(content)
+
+    // Filter and clean the remaining text, retaining letters, digits, whitespace, and non-ASCII characters
+    val meaningfulContent = cleanedContent.flatMap { char =>
+      if (char.isLetterOrDigit || char.isWhitespace || char >= 128) {
+        Some(char)
+      } else {
+        None
+      }
     }
+
+    // Put the cleaned content into the output buffer
+    val result = meaningfulContent.mkString.trim
+    println(s"Meaningful content: $result") // Print the meaningful content
+    // Copy meaningful content to the output buffer
+    output.put(result)
   }
 
   private def prepareBuffer(
@@ -44,13 +81,14 @@ class LangEstimation(private val minBytes: Int = 256) {
     val decoder = charset.newDecoder().onUnmappableCharacter(CodingErrorAction.REPORT)
     decBuf.clear()
     buf.clear()
+
     while (inputData.remaining() > 0 && buf.remaining() > 0) {
       val result = decoder.decode(inputData, decBuf, true)
       if (result.isUnmappable || result.isError || result.isMalformed) {
         return None
       }
       decBuf.flip()
-      copyNonAscii(decBuf, buf)
+      copyMeaningfulContent(decBuf, buf)
       decBuf.clear()
     }
 
@@ -58,18 +96,18 @@ class LangEstimation(private val minBytes: Int = 256) {
     Some(buf.limit())
   }
 
-  /** Estimate language by taking at most 5k characters from first 20kb of text. This detector
-    * ignores all ASCII characters, so languages which use such scripts are not detectable. Returns
-    * [[BadEncoding]] if there exist non-mappable characters using the passed encoding.
+  /** Estimate the language by taking at most 5k characters from the first 20kb of text.
+    * Retains both ASCII and non-ASCII characters, but removes HTML and JavaScript tags.
+    * Returns [[BadEncoding]] if there are unmappable characters using the provided encoding.
     *
     * @param data
-    *   text to detect language from
+    *   the text to detect language from
     * @param offset
-    *   offset from the array start
+    *   the offset from the start of the array
     * @param charset
-    *   charset to use for converting byte stream to characters
+    *   the charset to use for converting byte stream to characters
     * @return
-    *   child classes of [[EstimationResult]]
+    *   a subclass of [[EstimationResult]]
     */
   def estimateLang(
       data: Array[Byte],
@@ -77,16 +115,21 @@ class LangEstimation(private val minBytes: Int = 256) {
       charset: Charset
   ): EstimationResult = {
     val bufferStatus = prepareBuffer(data, offset, charset)
+    val internalBufferString = internalBuffer.toString
+    println(s"internalBuffer: $internalBufferString") // Print the content of the internal buffer
     if (bufferStatus.isEmpty) {
       return BadEncoding
     }
     val ncopied = bufferStatus.get
+    println(s"Copied characters: $ncopied") // Print the number of copied characters
     if (ncopied > minBytes) {
       val language = langDetector.detect(internalBuffer)
+      println(s"Detected language: ${language}") // Print the detected language
       if (!language.isPresent) {
         EstimationFailure
       } else {
         val code = language.get().getLanguage
+        println(s"Detected language code: $code") // Print the detected language code
         ProbableLanguage(code)
       }
     } else {
