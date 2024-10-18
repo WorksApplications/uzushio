@@ -34,21 +34,22 @@ class LangEstimation(private val minBytes: Int = 256) {
     val htmlTagPattern = Pattern.compile("<[^>]+>")
 
     
-    // 1. 从前 50% 开始处理
+    // Process from 50% ~
     val startPos = input.length / 2
     var cleanedContent = input.substring(startPos)
 
-    // First, remove the <script> block
+    // First, remove the <script> and etc block
     cleanedContent = removePattern(cleanedContent, scriptPattern)
     cleanedContent = removePattern(cleanedContent, stylePattern)
     cleanedContent = removePattern(cleanedContent, commentPattern)
 
-    // 3. 去除 HTML 标签
+    // remove html tags
     cleanedContent = removePattern(cleanedContent, htmlTagPattern)
 
-    println(s"Cleaned content: ${cleanedContent.take(100)}...") // 打印部分清理后的内容
+    println(s"Cleaned content: ${cleanedContent.take(100)}...") // debug print
     cleanedContent
   }
+  
   /** Helper function to remove pattern from string using JVM's regex */
   private def removePattern(input: String, pattern: Pattern): String = {
     val matcher: Matcher = pattern.matcher(input)
