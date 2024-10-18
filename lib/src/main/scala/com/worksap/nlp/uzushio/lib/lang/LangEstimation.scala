@@ -4,7 +4,7 @@ import com.optimaize.langdetect.LanguageDetectorBuilder
 import com.optimaize.langdetect.ngram.NgramExtractor
 import java.nio.charset.{Charset, CodingErrorAction}
 import java.nio.{ByteBuffer, CharBuffer}
-import scala.util.matching.Regex
+import java.util.regex.{Matcher, Pattern}
 
 sealed trait EstimationResult {
   def str: String = "unk"
@@ -28,15 +28,31 @@ class LangEstimation(private val minBytes: Int = 256) {
     */
   private def cleanHtmlContent(input: String): String = {
     // Use regex to remove HTML tags and content inside <script> tags
-    val htmlTagPattern: Regex = """<[^>]+>""".r
-    val scriptPattern: Regex = """(?s)<script.*?>.*?</script>""".r
+    val scriptPattern = Pattern.compile("(?s)<script.*?>.*?</script>")
+    val stylePattern = Pattern.compile("(?s)<style.*?>.*?</style>")
+    val commentPattern = Pattern.compile("(?s)<!--.*?-->")
+    val htmlTagPattern = Pattern.compile("<[^>]+>")
+
+    
+    // 1. 从前 50% 开始处理
+    val startPos = input.length / 2
+    var cleanedContent = input.substring(startPos)
 
     // First, remove the <script> block
-    val noScriptContent = scriptPattern.replaceAllIn(input, "")
-    // Then, remove all HTML tags
-    val cleaned = htmlTagPattern.replaceAllIn(noScriptContent, "")
-    println(s"Cleaned content: $cleaned") // Print the cleaned content
-    cleaned
+    cleanedContent = removePattern(cleanedContent, scriptPattern)
+    cleanedContent = removePattern(cleanedContent, stylePattern)
+    cleanedContent = removePattern(cleanedContent, commentPattern)
+
+    // 3. 去除 HTML 标签
+    cleanedContent = removePattern(cleanedContent, htmlTagPattern)
+
+    println(s"Cleaned content: ${cleanedContent.take(100)}...") // 打印部分清理后的内容
+    cleanedContent
+  }
+  /** Helper function to remove pattern from string using JVM's regex */
+  private def removePattern(input: String, pattern: Pattern): String = {
+    val matcher: Matcher = pattern.matcher(input)
+    matcher.replaceAll("")
   }
 
   /** Copy meaningful content into detection buffer, removing HTML, JavaScript, and retaining text.
