@@ -92,7 +92,7 @@ object MergeDedupStats {
         explode($"tgtAll").as("srcHash"),
         $"tgtMin".as("tgtHash")
       )
-    ).where($"srcHash" =!= $"tgtHash").distinct().persist()
+    ).where($"srcHash" =!= $"tgtHash").distinct().localCheckpoint(eager = true)
 
     // Step 2b: collect all repr hash candidates to consider for updating
     // find all repr hashes which have distinct hashes
@@ -108,10 +108,10 @@ object MergeDedupStats {
       df.join(nonUnique, "hash").select($"reprHash".as("initReprHash"))
     }
 
-    val seedGroups = seedGroupsA.union(seedGroupsB).distinct().select(
+    val seedGroups = seedGroupsA.union(seedGroupsB).distinct().localCheckpoint(eager = true).select(
       $"initReprHash",
       $"initReprHash".as("newReprHash")
-    ).persist()
+    )
 
     // compute the correct remaps themselves iteratively
     // this will have false positives, but hopefully not much
