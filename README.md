@@ -26,7 +26,7 @@ You need to install Apache Spark, sbt, and Sudachi dictionary file.
 Download it from the [official page](https://spark.apache.org/downloads.html). 
 You can put it in PATH or use absolute paths for Spark startup scripts to launch Uzushio. 
 
-At the moment uzushio is built against: `spark 3.4.1` + `Scala 2.12.*`.
+At the moment uzushio is built against: `spark 3.5.3` + `Scala 2.12.*`.
 
 Check if `spark-submit --version` works.
 
