@@ -102,12 +102,10 @@ object MergeDedupStats {
 
     // find all reprs if hash has several of them in the merged dataset
     val seedGroupsB = {
-      val nonUnique = df.groupBy("hash")
-        .agg(countDistinct("reprHash").as("count"))
+      val nonUnique = df.groupBy("hash").agg(countDistinct("reprHash").as("count"))
         .where($"count" > 1)
 
-      df.join(nonUnique, "hash")
-        .select($"reprHash".as("initReprHash"))
+      df.join(nonUnique, "hash").select($"reprHash".as("initReprHash"))
     }
 
     val seedGroups = seedGroupsA.union(seedGroupsB).distinct().select(

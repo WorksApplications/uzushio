@@ -1,11 +1,20 @@
 package com.worksap.nlp.uzushio.lib.warc
 
 import com.worksap.nlp.uzushio.lib.html.{AllTagMapper, ParagraphExtractor, ParseAbortException}
-import com.worksap.nlp.uzushio.lib.lang.{EstimationFailure, LangEstimation, LangTagSniffer, ProbableLanguage}
+import com.worksap.nlp.uzushio.lib.lang.{
+  EstimationFailure,
+  LangEstimation,
+  LangTagSniffer,
+  ProbableLanguage
+}
 import com.worksap.nlp.uzushio.lib.warc.WarcEntryParser.{logger, resolveEarliestDate}
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap
 import org.apache.commons.lang3.StringUtils
-import org.apache.hc.core5.http.impl.nio.{DefaultHttpResponseFactory, DefaultHttpResponseParser, SessionBufferAccess}
+import org.apache.hc.core5.http.impl.nio.{
+  DefaultHttpResponseFactory,
+  DefaultHttpResponseParser,
+  SessionBufferAccess
+}
 import org.apache.hc.core5.http.{HttpException, HttpMessage, MessageHeaders}
 import org.apache.tika.detect.EncodingDetector
 import org.apache.tika.exception.TikaException
@@ -17,7 +26,12 @@ import org.mozilla.universalchardet.UniversalDetector
 import org.slf4j.LoggerFactory
 
 import java.io.{ByteArrayInputStream, IOException, InputStream}
-import java.nio.charset.{Charset, IllegalCharsetNameException, StandardCharsets, UnsupportedCharsetException}
+import java.nio.charset.{
+  Charset,
+  IllegalCharsetNameException,
+  StandardCharsets,
+  UnsupportedCharsetException
+}
 import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.util
