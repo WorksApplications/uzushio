@@ -19,9 +19,9 @@ object Build {
     publishTo := None
   )
   val V = new {
-    val scala212 = "2.12.18"
-    val scala3 = "3.3.1"
-    val spark = "3.4.1"
+    val scala212 = "2.12.20"
+    val scala3 = "3.3.4"
+    val spark = "3.5.4"
   }
   val lintSettings = Def.settings {
     scalacOptions ++= (

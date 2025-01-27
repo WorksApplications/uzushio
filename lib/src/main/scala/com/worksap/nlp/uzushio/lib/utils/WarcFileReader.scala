@@ -19,10 +19,11 @@ class WarcFileReader(conf: Configuration, filePath: Path) {
   private val fileSize = fs.getFileStatus(filePath).getLen
   private val fsin = {
     val rawStream = fs.open(filePath)
-    val wrapped = if (rawStream.markSupported()) {
-      rawStream
-    } else new BufferedInputStream(rawStream)
-    //noinspection UnstableApiUsage
+    val wrapped =
+      if (rawStream.markSupported()) {
+        rawStream
+      } else new BufferedInputStream(rawStream)
+    // noinspection UnstableApiUsage
     new CountingInputStream(wrapped)
   }
   private val reader = WARCReaderFactory.get(filePath.getName, fsin, true)

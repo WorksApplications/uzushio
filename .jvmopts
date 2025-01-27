@@ -1,1 +1,2 @@
 -Xmx2G
+--add-exports=java.base/sun.nio.ch=ALL-UNNAMED
