@@ -55,7 +55,7 @@ and dump-wise filtering.
 ```mermaid
 graph LR
     subgraph "Year 2022 (freq computation)"
-        D22_1[Dump 2022-01] --> Freq22[Freq computation 20 22]
+        D22_1[Dump 2022-01] --> Freq22[Freq computation 2022]
         D22_2[Dump 2022-02] --> Freq22
         D22_3[...] --> Freq22
         Freq22 --> Stats22[Stats 2022]
