@@ -177,7 +177,7 @@ but near-duplicates (minor edits, whitespace changes, small variations).
 
 Uzushio uses hashing heavily. There are four distinct types:
 
-- **Paragraph hash**: 64-bit hash of the paragraph text.
+- **Paragraph hash**: 64-bit xxhash64 of the paragraph text.
   Used as the paragraph's identity and as join keys in frequency lookups.
   Exact duplicates share the same paragraph hash.
 - **Group hash**: tracks near-duplicate group membership.
@@ -213,8 +213,7 @@ Sorting by signature puts similar paragraphs near each other —
 not perfectly, but enough that a fixed-size sliding window catches most near-duplicates.
 
 After sorting (O(n log n)), the window scan is O(n * w^2)
-where w is the window size. This is linear in corpus size, quadratic in window size.
-
+where w is the window size. 
 This avoids the bucket-based grouping that LSH typically requires,
 which would reintroduce skew.
 
